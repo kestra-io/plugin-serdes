@@ -23,7 +23,7 @@ repositories {
 }
 
 sourceCompatibility = 11
-group "io.kestra.task.templates"
+group "org.kestra.task.serdes"
 
 tasks.withType(JavaCompile){
     options.encoding = "UTF-8"
@@ -53,8 +53,9 @@ dependencies {
     // kestra
     implementation group: "org.kestra", name: "core", version: kestraVersion
 
-    // libs
-    // use "libs" to include all your needed dependencies in final jar
+    libs group: "org.apache.avro", name: "avro", version: "1.9.0"
+    libs 'de.siegmar:fastcsv:1.0.3'
+    libs 'io.reactivex.rxjava2:rxjava:2.2.16'
     libs group: 'org.apache.commons', name: 'commons-lang3', version: '3.9'
 
     configurations.implementation.extendsFrom(configurations.libs)
@@ -78,15 +79,17 @@ testlogger {
 }
 
 dependencies {
-    // test deps needed only for ExampleRunnerTest
     testImplementation group: "org.kestra", name: "repository-memory", version: kestraVersion
     testImplementation group: "org.kestra", name: "runner-memory", version: kestraVersion
     testImplementation group: "org.kestra", name: "storage-local", version: kestraVersion
 
-    // test
     testImplementation "org.junit.jupiter:junit-jupiter-engine:5.5.2"
     testImplementation "org.hamcrest:hamcrest:2.2"
     testImplementation "org.hamcrest:hamcrest-library:2.2"
+
+    testImplementation "org.junit.jupiter:junit-jupiter-params:5.5.2"
+
+    testImplementation group: 'com.devskiller.friendly-id', name: 'friendly-id', version: '1.1.0'
 }
 
 /**********************************************************************************************************************\
