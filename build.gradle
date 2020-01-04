@@ -33,6 +33,7 @@ tasks.withType(JavaCompile){
 configurations {
     libs
 }
+configurations.implementation.extendsFrom(configurations.libs)
 
 dependencies {
     // micronaut
@@ -56,9 +57,6 @@ dependencies {
     libs group: "org.apache.avro", name: "avro", version: "1.9.0"
     libs 'de.siegmar:fastcsv:1.0.3'
     libs 'io.reactivex.rxjava2:rxjava:2.2.16'
-    libs group: 'org.apache.commons', name: 'commons-lang3', version: '3.9'
-
-    configurations.implementation.extendsFrom(configurations.libs)
 }
 
 
