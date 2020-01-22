@@ -10,6 +10,7 @@ import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
@@ -76,6 +77,7 @@ public class CsvReader extends Task implements RunnableTask {
         // metrics & finalize
         Single<Long> count = flowable.count();
         Long lineCount = count.blockingGet();
+        runContext.metric(Counter.of("records", lineCount));
 
         return RunOutput.builder()
             .outputs(ImmutableMap.of("uri", runContext.putFile(tempFile).getUri()))

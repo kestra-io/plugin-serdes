@@ -17,6 +17,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
+import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
@@ -69,7 +70,7 @@ public class AvroWriter extends Task implements RunnableTask {
 
         // avro writer
         Schema.Parser parser = new Schema.Parser();
-        Schema schema = parser.parse(this.schema);
+        Schema schema = parser.parse(runContext.render(this.schema));
 
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
         DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
@@ -108,6 +109,7 @@ public class AvroWriter extends Task implements RunnableTask {
         // metrics & finalize
         Single<Long> count = flowable.count();
         Long lineCount = count.blockingGet();
+        runContext.metric(Counter.of("records", lineCount));
 
         return RunOutput.builder()
             .outputs(ImmutableMap.of("uri", runContext.putFile(tempFile).getUri()))

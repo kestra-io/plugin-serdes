@@ -8,6 +8,7 @@ import org.kestra.core.runners.RunContext;
 import org.kestra.core.runners.RunOutput;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.storages.StorageObject;
+import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
 import org.junit.jupiter.api.Test;
 
@@ -37,19 +38,23 @@ class CsvReaderWriterTest {
         StorageObject source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         CsvReader reader = CsvReader.builder()
+            .id(CsvReaderWriterTest.class.getSimpleName())
+            .type(CsvReader.class.getName())
             .from(source.getUri().toString())
             .fieldSeparator(";".charAt(0))
             .header(header)
             .build();
-        RunOutput readerRunOutput = reader.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        RunOutput readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
 
         CsvWriter writer = CsvWriter.builder()
+            .id(CsvReaderWriterTest.class.getSimpleName())
+            .type(CsvWriter.class.getName())
             .from(readerRunOutput.getOutputs().get("uri").toString())
             .fieldSeparator(";".charAt(0))
             .alwaysDelimitText(true)
             .header(header)
             .build();
-        RunOutput writerRunOutput = writer.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        RunOutput writerRunOutput = writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
 
         assertThat(
             CharStreams.toString(new InputStreamReader(storageInterface.get((URI) writerRunOutput.getOutputs().get("uri")))),

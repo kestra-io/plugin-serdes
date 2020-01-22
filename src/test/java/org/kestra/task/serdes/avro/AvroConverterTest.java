@@ -13,14 +13,15 @@ import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
+import org.junit.jupiter.api.Test;
 import org.kestra.core.runners.RunContext;
 import org.kestra.core.runners.RunOutput;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.storages.StorageObject;
+import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
 import org.kestra.task.serdes.csv.CsvReader;
 import org.kestra.task.serdes.json.JsonReader;
-import org.junit.jupiter.api.Test;
 
 import javax.inject.Inject;
 import java.io.*;
@@ -52,20 +53,24 @@ public class AvroConverterTest {
         StorageObject csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         CsvReader reader = CsvReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(CsvReader.class.getName())
             .from(csv.getUri().toString())
             .fieldSeparator(",".charAt(0))
             .header(true)
             .build();
-        RunOutput readerRunOutput = reader.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        RunOutput readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
 
         AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
             .from(readerRunOutput.getOutputs().get("uri").toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
             .build();
 
-        RunOutput avroRunOutput = task.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        RunOutput avroRunOutput = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
 
         assertThat(
             AvroWriterTest.avroSize(this.storageInterface.get((URI) avroRunOutput.getOutputs().get("uri"))),
@@ -85,18 +90,22 @@ public class AvroConverterTest {
         StorageObject csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         JsonReader reader = JsonReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(JsonReader.class.getName())
             .from(csv.getUri().toString())
             .build();
-        RunOutput readerRunOutput = reader.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        RunOutput readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
 
         AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
             .from(readerRunOutput.getOutputs().get("uri").toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
             .build();
 
-        RunOutput avroRunOutput = task.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        RunOutput avroRunOutput = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
 
         assertThat(
             AvroWriterTest.avroSize(this.storageInterface.get((URI) avroRunOutput.getOutputs().get("uri"))),

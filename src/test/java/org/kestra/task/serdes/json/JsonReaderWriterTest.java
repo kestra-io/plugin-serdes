@@ -4,12 +4,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
+import org.junit.jupiter.api.Test;
 import org.kestra.core.runners.RunContext;
 import org.kestra.core.runners.RunOutput;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.storages.StorageObject;
+import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
-import org.junit.jupiter.api.Test;
+import org.kestra.task.serdes.avro.AvroWriter;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -42,9 +44,11 @@ class JsonReaderWriterTest {
         RunOutput readerRunOutput = reader.run(new RunContext(this.applicationContext, ImmutableMap.of()));
 
         JsonWriter writer = JsonWriter.builder()
+            .id(JsonWriter.class.getSimpleName())
+            .type(AvroWriter.class.getName())
             .from(readerRunOutput.getOutputs().get("uri").toString())
             .build();
-        RunOutput writerRunOutput = writer.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        RunOutput writerRunOutput = writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
 
         assertThat(
             CharStreams.toString(new InputStreamReader(storageInterface.get((URI) writerRunOutput.getOutputs().get("uri")))),
