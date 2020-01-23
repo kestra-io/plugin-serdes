@@ -7,10 +7,7 @@ import io.reactivex.Flowable;
 import io.reactivex.FlowableOnSubscribe;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
@@ -21,6 +18,7 @@ import org.kestra.core.serializers.ObjectsSerde;
 import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @ToString
@@ -31,11 +29,14 @@ public class JsonReader extends Task implements RunnableTask {
     @NotNull
     private String from;
 
+    @Builder.Default
+    private String charset = StandardCharsets.UTF_8.name();
+
     @Override
     public RunOutput run(RunContext runContext) throws Exception {
         // reader
         URI from = new URI(runContext.render(this.from));
-        BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
+        BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
 
         // temp file
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".javas");

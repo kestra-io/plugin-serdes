@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.ObjectInputStream;
 import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @ToString
@@ -46,13 +48,16 @@ public class JsonWriter extends Task implements RunnableTask {
     @Builder.Default
     private Boolean alwaysDelimitText = false;
 
+    @Builder.Default
+    private String charset = StandardCharsets.UTF_8.name();
+
     @Override
     public RunOutput run(RunContext runContext) throws Exception {
         // temp file
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".jsonl");
 
         // writer
-        BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile));
+        BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
         ObjectMapper mapper = new ObjectMapper();
 
         // reader

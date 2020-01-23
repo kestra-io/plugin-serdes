@@ -21,6 +21,7 @@ import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.ObjectInputStream;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,9 @@ public class CsvWriter extends Task implements RunnableTask {
     @Builder.Default
     private Boolean alwaysDelimitText = false;
 
+    @Builder.Default
+    private String charset = StandardCharsets.UTF_8.name();
+
     @Override
     public RunOutput run(RunContext runContext) throws Exception {
         // temp file
@@ -56,7 +60,7 @@ public class CsvWriter extends Task implements RunnableTask {
 
         // writer
         de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter();
-        CsvAppender csvAppender = csvWriter.append(tempFile, StandardCharsets.UTF_8);
+        CsvAppender csvAppender = csvWriter.append(tempFile, Charset.forName(this.charset));
 
         // reader
         URI from = new URI(runContext.render(this.from));

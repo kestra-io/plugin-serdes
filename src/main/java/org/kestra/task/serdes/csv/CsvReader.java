@@ -1,4 +1,4 @@
-    package org.kestra.task.serdes.csv;
+package org.kestra.task.serdes.csv;
 
 import com.google.common.collect.ImmutableMap;
 import de.siegmar.fastcsv.reader.CsvParser;
@@ -23,7 +23,8 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 import java.net.URI;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @SuperBuilder
 @ToString
@@ -46,20 +47,36 @@ public class CsvReader extends Task implements RunnableTask {
     @Builder.Default
     private Boolean skipEmptyRows = false;
 
+    @Builder.Default
+    private Integer skipRows = 0;
+
+    @Builder.Default
+    private String charset = StandardCharsets.UTF_8.name();
+
     @Override
     public RunOutput run(RunContext runContext) throws Exception {
         // reader
         URI from = new URI(runContext.render(this.from));
         de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader();
-        CsvParser csvParser = csvReader.parse(new InputStreamReader(runContext.uriToInputStream(from)));
+        CsvParser csvParser = csvReader.parse(new InputStreamReader(runContext.uriToInputStream(from), charset));
 
         // temp file
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".javas");
         ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile));
 
+        AtomicInteger skipped = new AtomicInteger();
+
         // convert
         Flowable<Object> flowable = Flowable
             .create(this.nextRow(csvParser), BackpressureStrategy.BUFFER)
+            .filter(csvRow -> {
+                if (this.skipRows > 0 && skipped.get() < this.skipRows) {
+                    skipped.incrementAndGet();
+                    return false;
+                }
+
+                return true;
+            })
             .map(r -> {
                 if (header) {
                     return r.getFieldMap();
