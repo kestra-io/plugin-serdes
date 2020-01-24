@@ -1,15 +1,11 @@
 package org.kestra.task.serdes.avro;
 
-import com.google.common.collect.ImmutableMap;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
@@ -21,9 +17,7 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.runners.RunOutput;
 import org.kestra.core.serializers.ObjectsSerde;
-import org.slf4j.Logger;
 
 import javax.validation.constraints.NotNull;
 import java.io.BufferedOutputStream;
@@ -41,7 +35,7 @@ import java.util.stream.Collectors;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public class AvroWriter extends Task implements RunnableTask {
+public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> {
     @NotNull
     private String from;
 
@@ -61,9 +55,7 @@ public class AvroWriter extends Task implements RunnableTask {
     private String datetimeFormat;
 
     @Override
-    public RunOutput run(RunContext runContext) throws Exception {
-        Logger logger = runContext.logger(this.getClass());
-
+    public Output run(RunContext runContext) throws Exception {
         // temp file
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".avro");
         BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
@@ -111,9 +103,16 @@ public class AvroWriter extends Task implements RunnableTask {
         Long lineCount = count.blockingGet();
         runContext.metric(Counter.of("records", lineCount));
 
-        return RunOutput.builder()
-            .outputs(ImmutableMap.of("uri", runContext.putFile(tempFile).getUri()))
+        return Output
+            .builder()
+            .uri(runContext.putFile(tempFile).getUri())
             .build();
+    }
+
+    @Builder
+    @Getter
+    public static class Output implements org.kestra.core.models.tasks.Output {
+        private URI uri;
     }
 
     @SuppressWarnings("unchecked")

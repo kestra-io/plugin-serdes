@@ -6,7 +6,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.runners.RunOutput;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.storages.StorageObject;
 import org.kestra.core.utils.TestsUtils;
@@ -17,7 +16,6 @@ import javax.inject.Inject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
-import java.net.URI;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -41,17 +39,17 @@ class JsonReaderWriterTest {
         JsonReader reader = JsonReader.builder()
             .from(source.getUri().toString())
             .build();
-        RunOutput readerRunOutput = reader.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        JsonReader.Output readerRunOutput = reader.run(new RunContext(this.applicationContext, ImmutableMap.of()));
 
         JsonWriter writer = JsonWriter.builder()
             .id(JsonWriter.class.getSimpleName())
             .type(AvroWriter.class.getName())
-            .from(readerRunOutput.getOutputs().get("uri").toString())
+            .from(readerRunOutput.getUri().toString())
             .build();
-        RunOutput writerRunOutput = writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
+        JsonWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
 
         assertThat(
-            CharStreams.toString(new InputStreamReader(storageInterface.get((URI) writerRunOutput.getOutputs().get("uri")))),
+            CharStreams.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
             is(CharStreams.toString(new InputStreamReader(new FileInputStream(sourceFile))))
         );
     }

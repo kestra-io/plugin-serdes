@@ -5,25 +5,21 @@ import com.google.common.io.CharStreams;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.apache.commons.lang3.ArrayUtils;
-import org.kestra.core.models.executions.AbstractMetricEntry;
+import org.junit.jupiter.api.Test;
 import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.runners.RunOutput;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.storages.StorageObject;
 import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
-import org.junit.jupiter.api.Test;
 
 import javax.inject.Inject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
-import java.net.URI;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @MicronautTest
 class CsvReaderWriterTest {
@@ -47,21 +43,21 @@ class CsvReaderWriterTest {
             .fieldSeparator(";".charAt(0))
             .header(header)
             .build();
-        RunOutput readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
 
         CsvWriter writer = CsvWriter.builder()
             .id(CsvReaderWriterTest.class.getSimpleName())
             .type(CsvWriter.class.getName())
-            .from(readerRunOutput.getOutputs().get("uri").toString())
+            .from(readerRunOutput.getUri().toString())
             .fieldSeparator(";".charAt(0))
             .alwaysDelimitText(true)
             .lineDelimiter(ArrayUtils.toObject((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n").toCharArray()))
             .header(header)
             .build();
-        RunOutput writerRunOutput = writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
+        CsvWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
 
         assertThat(
-            CharStreams.toString(new InputStreamReader(storageInterface.get((URI) writerRunOutput.getOutputs().get("uri")))),
+            CharStreams.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
             is(CharStreams.toString(new InputStreamReader(new FileInputStream(sourceFile))))
         );
     }
@@ -91,7 +87,7 @@ class CsvReaderWriterTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of());
-        RunOutput readerRunOutput = reader.run(runContext);
+        reader.run(runContext);
 
         Counter records = (Counter) runContext.metrics()
             .stream()

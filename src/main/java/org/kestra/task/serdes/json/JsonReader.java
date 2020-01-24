@@ -1,7 +1,6 @@
 package org.kestra.task.serdes.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableOnSubscribe;
@@ -12,7 +11,6 @@ import lombok.experimental.SuperBuilder;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.runners.RunOutput;
 import org.kestra.core.serializers.ObjectsSerde;
 
 import javax.validation.constraints.NotNull;
@@ -25,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public class JsonReader extends Task implements RunnableTask {
+public class JsonReader extends Task implements RunnableTask<JsonReader.Output> {
     @NotNull
     private String from;
 
@@ -33,7 +31,7 @@ public class JsonReader extends Task implements RunnableTask {
     private String charset = StandardCharsets.UTF_8.name();
 
     @Override
-    public RunOutput run(RunContext runContext) throws Exception {
+    public Output run(RunContext runContext) throws Exception {
         // reader
         URI from = new URI(runContext.render(this.from));
         BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
@@ -56,9 +54,16 @@ public class JsonReader extends Task implements RunnableTask {
         Single<Long> count = flowable.count();
         Long lineCount = count.blockingGet();
 
-        return RunOutput.builder()
-            .outputs(ImmutableMap.of("uri", runContext.putFile(tempFile).getUri()))
+        return Output
+            .builder()
+            .uri(runContext.putFile(tempFile).getUri())
             .build();
+    }
+
+    @Builder
+    @Getter
+    public static class Output implements org.kestra.core.models.tasks.Output {
+        private URI uri;
     }
 
     private FlowableOnSubscribe<Object> nextRow(BufferedReader inputStream) {

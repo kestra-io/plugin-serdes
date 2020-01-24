@@ -11,7 +11,6 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.junit.jupiter.api.Test;
-import org.kestra.core.runners.RunOutput;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.storages.StorageObject;
 import org.kestra.core.utils.TestsUtils;
@@ -66,10 +65,10 @@ class AvroWriterTest {
             )
             .build();
 
-        RunOutput run = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
+        AvroWriter.Output run = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get((URI) run.getOutputs().get("uri"))),
+            AvroWriterTest.avroSize(this.storageInterface.get(run.getUri())),
             is(AvroWriterTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
                     .getResource("csv/insurance_sample.avro"))

@@ -14,8 +14,6 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
 import org.junit.jupiter.api.Test;
-import org.kestra.core.runners.RunContext;
-import org.kestra.core.runners.RunOutput;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.storages.StorageObject;
 import org.kestra.core.utils.TestsUtils;
@@ -25,7 +23,6 @@ import org.kestra.task.serdes.json.JsonReader;
 
 import javax.inject.Inject;
 import java.io.*;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -59,21 +56,21 @@ public class AvroConverterTest {
             .fieldSeparator(",".charAt(0))
             .header(true)
             .build();
-        RunOutput readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
 
         AvroWriter task = AvroWriter.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(AvroWriter.class.getName())
-            .from(readerRunOutput.getOutputs().get("uri").toString())
+            .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
             .build();
 
-        RunOutput avroRunOutput = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
+        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get((URI) avroRunOutput.getOutputs().get("uri"))),
+            AvroWriterTest.avroSize(this.storageInterface.get(avroRunOutput.getUri())),
             is(AvroWriterTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
                     .getResource("csv/full.avro"))
@@ -94,21 +91,21 @@ public class AvroConverterTest {
             .type(JsonReader.class.getName())
             .from(csv.getUri().toString())
             .build();
-        RunOutput readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
+        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
 
         AvroWriter task = AvroWriter.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(AvroWriter.class.getName())
-            .from(readerRunOutput.getOutputs().get("uri").toString())
+            .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
             .build();
 
-        RunOutput avroRunOutput = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
+        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get((URI) avroRunOutput.getOutputs().get("uri"))),
+            AvroWriterTest.avroSize(this.storageInterface.get(avroRunOutput.getUri())),
             is(AvroWriterTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
                     .getResource("csv/full.avro"))

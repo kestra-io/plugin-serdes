@@ -1,6 +1,5 @@
 package org.kestra.task.serdes.csv;
 
-import com.google.common.collect.ImmutableMap;
 import de.siegmar.fastcsv.reader.CsvParser;
 import de.siegmar.fastcsv.reader.CsvRow;
 import io.reactivex.BackpressureStrategy;
@@ -14,7 +13,6 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.runners.RunOutput;
 import org.kestra.core.serializers.ObjectsSerde;
 
 import javax.validation.constraints.NotNull;
@@ -31,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public class CsvReader extends Task implements RunnableTask {
+public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
     @NotNull
     private String from;
 
@@ -54,7 +52,7 @@ public class CsvReader extends Task implements RunnableTask {
     private String charset = StandardCharsets.UTF_8.name();
 
     @Override
-    public RunOutput run(RunContext runContext) throws Exception {
+    public Output run(RunContext runContext) throws Exception {
         // reader
         URI from = new URI(runContext.render(this.from));
         de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader();
@@ -96,9 +94,16 @@ public class CsvReader extends Task implements RunnableTask {
         Long lineCount = count.blockingGet();
         runContext.metric(Counter.of("records", lineCount));
 
-        return RunOutput.builder()
-            .outputs(ImmutableMap.of("uri", runContext.putFile(tempFile).getUri()))
+        return Output
+            .builder()
+            .uri(runContext.putFile(tempFile).getUri())
             .build();
+    }
+
+    @Builder
+    @Getter
+    public static class Output implements org.kestra.core.models.tasks.Output {
+        private URI uri;
     }
 
     private FlowableOnSubscribe<CsvRow> nextRow(CsvParser csvParser) {
