@@ -105,7 +105,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
 
         return Output
             .builder()
-            .uri(runContext.putFile(tempFile).getUri())
+            .uri(runContext.putTempFile(tempFile).getUri())
             .build();
     }
 

@@ -56,7 +56,7 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
 
         return Output
             .builder()
-            .uri(runContext.putFile(tempFile).getUri())
+            .uri(runContext.putTempFile(tempFile).getUri())
             .build();
     }
 

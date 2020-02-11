@@ -79,7 +79,7 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
 
         return Output
             .builder()
-            .uri(runContext.putFile(tempFile).getUri())
+            .uri(runContext.putTempFile(tempFile).getUri())
             .build();
     }
 
