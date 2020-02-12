@@ -13,6 +13,9 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
+import org.kestra.core.models.annotations.Documentation;
+import org.kestra.core.models.annotations.InputProperty;
+import org.kestra.core.models.annotations.OutputProperty;
 import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
@@ -35,23 +38,68 @@ import java.util.stream.Collectors;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
+@Documentation(
+    description = "Read a provided file containing java serialized data and convert it to avro."
+)
 public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> {
     @NotNull
+    @InputProperty(
+        description = "Source file URI"
+    )
     private String from;
 
     @NotNull
+    @InputProperty(
+        description = "The avro schema associated to the data"
+    )
     private String schema;
 
+    @InputProperty(
+        description = "Values to consider as True",
+        body = "Default values are \"t\", \"true\", \"enabled\", \"1\", \"on\", \"yes\""
+    )
     private List<String> trueValues;
 
+    @InputProperty(
+        description = "Values to consider as False",
+        body = "Default values are \"f\", \"false\", \"disabled\", \"0\", \"off\", \"no\", \"\""
+    )
     private List<String> falseValues;
 
+    @InputProperty(
+        description = "Values to consider as null",
+        body = "Default values are \"\",\n" +
+            "        \"#N/A\",\n" +
+            "        \"#N/A N/A\",\n" +
+            "        \"#NA\",\n" +
+            "        \"-1.#IND\",\n" +
+            "        \"-1.#QNAN\",\n" +
+            "        \"-NaN\",\n" +
+            "        \"1.#IND\",\n" +
+            "        \"1.#QNAN\",\n" +
+            "        \"NA\",\n" +
+            "        \"n/a\",\n" +
+            "        \"nan\",\n" +
+            "        \"null\""
+    )
     private List<String> nullValues;
 
+    @InputProperty(
+        description = "Format to use when parsing date",
+        body = "Default value is yyyy-MM-dd[XXX]."
+    )
     private String dateFormat;
 
+    @InputProperty(
+        description = "Format to use when parsing time",
+        body = "Default value is HH:mm[:ss][.SSSSSS][XXX]"
+    )
     private String timeFormat;
 
+    @InputProperty(
+        description = "Format to use when parsing datetime",
+        body = "Default value is yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]"
+    )
     private String datetimeFormat;
 
     @Override
@@ -105,13 +153,16 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile).getUri())
+            .uri(runContext.putFile(tempFile).getUri())
             .build();
     }
 
     @Builder
     @Getter
     public static class Output implements org.kestra.core.models.tasks.Output {
+        @OutputProperty(
+            description = "URI of a temporary result file"
+        )
         private URI uri;
     }
 

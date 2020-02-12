@@ -9,6 +9,9 @@ import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.kestra.core.models.annotations.Documentation;
+import org.kestra.core.models.annotations.InputProperty;
+import org.kestra.core.models.annotations.OutputProperty;
 import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
@@ -29,26 +32,51 @@ import java.util.concurrent.atomic.AtomicInteger;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
+@Documentation(
+    description = "Read a csv file and write it to a java serialized data file."
+)
 public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
     @NotNull
+    @InputProperty(
+        description = "Source file URI"
+    )
     private String from;
 
     @Builder.Default
+    @InputProperty(
+        description = "Specifies if the first line should be the header (default: false)"
+    )
     private Boolean header = true;
 
     @Builder.Default
+    @InputProperty(
+        description = "The field separator character (default: ',' - comma)"
+    )
     private Character fieldSeparator = ",".charAt(0);
 
     @Builder.Default
+    @InputProperty(
+        description = "The text delimiter character (default: '\"' - double quotes)"
+    )
     private Character textDelimiter = "\"".charAt(0);
 
     @Builder.Default
+    @InputProperty(
+        description = "Specifies if empty rows should be skipped (default: true)"
+    )
     private Boolean skipEmptyRows = false;
 
     @Builder.Default
+    @InputProperty(
+        description = "Number of lines to skip at the start of the file"
+    )
     private Integer skipRows = 0;
 
     @Builder.Default
+    @InputProperty(
+        description = "The name of a supported charset",
+        body = "Default value is UTF-8."
+    )
     private String charset = StandardCharsets.UTF_8.name();
 
     @Override
@@ -96,13 +124,16 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile).getUri())
+            .uri(runContext.putFile(tempFile).getUri())
             .build();
     }
 
     @Builder
     @Getter
     public static class Output implements org.kestra.core.models.tasks.Output {
+        @OutputProperty(
+            description = "URI of a temporary result file"
+        )
         private URI uri;
     }
 
