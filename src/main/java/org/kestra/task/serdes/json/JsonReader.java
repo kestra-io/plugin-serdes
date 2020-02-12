@@ -8,6 +8,9 @@ import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.kestra.core.models.annotations.Documentation;
+import org.kestra.core.models.annotations.InputProperty;
+import org.kestra.core.models.annotations.OutputProperty;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
@@ -23,11 +26,21 @@ import java.nio.charset.StandardCharsets;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
+@Documentation(
+    description = "Read a json file and write it to a java serialized data file."
+)
 public class JsonReader extends Task implements RunnableTask<JsonReader.Output> {
     @NotNull
+    @InputProperty(
+        description = "Source file URI"
+    )
     private String from;
 
     @Builder.Default
+    @InputProperty(
+        description = "The name of a supported charset",
+        body = "Default value is UTF-8."
+    )
     private String charset = StandardCharsets.UTF_8.name();
 
     @Override
@@ -63,6 +76,9 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
     @Builder
     @Getter
     public static class Output implements org.kestra.core.models.tasks.Output {
+        @OutputProperty(
+            description = "URI of a temporary result file"
+        )
         private URI uri;
     }
 
