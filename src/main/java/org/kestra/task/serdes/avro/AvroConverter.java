@@ -73,7 +73,7 @@ public class AvroConverter {
             try {
                 record.put(field.name(), convert(field.schema(), data.get(field.name())));
             } catch (IllegalCellConversion e) {
-                throw new IllegalRowConvertion(data, e);
+                throw new IllegalRowConvertion(data, e, field);
             }
         }
 
@@ -367,18 +367,21 @@ public class AvroConverter {
     @Getter
     public static class IllegalRowConvertion extends Exception {
         private static ObjectMapper mapper = new ObjectMapper();
+        private Schema.Field field;
         private Object data;
 
-        public IllegalRowConvertion(Map<String, Object> data, Throwable e) {
+        public IllegalRowConvertion(Map<String, Object> data, Throwable e, Schema.Field field) {
             super(e);
 
+            this.field = field;
             this.data = data;
         }
+
 
         @Override
         public String toString() {
             try {
-                return super.toString() + " on line with data [" + mapper.writeValueAsString(data) + "]";
+                return super.toString() + (field != null ? " on field '" + field.name() : "") + "' with data [" + mapper.writeValueAsString(data) + "]";
             } catch (JsonProcessingException e) {
                 return super.toString();
             }

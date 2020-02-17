@@ -136,7 +136,8 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
                             .stream()
                             .map(field -> new AbstractMap.SimpleEntry<>(field.name(), datum.get(field.name())))
                             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
-                        e
+                        e,
+                        null
                     );
                 }
             })
