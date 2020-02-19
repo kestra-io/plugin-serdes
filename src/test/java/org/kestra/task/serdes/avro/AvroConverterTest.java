@@ -23,6 +23,7 @@ import org.kestra.task.serdes.json.JsonReader;
 import java.io.*;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import javax.inject.Inject;
@@ -135,8 +136,9 @@ public class AvroConverterTest {
         public static void oneFieldFailed(Object v, Schema type) {
             AvroConverter avroConverter = AvroConverter.builder().build();
             Schema schema = oneFieldSchema(type);
-
-            assertThrows(AvroConverter.IllegalRowConvertion.class, () -> avroConverter.fromMap(schema, ImmutableMap.of("fieldName", v)));
+            Map<String, Object> data = new HashMap<>(); // Map instead of ImmutableMap to allow null values
+            data.put("fieldName", v);
+            assertThrows(AvroConverter.IllegalRowConvertion.class, () -> avroConverter.fromMap(schema, data));
         }
 
         public static Schema oneFieldSchema(Schema type) {

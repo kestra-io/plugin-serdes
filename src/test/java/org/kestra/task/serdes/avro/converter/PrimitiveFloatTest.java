@@ -51,7 +51,8 @@ public class PrimitiveFloatTest {
     static Stream<Arguments> failedSource() {
         return Stream.of(
             Arguments.of("a"),
-            Arguments.of(9223372036854775807L)
+            Arguments.of(9223372036854775807L),
+            Arguments.of((Object) null)
         );
     }
 

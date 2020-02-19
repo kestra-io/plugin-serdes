@@ -21,7 +21,7 @@ public class PrimitiveBoolTest {
             Arguments.of(0, false),
             Arguments.of("", false),
             Arguments.of(false, false)
-        );
+            );
     }
 
     @ParameterizedTest
@@ -29,4 +29,6 @@ public class PrimitiveBoolTest {
     void convert(Object v, boolean expected) throws Exception {
         AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.BOOLEAN));
     }
+
+    // TODO test wrong value
 }

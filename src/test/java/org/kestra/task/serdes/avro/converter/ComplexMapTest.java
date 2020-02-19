@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 
 public class ComplexMapTest {
     static Stream<Arguments> source() {
+        // TODO test null (not "null") in Map
         return Stream.of(
             Arguments.of(
                 ImmutableMap.of("a", 42.2D, "b", "42", "c", 42.2D),

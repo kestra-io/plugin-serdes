@@ -14,7 +14,8 @@ public class PrimitiveNullTest {
             Arguments.of("NULL", null),
             Arguments.of("n/a", null),
             Arguments.of("N/A", null),
-            Arguments.of("", null)
+            Arguments.of("", null),
+            Arguments.of(null, null)
         );
     }
 

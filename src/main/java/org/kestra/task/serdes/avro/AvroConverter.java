@@ -76,8 +76,7 @@ public class AvroConverter {
 
         for (Schema.Field field : schema.getFields()) {
             try {
-                record.put(field.name(), convert(field.schema(), data.get(field.name())));
-            } catch (IllegalCellConversion e) {
+            } catch (IllegalCellConversion | NullPointerException e) {
                 throw new IllegalRowConvertion(data, e, field);
             }
         }
@@ -366,6 +365,10 @@ public class AvroConverter {
     }
 
     public String primitiveString(Object data) {
+        if (data == null) {
+            throw new NullPointerException("Invalid object with null data");
+        }
+
         return String.valueOf(data);
     }
 

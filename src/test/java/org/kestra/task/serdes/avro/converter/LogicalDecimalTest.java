@@ -27,7 +27,7 @@ public class LogicalDecimalTest {
             Arguments.of(12.8444D, new BigDecimal("12.84"), 4, 2),
             Arguments.of(12.8444F, new BigDecimal("12.84"), 4, 2),
             Arguments.of("2019", new BigDecimal("2019"), 4, 0)
-        );
+            );
     }
 
     @ParameterizedTest
@@ -55,4 +55,6 @@ public class LogicalDecimalTest {
             LogicalTypes.decimal(precision, scale).addToSchema(Schema.create(Schema.Type.BYTES))
         );
     }
+
+    // TODO add invalid Decimal test (test null, precision not big enough, scale not big enough, ...)
 }

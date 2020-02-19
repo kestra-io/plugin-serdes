@@ -28,8 +28,9 @@ public class ComplexArrayTest {
     static Stream<Arguments> failedSource() {
         return Stream.of(
             Arguments.of(Arrays.asList("a", 42.2), Schema.create(Schema.Type.FLOAT)),
-            Arguments.of(Arrays.asList("null", "a"), Schema.createUnion(Schema.create(Schema.Type.BOOLEAN), Schema.create(Schema.Type.NULL)))
-
+            Arguments.of(Arrays.asList("null", "a"), Schema.createUnion(Schema.create(Schema.Type.BOOLEAN), Schema.create(Schema.Type.NULL))),
+            Arguments.of((Object) null, Schema.create(Schema.Type.FLOAT)),
+            Arguments.of(Arrays.asList(1.1, null), Schema.create(Schema.Type.FLOAT))
         );
     }
 

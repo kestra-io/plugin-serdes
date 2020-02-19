@@ -31,7 +31,8 @@ class PrimitiveLongTest {
             Arguments.of(42.2D),
             Arguments.of(42.2F),
             Arguments.of("a"),
-            Arguments.of("9223372036854775808")
+            Arguments.of("9223372036854775808"),
+            Arguments.of((Object) null)
         );
     }
 

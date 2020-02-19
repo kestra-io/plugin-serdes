@@ -30,7 +30,8 @@ public class PrimitiveIntTest {
             Arguments.of(42.2D),
             Arguments.of(42.2F),
             Arguments.of("a"),
-            Arguments.of(9223372036854775807L)
+            Arguments.of(9223372036854775807L),
+            Arguments.of((Object) null)
         );
     }
 
