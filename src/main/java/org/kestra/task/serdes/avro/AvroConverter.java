@@ -19,7 +19,6 @@ import java.nio.ByteBuffer;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Pattern;
 
 @Builder
 public class AvroConverter {
@@ -58,6 +57,9 @@ public class AvroConverter {
     @Builder.Default
     private char decimalSeparator = '.';
 
+    @Builder.Default
+    private boolean missingDefaultIsNull = true;
+
     public static GenericData genericData() {
         GenericData genericData = new GenericData();
         genericData.addLogicalTypeConversion(new Conversions.UUIDConversion());
@@ -76,6 +78,16 @@ public class AvroConverter {
 
         for (Schema.Field field : schema.getFields()) {
             try {
+                if (schema.getField(field.name()).hasDefaultValue()) {
+                    Object defaultVal = schema.getField(field.name()).defaultVal();
+                    record.put(field.name(), convert(field.schema(), data.getOrDefault(field.name(), defaultVal)));
+                } else if (!schema.getField(field.name()).hasDefaultValue() && missingDefaultIsNull) {
+                    record.put(field.name(), convert(field.schema(), data.getOrDefault(field.name(), null)));
+                } else if (!data.containsKey(field.name())) {
+                    throw new NullPointerException("key " + field.name() + "not found in " + data);
+                } else {
+                    record.put(field.name(), convert(field.schema(), data.get(field.name())));
+                }
             } catch (IllegalCellConversion | NullPointerException e) {
                 throw new IllegalRowConvertion(data, e, field);
             }
