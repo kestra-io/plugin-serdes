@@ -364,6 +364,17 @@ public class AvroConverter {
         return list.stream().anyMatch(s -> s.equalsIgnoreCase(data));
     }
 
+    private static String trimExceptionMessage(Object data) throws JsonProcessingException {
+        ObjectMapper mapper = new ObjectMapper();
+        String s = mapper.writeValueAsString(data);
+
+        if (s.length() > 250) {
+            s = s.substring(0, 250) + " ...";
+        }
+
+        return s;
+    }
+
     @Getter
     public static class IllegalRowConvertion extends Exception {
         private static ObjectMapper mapper = new ObjectMapper();
@@ -381,7 +392,7 @@ public class AvroConverter {
         @Override
         public String toString() {
             try {
-                return super.toString() + (field != null ? " on field '" + field.name() : "") + "' with data [" + mapper.writeValueAsString(data) + "]";
+                return super.toString() + (field != null ? " on field '" + field.name() : "") + "' with data [" + trimExceptionMessage(data) + "]";
             } catch (JsonProcessingException e) {
                 return super.toString();
             }
@@ -404,7 +415,7 @@ public class AvroConverter {
         @Override
         public String toString() {
             try {
-                return super.toString() + " on cols with data [" + mapper.writeValueAsString(data) + "] and schema [" + schema.toString() + "]";
+                return super.toString() + " on cols with data [" + trimExceptionMessage(data) + "] and schema [" + schema.toString() + "]";
             } catch (JsonProcessingException e) {
                 return super.toString();
             }
