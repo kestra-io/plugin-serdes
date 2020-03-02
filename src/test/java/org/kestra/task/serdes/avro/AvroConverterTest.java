@@ -15,17 +15,17 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
 import org.junit.jupiter.api.Test;
 import org.kestra.core.storages.StorageInterface;
-import org.kestra.core.storages.StorageObject;
 import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
 import org.kestra.task.serdes.csv.CsvReader;
 import org.kestra.task.serdes.json.JsonReader;
 
-import javax.inject.Inject;
 import java.io.*;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.Consumer;
+import javax.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -47,12 +47,12 @@ public class AvroConverterTest {
         String read = SerdesUtils.readResource("csv/full.avsc");
 
         File sourceFile = SerdesUtils.resourceToFile("csv/full.csv");
-        StorageObject csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         CsvReader reader = CsvReader.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvReader.class.getName())
-            .from(csv.getUri().toString())
+            .from(csv.toString())
             .fieldSeparator(",".charAt(0))
             .header(true)
             .build();
@@ -84,12 +84,12 @@ public class AvroConverterTest {
         String read = SerdesUtils.readResource("csv/full.avsc");
 
         File sourceFile = SerdesUtils.resourceToFile("csv/full.jsonl");
-        StorageObject csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         JsonReader reader = JsonReader.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonReader.class.getName())
-            .from(csv.getUri().toString())
+            .from(csv.toString())
             .build();
         JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
 

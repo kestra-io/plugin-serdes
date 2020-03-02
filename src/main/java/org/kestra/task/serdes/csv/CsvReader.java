@@ -124,7 +124,7 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile).getUri())
+            .uri(runContext.putTempFile(tempFile))
             .build();
     }
 

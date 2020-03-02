@@ -9,14 +9,14 @@ import org.junit.jupiter.api.Test;
 import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.runners.RunContext;
 import org.kestra.core.storages.StorageInterface;
-import org.kestra.core.storages.StorageObject;
 import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
 
-import javax.inject.Inject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.net.URI;
+import javax.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -34,12 +34,12 @@ class CsvReaderWriterTest {
 
     private void test(String file, boolean header) throws Exception {
         File sourceFile = SerdesUtils.resourceToFile(file);
-        StorageObject source = this.serdesUtils.resourceToStorageObject(sourceFile);
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         CsvReader reader = CsvReader.builder()
             .id(CsvReaderWriterTest.class.getSimpleName())
             .type(CsvReader.class.getName())
-            .from(source.getUri().toString())
+            .from(source.toString())
             .fieldSeparator(";".charAt(0))
             .header(header)
             .build();
@@ -75,12 +75,12 @@ class CsvReaderWriterTest {
     @Test
     void skipRows() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("csv/insurance_sample.csv");
-        StorageObject source = this.serdesUtils.resourceToStorageObject(sourceFile);
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         CsvReader reader = CsvReader.builder()
             .id(CsvReaderWriterTest.class.getSimpleName())
             .type(CsvReader.class.getName())
-            .from(source.getUri().toString())
+            .from(source.toString())
             .fieldSeparator(";".charAt(0))
             .skipRows(4)
             .header(false)

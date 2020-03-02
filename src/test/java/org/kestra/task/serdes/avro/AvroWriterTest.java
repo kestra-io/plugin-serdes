@@ -12,10 +12,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.junit.jupiter.api.Test;
 import org.kestra.core.storages.StorageInterface;
-import org.kestra.core.storages.StorageObject;
 import org.kestra.core.utils.TestsUtils;
 
-import javax.inject.Inject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -23,6 +21,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -46,7 +45,7 @@ class AvroWriterTest {
     }
 
     void test(String file) throws Exception {
-        StorageObject source = storageInterface.put(
+        URI source = storageInterface.put(
             new URI("/" + FriendlyId.createFriendlyId()),
             new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
                 .getResource(file))
@@ -56,7 +55,7 @@ class AvroWriterTest {
         AvroWriter task = AvroWriter.builder()
             .id(AvroWriterTest.class.getSimpleName())
             .type(AvroWriter.class.getName())
-            .from(source.getUri().toString())
+            .from(source.toString())
             .schema(
                 Files.asCharSource(
                     new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader().getResource("csv/insurance_sample.avsc")).toURI()),

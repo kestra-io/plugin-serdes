@@ -146,7 +146,7 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile).getUri())
+            .uri(runContext.putTempFile(tempFile))
             .build();
     }
 
