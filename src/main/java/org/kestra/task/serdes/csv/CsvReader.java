@@ -2,11 +2,6 @@ package org.kestra.task.serdes.csv;
 
 import de.siegmar.fastcsv.reader.CsvParser;
 import de.siegmar.fastcsv.reader.CsvRow;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableOnSubscribe;
-import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.kestra.core.models.annotations.Documentation;
@@ -16,16 +11,15 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.serializers.ObjectsSerde;
+import org.kestra.task.serdes.serializers.ObjectsSerde;
 
-import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicInteger;
+import javax.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
@@ -84,43 +78,37 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
         // reader
         URI from = new URI(runContext.render(this.from));
         de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader();
-        CsvParser csvParser = csvReader.parse(new InputStreamReader(runContext.uriToInputStream(from), charset));
 
         // temp file
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".javas");
-        ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile));
 
-        AtomicInteger skipped = new AtomicInteger();
+        try (
+            CsvParser csvParser = csvReader.parse(new InputStreamReader(runContext.uriToInputStream(from), charset));
+            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile))
+        ) {
+            CsvRow row;
+            int count = 0;
+            int skipped = 0;
 
-        // convert
-        Flowable<Object> flowable = Flowable
-            .create(this.nextRow(csvParser), BackpressureStrategy.BUFFER)
-            .filter(csvRow -> {
-                if (this.skipRows > 0 && skipped.get() < this.skipRows) {
-                    skipped.incrementAndGet();
-                    return false;
-                }
-
-                return true;
-            })
-            .map(r -> {
-                if (header) {
-                    return r.getFieldMap();
+            while ((row = csvParser.nextRow()) != null) {
+                if (this.skipRows > 0 && skipped < this.skipRows) {
+                    skipped++;
                 } else {
-                    return r.getFields();
-                }
-            })
-            .observeOn(Schedulers.io())
-            .doOnNext(row -> ObjectsSerde.write(output, row))
-            .doOnComplete(() -> {
-                output.close();
-                csvParser.close();
-            });
+                    Object map;
+                    count++;
 
-        // metrics & finalize
-        Single<Long> count = flowable.count();
-        Long lineCount = count.blockingGet();
-        runContext.metric(Counter.of("records", lineCount));
+                    if (header) {
+                        map = row.getFieldMap();
+                    } else {
+                        map = row.getFields();
+                    }
+
+                    ObjectsSerde.write(output, map);
+                }
+            }
+
+            runContext.metric(Counter.of("records", count));
+        }
 
         return Output
             .builder()
@@ -135,17 +123,6 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
             description = "URI of a temporary result file"
         )
         private URI uri;
-    }
-
-    private FlowableOnSubscribe<CsvRow> nextRow(CsvParser csvParser) {
-        return s -> {
-            CsvRow row;
-            while ((row = csvParser.nextRow()) != null) {
-                s.onNext(row);
-            }
-
-            s.onComplete();
-        };
     }
 
     private de.siegmar.fastcsv.reader.CsvReader csvReader() {

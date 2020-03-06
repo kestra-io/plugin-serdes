@@ -5,7 +5,6 @@ import com.google.common.io.CharStreams;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
-import org.kestra.core.runners.RunContext;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
@@ -37,9 +36,11 @@ class JsonReaderWriterTest {
         URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         JsonReader reader = JsonReader.builder()
+            .id(JsonReader.class.getSimpleName())
+            .type(JsonReader.class.getName())
             .from(source.toString())
             .build();
-        JsonReader.Output readerRunOutput = reader.run(new RunContext(this.applicationContext, ImmutableMap.of()));
+        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(this.applicationContext, reader, ImmutableMap.of()));
 
         JsonWriter writer = JsonWriter.builder()
             .id(JsonWriter.class.getSimpleName())

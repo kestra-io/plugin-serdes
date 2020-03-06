@@ -20,7 +20,7 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.serializers.ObjectsSerde;
+import org.kestra.task.serdes.serializers.ObjectsSerde;
 
 import javax.validation.constraints.NotNull;
 import java.io.BufferedOutputStream;
@@ -170,10 +170,9 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     @SuppressWarnings("unchecked")
     private Function<Object, GenericData.Record> convertToAvro(Schema schema) {
         AvroConverter converter = this.converter();
+        GenericData.Record record = new GenericData.Record(schema);
 
         return row -> {
-            GenericData.Record record = new GenericData.Record(schema);
-
             if (row instanceof List) {
                 List<String> casted = (List<String>) row;
 

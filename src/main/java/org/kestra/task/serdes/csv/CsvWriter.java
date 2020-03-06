@@ -1,11 +1,6 @@
 package org.kestra.task.serdes.csv;
 
 import de.siegmar.fastcsv.writer.CsvAppender;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.reactivex.functions.Consumer;
-import io.reactivex.schedulers.Schedulers;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.commons.lang3.ArrayUtils;
@@ -16,9 +11,8 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.serializers.ObjectsSerde;
+import org.kestra.task.serdes.serializers.ObjectsSerde;
 
-import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.ObjectInputStream;
 import java.net.URI;
@@ -26,6 +20,10 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.validation.constraints.NotNull;
+
+import static org.kestra.core.utils.Rethrow.throwConsumer;
 
 @SuperBuilder
 @ToString
@@ -80,6 +78,7 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
     )
     private String charset = StandardCharsets.UTF_8.name();
 
+    @SuppressWarnings("unchecked")
     @Override
     public Output run(RunContext runContext) throws Exception {
         // temp file
@@ -87,62 +86,45 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
 
         // writer
         de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter();
-        CsvAppender csvAppender = csvWriter.append(tempFile, Charset.forName(this.charset));
+        try (CsvAppender csvAppender = csvWriter.append(tempFile, Charset.forName(this.charset))) {
+            URI from = new URI(runContext.render(this.from));
+            ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
+            AtomicInteger count = new AtomicInteger();
 
-        // reader
-        URI from = new URI(runContext.render(this.from));
-        ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
+            ObjectsSerde.reader(inputStream, throwConsumer(row -> {
+                if (row instanceof List) {
+                    List<String> casted = (List<String>) row;
 
-        Flowable<Object> flowable = Flowable
-            .create(ObjectsSerde.<String, String>reader(inputStream), BackpressureStrategy.BUFFER)
-            .observeOn(Schedulers.io())
-            .doOnNext(new Consumer<>() {
-                private boolean first = false;
+                    if (header) {
+                        throw new IllegalArgumentException("Invalid data of type List with header");
+                    }
 
-                @SuppressWarnings("unchecked")
-                @Override
-                public void accept(Object row) throws Exception {
-                    if (row instanceof List) {
-                        List<String> casted = (List<String>) row;
+                    for (final String value : casted) {
+                        csvAppender.appendField(value);
+                    }
+                } else if (row instanceof Map) {
+                    Map<String, String> casted = (Map<String, String>) row;
 
+                    if (count.get() == 0) {
                         if (header) {
-                            throw new IllegalArgumentException("Invalid data of type List with header");
-                        }
-
-                        for (final String value : casted) {
-                            csvAppender.appendField(value);
-                        }
-                    } else if (row instanceof Map) {
-                        Map<String, String> casted = (Map<String, String>) row;
-
-                        if (!first) {
-                            this.first = true;
-                            if (header) {
-                                for (final String value : casted.keySet()) {
-                                    csvAppender.appendField(value);
-                                }
-                                csvAppender.endLine();
+                            for (final String value : casted.keySet()) {
+                                csvAppender.appendField(value);
                             }
-                        }
-
-                        for (final String value : casted.values()) {
-                            csvAppender.appendField(value);
+                            csvAppender.endLine();
                         }
                     }
 
-                    csvAppender.endLine();
+                    for (final String value : casted.values()) {
+                        csvAppender.appendField(value);
+                    }
                 }
-            })
-            .doOnComplete(() -> {
-                csvAppender.close();
-                inputStream.close();
-            });
+                count.getAndIncrement();
 
+                csvAppender.endLine();
+            }));
 
-        // metrics & finalize
-        Single<Long> count = flowable.count();
-        Long lineCount = count.blockingGet();
-        runContext.metric(Counter.of("records", lineCount));
+            runContext.metric(Counter.of("records", count.get()));
+        }
 
         return Output
             .builder()

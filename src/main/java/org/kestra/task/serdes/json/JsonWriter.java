@@ -1,10 +1,6 @@
 package org.kestra.task.serdes.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.kestra.core.models.annotations.Documentation;
@@ -14,7 +10,7 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.core.serializers.ObjectsSerde;
+import org.kestra.task.serdes.serializers.ObjectsSerde;
 
 import javax.validation.constraints.NotNull;
 import java.io.BufferedWriter;
@@ -24,6 +20,9 @@ import java.io.ObjectInputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.kestra.core.utils.Rethrow.throwConsumer;
 
 @SuperBuilder
 @ToString
@@ -49,31 +48,22 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        // temp file
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".jsonl");
-
-        // writer
-        BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
         ObjectMapper mapper = new ObjectMapper();
-
-        // reader
         URI from = new URI(runContext.render(this.from));
-        ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
+        AtomicInteger count = new AtomicInteger();
 
-        Flowable<Object> flowable = Flowable
-            .create(ObjectsSerde.<String, String>reader(inputStream), BackpressureStrategy.BUFFER)
-            .observeOn(Schedulers.io())
-            .doOnNext(o -> outfile.write(mapper.writeValueAsString(o) + "\n"))
-            .doOnComplete(() -> {
-                outfile.close();
-                inputStream.close();
-            });
+        try (
+            BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
+            ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from))
+        ) {
+            ObjectsSerde.reader(inputStream, throwConsumer(row -> {
+                outfile.write(mapper.writeValueAsString(row) + "\n");
+                count.getAndIncrement();
+            }));
+        }
 
-
-        // metrics & finalize
-        Single<Long> count = flowable.count();
-        Long lineCount = count.blockingGet();
-        runContext.metric(Counter.of("records", lineCount));
+        runContext.metric(Counter.of("records", count.get()));
 
         return Output
             .builder()
