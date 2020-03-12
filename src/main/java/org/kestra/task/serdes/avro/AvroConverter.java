@@ -376,8 +376,27 @@ public class AvroConverter {
     }
 
     @Getter
+    public static class IllegalRow extends Exception {
+        private Object data;
+
+        public IllegalRow(Object data, Throwable e) {
+            super(e);
+
+            this.data = data;
+        }
+
+        @Override
+        public String toString() {
+            try {
+                return super.toString() + "' with data [" + trimExceptionMessage(data) + "]";
+            } catch (JsonProcessingException e) {
+                return super.toString();
+            }
+        }
+    }
+
+    @Getter
     public static class IllegalRowConvertion extends Exception {
-        private static ObjectMapper mapper = new ObjectMapper();
         private Schema.Field field;
         private Object data;
 
@@ -401,7 +420,6 @@ public class AvroConverter {
 
     @Getter
     public static class IllegalCellConversion extends Exception {
-        private static ObjectMapper mapper = new ObjectMapper();
         private Object data;
         private Schema schema;
 

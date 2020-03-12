@@ -173,17 +173,24 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
         GenericData.Record record = new GenericData.Record(schema);
 
         return row -> {
-            if (row instanceof List) {
-                List<String> casted = (List<String>) row;
+            try {
+                if (row instanceof List) {
+                    List<String> casted = (List<String>) row;
 
-                return converter.fromArray(schema, casted);
-            } else if (row instanceof Map) {
-                Map<String, Object> casted = (Map<String, Object>) row;
+                    return converter.fromArray(schema, casted);
+                } else if (row instanceof Map) {
+                    Map<String, Object> casted = (Map<String, Object>) row;
 
-                return converter.fromMap(schema, casted);
+                    return converter.fromMap(schema, casted);
+                }
+
+                return record;
+            } catch (Throwable e) {
+                throw new AvroConverter.IllegalRow(
+                    row,
+                    e
+                );
             }
-
-            return record;
         };
     }
 
