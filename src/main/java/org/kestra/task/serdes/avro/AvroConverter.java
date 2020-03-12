@@ -10,6 +10,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.data.TimeConversions;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -18,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Builder
 public class AvroConverter {
@@ -52,6 +54,9 @@ public class AvroConverter {
 
     @Builder.Default
     private String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]";
+
+    @Builder.Default
+    private char decimalSeparator = '.';
 
     public static GenericData genericData() {
         GenericData genericData = new GenericData();
@@ -144,6 +149,14 @@ public class AvroConverter {
         }
     }
 
+    private String convertDecimalSeparator(String value) {
+        if (this.decimalSeparator == '.') {
+            return value;
+        }
+
+        return StringUtils.replaceOnce(value, String.valueOf(this.decimalSeparator), ".");
+    }
+
     @SuppressWarnings("UnpredictableBigDecimalConstructorCall")
     private BigDecimal logicalDecimal(Schema schema, Object data) {
         int scale = ((LogicalTypes.Decimal) schema.getLogicalType()).getScale();
@@ -153,7 +166,7 @@ public class AvroConverter {
         BigDecimal value;
 
         if (data instanceof String) {
-            value = new BigDecimal(((String) data));
+            value = new BigDecimal(convertDecimalSeparator(((String) data)));
         } else if (data instanceof Long) {
             value = BigDecimal.valueOf((long) ((long) data * multiply), scale);
         } else if (data instanceof Integer) {
@@ -316,7 +329,7 @@ public class AvroConverter {
 
     private Float primitiveFloat(Object data) {
         if (data instanceof String) {
-            return Float.valueOf((String) data);
+            return Float.valueOf(convertDecimalSeparator(((String) data)));
         } else if (data instanceof Integer) {
             return (float) ((int) data);
         } else if (data instanceof Double) {
@@ -328,7 +341,7 @@ public class AvroConverter {
 
     private Double primitiveDouble(Object data) {
         if (data instanceof String) {
-            return Double.valueOf((String) data);
+            return Double.valueOf(convertDecimalSeparator(((String) data)));
         } else if (data instanceof Integer) {
             return (double) ((int) data);
         } else if (data instanceof Float) {

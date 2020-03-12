@@ -1,50 +1,50 @@
 package org.kestra.task.serdes.avro.converter;
 
 import org.apache.avro.Schema;
-import org.kestra.task.serdes.avro.AvroConverter;
-import org.kestra.task.serdes.avro.AvroConverterTest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.kestra.task.serdes.avro.AvroConverter;
+import org.kestra.task.serdes.avro.AvroConverterTest;
 
 import java.util.stream.Stream;
 
-public class PrimitiveFloatTest {
+public class PrimitiveDoubleTest {
     static Stream<Arguments> source() {
         return Stream.of(
-            Arguments.of(-42F, -42F),
-            Arguments.of("-42", -42F),
-            Arguments.of(-42, -42F),
-            Arguments.of(-42D, -42F),
-            Arguments.of(42F, 42F),
-            Arguments.of("42", 42F),
-            Arguments.of(42, 42F),
-            Arguments.of(42D, 42F)
+            Arguments.of(-42D, -42D),
+            Arguments.of("-42", -42D),
+            Arguments.of(-42, -42D),
+            Arguments.of(-42D, -42D),
+            Arguments.of(42D, 42D),
+            Arguments.of("42", 42D),
+            Arguments.of(42, 42D),
+            Arguments.of(42D, 42D)
         );
     }
 
     @ParameterizedTest
     @MethodSource("source")
-    void convert(Object v, float expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.FLOAT));
+    void convert(Object v, double expected) throws Exception {
+        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.DOUBLE));
     }
 
     static Stream<Arguments> separator() {
         return Stream.of(
-            Arguments.of("-42.1", -42.1F, '.'),
-            Arguments.of("42,1", 42.1F, ','),
-            Arguments.of("42|1", 42.1F, '|')
+            Arguments.of("-42.1", -42.1D, '.'),
+            Arguments.of("42,1", 42.1D, ','),
+            Arguments.of("42|1", 42.1D, '|')
         );
     }
 
     @ParameterizedTest
     @MethodSource("separator")
-    void convertSeparator(Object v, float expected, Character separator) throws Exception {
+    void convertSeparator(Object v, double expected, Character separator) throws Exception {
         AvroConverterTest.Utils.oneField(
             AvroConverter.builder().decimalSeparator(separator).build(),
             v,
             expected,
-            Schema.create(Schema.Type.FLOAT)
+            Schema.create(Schema.Type.DOUBLE)
         );
     }
 
@@ -58,6 +58,6 @@ public class PrimitiveFloatTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v) {
-        AvroConverterTest.Utils.oneFieldFailed(v, Schema.create(Schema.Type.FLOAT));
+        AvroConverterTest.Utils.oneFieldFailed(v, Schema.create(Schema.Type.DOUBLE));
     }
 }

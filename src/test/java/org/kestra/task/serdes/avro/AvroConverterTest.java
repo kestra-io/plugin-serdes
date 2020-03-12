@@ -116,7 +116,10 @@ public class AvroConverterTest {
 
     public static class Utils {
         public static void oneField(Object v, Object expected, Schema type) throws AvroConverter.IllegalRowConvertion {
-            AvroConverter avroConverter = AvroConverter.builder().build();
+            oneField(AvroConverter.builder().build(), v, expected, type);
+        }
+
+        public static void oneField(AvroConverter avroConverter, Object v, Object expected, Schema type) throws AvroConverter.IllegalRowConvertion {
             Schema schema = oneFieldSchema(type);
 
             HashMap<String, Object> map = new HashMap<>();

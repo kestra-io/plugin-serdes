@@ -102,6 +102,12 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     )
     private String datetimeFormat;
 
+    @InputProperty(
+        description = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
+        body = "Default value is '.'"
+    )
+    private Character decimalSeparator;
+
     @Override
     public Output run(RunContext runContext) throws Exception {
         // temp file
@@ -219,6 +225,10 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
 
         if (this.datetimeFormat != null) {
             builder.datetimeFormat(this.datetimeFormat);
+        }
+
+        if (this.decimalSeparator != null) {
+            builder.decimalSeparator(this.decimalSeparator);
         }
 
         return builder.build();
