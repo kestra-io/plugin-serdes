@@ -4,22 +4,44 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.util.Utf8;
-import org.kestra.task.serdes.avro.AvroConverterTest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.kestra.task.serdes.avro.AvroConverterTest;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
 public class ComplexMapTest {
+    // because `ImmutableMap.of` doesn't allow null value
+    static Map<String, Object> nullMapIn = new HashMap<>();
+    static Map<Utf8, Object> nullMapOut = new HashMap<Utf8, Object>();
+
+    {
+        nullMapIn.put("a", 1D);
+        nullMapIn.put("b", null);
+        nullMapIn.put("c", 2F);
+        nullMapOut.put(new Utf8("a".getBytes()), 1F);
+        nullMapOut.put(new Utf8("b".getBytes()), null);
+        nullMapOut.put(new Utf8("c".getBytes()), 2F);
+    }
+
     static Stream<Arguments> source() {
-        // TODO test null (not "null") in Map
         return Stream.of(
             Arguments.of(
                 ImmutableMap.of("a", 42.2D, "b", "42", "c", 42.2D),
                 ImmutableMap.of(new Utf8("a".getBytes()), 42.2F, new Utf8("b".getBytes()), 42F, new Utf8("c".getBytes()), 42.2F),
-                Schema.create(Schema.Type.FLOAT))
+                Schema.create(Schema.Type.FLOAT)),
+            Arguments.of(nullMapIn, nullMapOut, SchemaBuilder.builder().unionOf().floatType().and().nullType().endUnion())
+        );
+    }
+
+    static Stream<Arguments> failedSource() {
+        return Stream.of(
+            Arguments.of(nullMapIn, Schema.create(Schema.Type.FLOAT)),
+            Arguments.of(ImmutableMap.of("a", 42.2D, "b", "a"), Schema.create(Schema.Type.FLOAT)),
+            Arguments.of(ImmutableMap.of("a", "null", "b", "a"), Schema.createUnion(Schema.create(Schema.Type.BOOLEAN), Schema.create(Schema.Type.NULL)))
         );
     }
 
@@ -27,13 +49,6 @@ public class ComplexMapTest {
     @MethodSource("source")
     void convert(Object v, Map<Utf8, Object> expected, Schema type) throws Exception {
         AvroConverterTest.Utils.oneField(v, expected, SchemaBuilder.map().values(type));
-    }
-
-    static Stream<Arguments> failedSource() {
-        return Stream.of(
-            Arguments.of(ImmutableMap.of("a", 42.2D, "b", "a"), Schema.create(Schema.Type.FLOAT)),
-            Arguments.of(ImmutableMap.of("a", "null", "b", "a"), Schema.createUnion(Schema.create(Schema.Type.BOOLEAN), Schema.create(Schema.Type.NULL)))
-        );
     }
 
     @ParameterizedTest

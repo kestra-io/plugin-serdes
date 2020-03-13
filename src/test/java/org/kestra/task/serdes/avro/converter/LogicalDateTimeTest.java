@@ -53,6 +53,8 @@ public class LogicalDateTimeTest {
     // FIXME if you add "null" to the list, you expect it to fail, but it surprisingly succeed
     static Stream<Arguments> failedSource() {
         return Stream.of(
+            Arguments.of((Object) null),
+            Arguments.of((String) null),
             Arguments.of("12:26:2019")
         );
     }

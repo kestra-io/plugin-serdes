@@ -129,7 +129,7 @@ public class AvroConverterTest {
             GenericData.Record record = avroConverter.fromMap(schema, map);
             GenericRecord serialized = Utils.test(schema, record);
 
-
+            new GenericData().validate(schema, serialized);
             assertThat(record, is(serialized));
             assertThat(serialized.get("fieldName"), is(expected));
         }

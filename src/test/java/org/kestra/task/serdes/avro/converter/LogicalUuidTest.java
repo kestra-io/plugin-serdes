@@ -25,9 +25,10 @@ public class LogicalUuidTest {
         AvroConverterTest.Utils.oneField(v, expected, schema);
     }
 
-    // FIXME if you add "null" to the list, you expect it to fail, but it surprisingly succeed
     static Stream<Arguments> failedSource() {
         return Stream.of(
+            Arguments.of((Object) null),
+            Arguments.of(1),
             Arguments.of("123e4567"),
             Arguments.of("123e4567e89b12d3a456556642440000")
         );
