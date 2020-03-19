@@ -53,7 +53,7 @@ public class AvroConverter {
     private String timeFormat = "HH:mm[:ss][.SSSSSS][XXX]";
 
     @Builder.Default
-    private String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]";
+    private String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S][XXX]";
 
     @Builder.Default
     private char decimalSeparator = '.';
