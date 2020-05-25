@@ -13,13 +13,12 @@ import org.kestra.core.runners.RunContext;
 import org.kestra.task.serdes.serializers.ObjectsSerde;
 
 import javax.validation.constraints.NotNull;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.ObjectInputStream;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.kestra.core.utils.Rethrow.throwConsumer;
@@ -46,6 +45,16 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
     )
     private String charset = StandardCharsets.UTF_8.name();
 
+    @Builder.Default
+    @InputProperty(
+        description = "Is the file is a json new line (JSON-NL)",
+        body = {
+            "Is the file is a json with new line separator",
+            "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
+        }
+    )
+    private boolean newLine = true;
+
     @Override
     public Output run(RunContext runContext) throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".jsonl");
@@ -57,10 +66,21 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
             BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
             ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from))
         ) {
-            ObjectsSerde.reader(inputStream, throwConsumer(row -> {
-                outfile.write(mapper.writeValueAsString(row) + "\n");
-                count.getAndIncrement();
-            }));
+            if (this.newLine) {
+                ObjectsSerde.reader(inputStream, throwConsumer(row -> {
+                    outfile.write(mapper.writeValueAsString(row) + "\n");
+                    count.getAndIncrement();
+                }));
+            } else {
+                List<Object> list = new ArrayList<>();
+
+                ObjectsSerde.reader(inputStream, throwConsumer(row -> {
+                    list.add(row);
+                    count.getAndIncrement();
+                }));
+
+                outfile.write(mapper.writeValueAsString(list));
+            }
         }
 
         runContext.metric(Counter.of("records", count.get()));

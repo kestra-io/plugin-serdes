@@ -15,7 +15,10 @@ import org.kestra.task.serdes.serializers.ObjectsSerde;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import javax.validation.constraints.NotNull;
+
+import static org.kestra.core.utils.Rethrow.throwConsumer;
 
 @SuperBuilder
 @ToString
@@ -39,6 +42,16 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
     )
     private String charset = StandardCharsets.UTF_8.name();
 
+    @Builder.Default
+    @InputProperty(
+        description = "Is the file is a json new line (JSON-NL)",
+        body = {
+            "Is the file is a json with new line separator",
+            "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
+        }
+    )
+    private boolean newLine = true;
+
     @Override
     public Output run(RunContext runContext) throws Exception {
         URI from = new URI(runContext.render(this.from));
@@ -50,10 +63,16 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
             ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile))
         ) {
-            String line;
-            while ((line = input.readLine()) != null) {
-                ObjectsSerde.write(output, mapper.readValue(line, Object.class));
-                count++;
+            if (newLine) {
+                String line;
+                while ((line = input.readLine()) != null) {
+                    ObjectsSerde.write(output, mapper.readValue(line, Object.class));
+                    count++;
+                }
+            } else {
+                Object[] objects = mapper.readValue(input, Object[].class);
+                Arrays.asList(objects)
+                    .forEach(throwConsumer(o -> ObjectsSerde.write(output, o)));
             }
 
             runContext.metric(Counter.of("records", count));

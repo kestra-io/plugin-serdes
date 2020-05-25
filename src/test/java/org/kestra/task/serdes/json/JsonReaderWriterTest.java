@@ -1,7 +1,7 @@
 package org.kestra.task.serdes.json;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.CharStreams;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
@@ -31,14 +31,15 @@ class JsonReaderWriterTest {
     SerdesUtils serdesUtils;
 
     @Test
-    void run() throws Exception {
-        File sourceFile = SerdesUtils.resourceToFile("csv/full.jsonl");
+    private void run(String fileSource, boolean jsonNl) throws Exception {
+        File sourceFile = SerdesUtils.resourceToFile(fileSource);
         URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
         JsonReader reader = JsonReader.builder()
             .id(JsonReader.class.getSimpleName())
             .type(JsonReader.class.getName())
             .from(source.toString())
+            .newLine(jsonNl)
             .build();
         JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(this.applicationContext, reader, ImmutableMap.of()));
 
@@ -46,12 +47,25 @@ class JsonReaderWriterTest {
             .id(JsonWriter.class.getSimpleName())
             .type(AvroWriter.class.getName())
             .from(readerRunOutput.getUri().toString())
+            .newLine(jsonNl)
             .build();
         JsonWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
 
+        ObjectMapper mapper = new ObjectMapper();
+
         assertThat(
-            CharStreams.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
-            is(CharStreams.toString(new InputStreamReader(new FileInputStream(sourceFile))))
+            mapper.readTree(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
+            is(mapper.readTree(new InputStreamReader(new FileInputStream(sourceFile))))
         );
+    }
+
+    @Test
+    void newLine() throws Exception {
+        this.run("csv/full.jsonl", true);
+    }
+
+    @Test
+    void array() throws Exception {
+        this.run("csv/full.json", false);
     }
 }
