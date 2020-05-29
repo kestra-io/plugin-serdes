@@ -16,6 +16,7 @@ import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collection;
 import javax.validation.constraints.NotNull;
 
 import static org.kestra.core.utils.Rethrow.throwConsumer;
@@ -70,9 +71,14 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
                     count++;
                 }
             } else {
-                Object[] objects = mapper.readValue(input, Object[].class);
-                Arrays.asList(objects)
-                    .forEach(throwConsumer(o -> ObjectsSerde.write(output, o)));
+                Object objects = mapper.readValue(input, Object.class);
+
+                if (objects instanceof Collection) {
+                    ((Collection<?>) objects)
+                        .forEach(throwConsumer(o -> ObjectsSerde.write(output, o)));
+                } else {
+                    ObjectsSerde.write(output, objects);
+                }
             }
 
             runContext.metric(Counter.of("records", count));
