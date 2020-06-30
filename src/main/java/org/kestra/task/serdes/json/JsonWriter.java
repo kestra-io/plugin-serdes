@@ -34,14 +34,16 @@ import static org.kestra.core.utils.Rethrow.throwConsumer;
 public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> {
     @NotNull
     @InputProperty(
-        description = "Source file URI"
+        description = "Source file URI",
+        dynamic = true
     )
     private String from;
 
     @Builder.Default
     @InputProperty(
         description = "The name of a supported charset",
-        body = "Default value is UTF-8."
+        body = "Default value is UTF-8.",
+        dynamic = false
     )
     private String charset = StandardCharsets.UTF_8.name();
 
@@ -51,7 +53,8 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
         body = {
             "Is the file is a json with new line separator",
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
-        }
+        },
+        dynamic = false
     )
     private boolean newLine = true;
 

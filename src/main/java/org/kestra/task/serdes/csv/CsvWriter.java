@@ -36,7 +36,8 @@ import static org.kestra.core.utils.Rethrow.throwConsumer;
 public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
     @NotNull
     @InputProperty(
-        description = "Source file URI"
+        description = "Source file URI",
+        dynamic = true
     )
     private String from;
 

@@ -44,25 +44,29 @@ import java.util.stream.Collectors;
 public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> {
     @NotNull
     @InputProperty(
-        description = "Source file URI"
+        description = "Source file URI",
+        dynamic = true
     )
     private String from;
 
     @NotNull
     @InputProperty(
-        description = "The avro schema associated to the data"
+        description = "The avro schema associated to the data",
+        dynamic = true
     )
     private String schema;
 
     @InputProperty(
         description = "Values to consider as True",
-        body = "Default values are \"t\", \"true\", \"enabled\", \"1\", \"on\", \"yes\""
+        body = "Default values are \"t\", \"true\", \"enabled\", \"1\", \"on\", \"yes\"",
+        dynamic = false
     )
     private List<String> trueValues;
 
     @InputProperty(
         description = "Values to consider as False",
-        body = "Default values are \"f\", \"false\", \"disabled\", \"0\", \"off\", \"no\", \"\""
+        body = "Default values are \"f\", \"false\", \"disabled\", \"0\", \"off\", \"no\", \"\"",
+        dynamic = false
     )
     private List<String> falseValues;
 
@@ -80,31 +84,36 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
             "        \"NA\",\n" +
             "        \"n/a\",\n" +
             "        \"nan\",\n" +
-            "        \"null\""
+            "        \"null\"",
+        dynamic = false
     )
     private List<String> nullValues;
 
     @InputProperty(
         description = "Format to use when parsing date",
-        body = "Default value is yyyy-MM-dd[XXX]."
+        body = "Default value is yyyy-MM-dd[XXX].",
+        dynamic = false
     )
     private String dateFormat;
 
     @InputProperty(
         description = "Format to use when parsing time",
-        body = "Default value is HH:mm[:ss][.SSSSSS][XXX]"
+        body = "Default value is HH:mm[:ss][.SSSSSS][XXX]",
+        dynamic = false
     )
     private String timeFormat;
 
     @InputProperty(
         description = "Format to use when parsing datetime",
-        body = "Default value is yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]"
+        body = "Default value is yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]",
+        dynamic = false
     )
     private String datetimeFormat;
 
     @InputProperty(
         description = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
-        body = "Default value is '.'"
+        body = "Default value is '.'",
+        dynamic = false
     )
     private Character decimalSeparator;
 
