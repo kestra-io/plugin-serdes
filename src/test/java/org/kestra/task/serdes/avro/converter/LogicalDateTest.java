@@ -2,12 +2,13 @@ package org.kestra.task.serdes.avro.converter;
 
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
-import org.kestra.task.serdes.avro.AvroConverterTest;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.kestra.task.serdes.avro.AvroConverter;
+import org.kestra.task.serdes.avro.AvroConverterTest;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -32,6 +33,22 @@ class LogicalDateTest {
     @MethodSource("source")
     void convert(CharSequence v, LocalDate expected) throws Exception {
         AvroConverterTest.Utils.oneField(v, expected, schema);
+    }
+
+    static Stream<Arguments> withFormat() {
+        return Stream.of(
+            Arguments.of("28/5/20", "d/M/yy", LocalDate.of(2020, 5, 28))
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("withFormat")
+    void convertWithFormat(CharSequence v, String format, LocalDate expected) throws Exception {
+        AvroConverter avroConverter = AvroConverter.builder()
+            .dateFormat(format)
+            .build();
+
+        AvroConverterTest.Utils.oneField(avroConverter, v, expected, LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)));
     }
 
     Stream<Arguments> failedSource() {

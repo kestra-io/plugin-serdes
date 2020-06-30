@@ -62,6 +62,12 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
 
     @Builder.Default
     @InputProperty(
+        description = "Specifies if an exception should be thrown, if CSV data contains different field count (default: false)"
+    )
+    private Boolean errorOnDifferentFieldCount = false;
+
+    @Builder.Default
+    @InputProperty(
         description = "Number of lines to skip at the start of the file"
     )
     private Integer skipRows = 0;
@@ -142,6 +148,10 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
 
         if (this.skipEmptyRows != null) {
             csvReader.setSkipEmptyRows(skipEmptyRows);
+        }
+
+        if (this.errorOnDifferentFieldCount != null) {
+            csvReader.setErrorOnDifferentFieldCount(errorOnDifferentFieldCount);
         }
 
         return csvReader;

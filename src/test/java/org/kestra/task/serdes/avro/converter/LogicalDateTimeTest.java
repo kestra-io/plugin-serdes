@@ -36,7 +36,8 @@ public class LogicalDateTimeTest {
     static Stream<Arguments> withFormat() {
         return Stream.of(
             Arguments.of("2019-12-26 12:13 +02", "yyyy-MM-dd' 'HH:mm' 'X", LocalDateTime.parse("2019-12-26T12:13+02:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC)),
-            Arguments.of("2019-12-26 12:13:59 +02", "yyyy-MM-dd' 'HH:mm:ss' 'X", LocalDateTime.parse("2019-12-26T12:13:59+02:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC))
+            Arguments.of("2019-12-26 12:13:59 +02", "yyyy-MM-dd' 'HH:mm:ss' 'X", LocalDateTime.parse("2019-12-26T12:13:59+02:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC)),
+            Arguments.of("2020-04-30 08:00:00 +0200", "yyyy-MM-dd' 'HH:mm:ss' 'XXXX", LocalDateTime.parse("2020-04-30T08:00:00+02:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC))
         );
     }
 
