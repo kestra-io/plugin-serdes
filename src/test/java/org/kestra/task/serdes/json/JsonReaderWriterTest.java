@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableMap;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
+import org.kestra.core.runners.RunContextFactory;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
@@ -27,7 +28,7 @@ class JsonReaderWriterTest {
     private static ObjectMapper mapper = new ObjectMapper();
 
     @Inject
-    ApplicationContext applicationContext;
+    RunContextFactory runContextFactory;
 
     @Inject
     StorageInterface storageInterface;
@@ -45,7 +46,7 @@ class JsonReaderWriterTest {
             .newLine(jsonNl)
             .build();
 
-        return reader.run(TestsUtils.mockRunContext(this.applicationContext, reader, ImmutableMap.of()));
+        return reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
     }
 
     private JsonWriter.Output writer(URI from, boolean jsonNl) throws Exception {
@@ -56,7 +57,7 @@ class JsonReaderWriterTest {
             .newLine(jsonNl)
             .build();
 
-        return writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
+        return writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
     }
 
     @Test

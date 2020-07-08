@@ -4,13 +4,13 @@ import com.devskiller.friendly_id.FriendlyId;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.junit.jupiter.api.Test;
+import org.kestra.core.runners.RunContextFactory;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.utils.TestsUtils;
 
@@ -32,7 +32,7 @@ class AvroWriterTest {
     StorageInterface storageInterface;
 
     @Inject
-    ApplicationContext applicationContext;
+    RunContextFactory runContextFactory;
 
     @Test
     void map() throws Exception {
@@ -64,7 +64,7 @@ class AvroWriterTest {
             )
             .build();
 
-        AvroWriter.Output run = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
+        AvroWriter.Output run = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
             AvroWriterTest.avroSize(this.storageInterface.get(run.getUri())),

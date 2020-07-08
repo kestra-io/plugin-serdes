@@ -1,7 +1,6 @@
 package org.kestra.task.serdes.avro;
 
 import com.google.common.collect.ImmutableMap;
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -14,6 +13,7 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
 import org.junit.jupiter.api.Test;
+import org.kestra.core.runners.RunContextFactory;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @MicronautTest
 public class AvroConverterTest {
     @Inject
-    ApplicationContext applicationContext;
+    RunContextFactory runContextFactory;
 
     @Inject
     StorageInterface storageInterface;
@@ -56,7 +56,7 @@ public class AvroConverterTest {
             .fieldSeparator(",".charAt(0))
             .header(true)
             .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         AvroWriter task = AvroWriter.builder()
             .id(AvroConverterTest.class.getSimpleName())
@@ -67,7 +67,7 @@ public class AvroConverterTest {
             .timeFormat("H:mm")
             .build();
 
-        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
+        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
             AvroWriterTest.avroSize(this.storageInterface.get(avroRunOutput.getUri())),
@@ -91,7 +91,7 @@ public class AvroConverterTest {
             .type(JsonReader.class.getName())
             .from(csv.toString())
             .build();
-        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
+        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         AvroWriter task = AvroWriter.builder()
             .id(AvroConverterTest.class.getSimpleName())
@@ -102,7 +102,7 @@ public class AvroConverterTest {
             .timeFormat("H:mm")
             .build();
 
-        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(applicationContext, task, ImmutableMap.of()));
+        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
             AvroWriterTest.avroSize(this.storageInterface.get(avroRunOutput.getUri())),

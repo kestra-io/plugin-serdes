@@ -2,12 +2,12 @@ package org.kestra.task.serdes.csv;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.Test;
 import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.runners.RunContext;
+import org.kestra.core.runners.RunContextFactory;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
@@ -24,7 +24,7 @@ import static org.hamcrest.Matchers.is;
 @MicronautTest
 class CsvReaderWriterTest {
     @Inject
-    ApplicationContext applicationContext;
+    RunContextFactory runContextFactory;
 
     @Inject
     StorageInterface storageInterface;
@@ -43,7 +43,7 @@ class CsvReaderWriterTest {
             .fieldSeparator(";".charAt(0))
             .header(header)
             .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of()));
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         CsvWriter writer = CsvWriter.builder()
             .id(CsvReaderWriterTest.class.getSimpleName())
@@ -54,7 +54,7 @@ class CsvReaderWriterTest {
             .lineDelimiter(ArrayUtils.toObject((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n").toCharArray()))
             .header(header)
             .build();
-        CsvWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(applicationContext, writer, ImmutableMap.of()));
+        CsvWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
         assertThat(
             CharStreams.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
@@ -86,7 +86,7 @@ class CsvReaderWriterTest {
             .header(false)
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(applicationContext, reader, ImmutableMap.of());
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
         reader.run(runContext);
 
         Counter records = (Counter) runContext.metrics()
