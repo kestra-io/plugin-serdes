@@ -4,7 +4,6 @@ import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Function;
-import io.reactivex.schedulers.Schedulers;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.Schema;
@@ -22,7 +21,6 @@ import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
 import org.kestra.task.serdes.serializers.ObjectsSerde;
 
-import javax.validation.constraints.NotNull;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -32,6 +30,7 @@ import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
@@ -128,44 +127,42 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
         Schema schema = parser.parse(runContext.render(this.schema));
 
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
-        DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
-        dataFileWriter.create(schema, output);
 
         // reader
         URI from = new URI(runContext.render(this.from));
-        ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
 
-        // convert
-        Flowable<GenericData.Record> flowable = Flowable
-            .create(ObjectsSerde.reader(inputStream), BackpressureStrategy.BUFFER)
-            .observeOn(Schedulers.computation())
-            .map(this.convertToAvro(schema))
-            .observeOn(Schedulers.io())
-            .doOnNext(datum -> {
-                try {
-                    dataFileWriter.append(datum);
-                } catch (Throwable e) {
-                    throw new AvroConverter.IllegalRowConvertion(
-                        datum.getSchema()
-                            .getFields()
-                            .stream()
-                            .map(field -> new AbstractMap.SimpleEntry<>(field.name(), datum.get(field.name())))
-                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
-                        e,
-                        null
-                    );
-                }
-            })
-            .doOnComplete(() -> {
-                dataFileWriter.close();
-                inputStream.close();
-                output.close();
-            });
+        try (
+            ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
+            DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
+            DataFileWriter<GenericRecord> schemaDdataFileWriter = dataFileWriter.create(schema, output);
+        ) {
+            Flowable<GenericData.Record> flowable = Flowable
+                .create(ObjectsSerde.reader(inputStream), BackpressureStrategy.BUFFER)
+                .map(this.convertToAvro(schema))
+                .doOnNext(datum -> {
+                    try {
+                        dataFileWriter.append(datum);
+                    } catch (Throwable e) {
+                        throw new AvroConverter.IllegalRowConvertion(
+                            datum.getSchema()
+                                .getFields()
+                                .stream()
+                                .map(field -> new AbstractMap.SimpleEntry<>(field.name(), datum.get(field.name())))
+                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
+                            e,
+                            null
+                        );
+                    }
+                });
 
-        // metrics & finalize
-        Single<Long> count = flowable.count();
-        Long lineCount = count.blockingGet();
-        runContext.metric(Counter.of("records", lineCount));
+
+            // metrics & finalize
+            Single<Long> count = flowable.count();
+            Long lineCount = count.blockingGet();
+            runContext.metric(Counter.of("records", lineCount));
+
+            output.flush();
+        }
 
         return Output
             .builder()

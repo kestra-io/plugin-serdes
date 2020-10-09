@@ -97,4 +97,5 @@ class CsvReaderWriterTest {
 
         assertThat(records.getValue(), is(2D));
     }
+
 }

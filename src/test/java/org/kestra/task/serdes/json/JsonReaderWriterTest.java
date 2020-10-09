@@ -2,7 +2,6 @@ package org.kestra.task.serdes.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.test.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
 import org.kestra.core.runners.RunContextFactory;
@@ -41,7 +40,7 @@ class JsonReaderWriterTest {
 
         JsonReader reader = JsonReader.builder()
             .id(JsonReader.class.getSimpleName())
-            .type(JsonReader.class.getName())
+            .type(AvroWriter.class.getName())
             .from(source.toString())
             .newLine(jsonNl)
             .build();
@@ -52,7 +51,7 @@ class JsonReaderWriterTest {
     private JsonWriter.Output writer(URI from, boolean jsonNl) throws Exception {
         JsonWriter writer = JsonWriter.builder()
             .id(JsonWriter.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(JsonWriter.class.getName())
             .from(from.toString())
             .newLine(jsonNl)
             .build();

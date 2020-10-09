@@ -2,6 +2,10 @@ package org.kestra.task.serdes.csv;
 
 import de.siegmar.fastcsv.reader.CsvParser;
 import de.siegmar.fastcsv.reader.CsvRow;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.FlowableOnSubscribe;
+import io.reactivex.Single;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.kestra.core.models.annotations.Documentation;
@@ -19,6 +23,7 @@ import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.validation.constraints.NotNull;
 
 @SuperBuilder
@@ -89,32 +94,38 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
         // temp file
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".javas");
 
+        // configuration
+        AtomicInteger skipped = new AtomicInteger();
+
         try (
             CsvParser csvParser = csvReader.parse(new InputStreamReader(runContext.uriToInputStream(from), charset));
-            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile))
+            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile));
         ) {
-            CsvRow row;
-            int count = 0;
-            int skipped = 0;
-
-            while ((row = csvParser.nextRow()) != null) {
-                if (this.skipRows > 0 && skipped < this.skipRows) {
-                    skipped++;
-                } else {
-                    Object map;
-                    count++;
-
-                    if (header) {
-                        map = row.getFieldMap();
-                    } else {
-                        map = row.getFields();
+            Flowable<Object> flowable = Flowable
+                .create(this.nextRow(csvParser), BackpressureStrategy.BUFFER)
+                .filter(csvRow -> {
+                    if (this.skipRows > 0 && skipped.get() < this.skipRows) {
+                        skipped.incrementAndGet();
+                        return false;
                     }
 
-                    ObjectsSerde.write(output, map);
-                }
-            }
+                    return true;
+                })
+                .map(r -> {
+                    if (header) {
+                        return r.getFieldMap();
+                    } else {
+                        return r.getFields();
+                    }
+                })
+                .doOnNext(row -> ObjectsSerde.write(output, row));
 
-            runContext.metric(Counter.of("records", count));
+            // metrics & finalize
+            Single<Long> count = flowable.count();
+            Long lineCount = count.blockingGet();
+            runContext.metric(Counter.of("records", lineCount));
+
+            output.flush();
         }
 
         return Output
@@ -130,6 +141,17 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
             description = "URI of a temporary result file"
         )
         private URI uri;
+    }
+
+    private FlowableOnSubscribe<CsvRow> nextRow(CsvParser csvParser) {
+        return s -> {
+            CsvRow row;
+            while ((row = csvParser.nextRow()) != null) {
+                s.onNext(row);
+            }
+
+            s.onComplete();
+        };
     }
 
     private de.siegmar.fastcsv.reader.CsvReader csvReader() {

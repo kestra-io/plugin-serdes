@@ -1,6 +1,9 @@
 package org.kestra.task.serdes.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.kestra.core.models.annotations.Documentation;
@@ -12,14 +15,17 @@ import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
 import org.kestra.task.serdes.serializers.ObjectsSerde;
 
-import javax.validation.constraints.NotNull;
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.ObjectInputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import javax.validation.constraints.NotNull;
 
 import static org.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -61,32 +67,40 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
     @Override
     public Output run(RunContext runContext) throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".jsonl");
-        ObjectMapper mapper = new ObjectMapper();
         URI from = new URI(runContext.render(this.from));
-        AtomicInteger count = new AtomicInteger();
 
         try (
             BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
-            ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from))
+            ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
         ) {
+            ObjectMapper mapper = new ObjectMapper();
+
             if (this.newLine) {
-                ObjectsSerde.reader(inputStream, throwConsumer(row -> {
-                    outfile.write(mapper.writeValueAsString(row) + "\n");
-                    count.getAndIncrement();
-                }));
+                Flowable<Object> flowable = Flowable
+                    .create(ObjectsSerde.reader(inputStream), BackpressureStrategy.BUFFER)
+                    .doOnNext(o -> {
+                        outfile.write(mapper.writeValueAsString(o) + "\n");
+                    });
+
+                // metrics & finalize
+                Single<Long> count = flowable.count();
+                Long lineCount = count.blockingGet();
+                runContext.metric(Counter.of("records", lineCount));
+
             } else {
+                AtomicLong lineCount = new AtomicLong();
+
                 List<Object> list = new ArrayList<>();
-
-                ObjectsSerde.reader(inputStream, throwConsumer(row -> {
-                    list.add(row);
-                    count.getAndIncrement();
+                ObjectsSerde.reader(inputStream, throwConsumer(e -> {
+                    list.add(e);
+                    lineCount.incrementAndGet();
                 }));
-
                 outfile.write(mapper.writeValueAsString(list));
+                runContext.metric(Counter.of("records", lineCount.get()));
             }
-        }
 
-        runContext.metric(Counter.of("records", count.get()));
+            outfile.flush();
+        }
 
         return Output
             .builder()

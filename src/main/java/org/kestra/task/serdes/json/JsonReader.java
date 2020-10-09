@@ -1,6 +1,10 @@
 package org.kestra.task.serdes.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.FlowableOnSubscribe;
+import io.reactivex.Single;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.kestra.core.models.annotations.Documentation;
@@ -15,11 +19,8 @@ import org.kestra.task.serdes.serializers.ObjectsSerde;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Collection;
 import javax.validation.constraints.NotNull;
-
-import static org.kestra.core.utils.Rethrow.throwConsumer;
 
 @SuperBuilder
 @ToString
@@ -56,39 +57,32 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
+        // reader
         URI from = new URI(runContext.render(this.from));
+
+        // temp file
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".javas");
-        ObjectMapper mapper = new ObjectMapper();
-        int count = 0;
 
         try (
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
-            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile))
+            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile));
         ) {
-            if (newLine) {
-                String line;
-                while ((line = input.readLine()) != null) {
-                    ObjectsSerde.write(output, mapper.readValue(line, Object.class));
-                    count++;
-                }
-            } else {
-                Object objects = mapper.readValue(input, Object.class);
+            Flowable<Object> flowable = Flowable
+                .create(this.nextRow(input), BackpressureStrategy.BUFFER)
+                .doOnNext(row -> ObjectsSerde.write(output, row));
 
-                if (objects instanceof Collection) {
-                    ((Collection<?>) objects)
-                        .forEach(throwConsumer(o -> ObjectsSerde.write(output, o)));
-                } else {
-                    ObjectsSerde.write(output, objects);
-                }
-            }
+            // metrics & finalize
+            Single<Long> count = flowable.count();
+            Long lineCount = count.blockingGet();
+            runContext.metric(Counter.of("records", lineCount));
 
-            runContext.metric(Counter.of("records", count));
-
-            return Output
-                .builder()
-                .uri(runContext.putTempFile(tempFile))
-                .build();
+            output.flush();
         }
+
+        return Output
+            .builder()
+            .uri(runContext.putTempFile(tempFile))
+            .build();
     }
 
     @Builder
@@ -98,5 +92,31 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
             description = "URI of a temporary result file"
         )
         private URI uri;
+    }
+
+    private FlowableOnSubscribe<Object> nextRow(BufferedReader inputStream) {
+        ObjectMapper mapper = new ObjectMapper();
+
+        return s -> {
+            if (newLine) {
+                String line;
+                while ((line = inputStream.readLine()) != null) {
+                    s.onNext(mapper.readValue(line, Object.class));
+                }
+            } else {
+                Object objects = mapper.readValue(inputStream, Object.class);
+
+                if (objects instanceof Collection) {
+                    ((Collection<?>) objects)
+                        .forEach(value -> {
+                            s.onNext(value);
+                        });
+                } else {
+                    s.onNext(objects);
+                }
+            }
+
+            s.onComplete();
+        };
     }
 }
