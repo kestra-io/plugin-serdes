@@ -46,9 +46,9 @@ dependencies {
     // kestra
     compileOnly group: "org.kestra", name: "core", version: kestraVersion
 
-    api group: "org.apache.avro", name: "avro", version: "1.9.0"
     api 'de.siegmar:fastcsv:1.0.3'
-    api 'io.reactivex.rxjava2:rxjava:2.2.16'
+    api 'org.apache.avro:avro:1.10.0'
+    api 'io.reactivex.rxjava2:rxjava:2.2.19'
 }
 
 
