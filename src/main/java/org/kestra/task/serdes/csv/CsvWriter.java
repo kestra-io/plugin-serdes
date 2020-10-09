@@ -15,10 +15,11 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.task.serdes.serializers.ObjectsSerde;
+import org.kestra.core.serializers.FileSerde;
 
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.ObjectInputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +33,7 @@ import javax.validation.constraints.NotNull;
 @Getter
 @NoArgsConstructor
 @Documentation(
-    description = "Read a java serialized data file and write it to a csv file."
+    description = "Read an ion serialized data file and write it to a csv file."
 )
 public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
     @NotNull
@@ -92,11 +93,11 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
         URI from = new URI(runContext.render(this.from));
 
         try (
-            ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
             CsvAppender csvAppender = csvWriter.append(tempFile, Charset.forName(this.charset));
         ) {
             Flowable<Object> flowable = Flowable
-                .create(ObjectsSerde.reader(inputStream), BackpressureStrategy.BUFFER)
+                .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
 

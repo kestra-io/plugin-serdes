@@ -36,12 +36,12 @@ class AvroWriterTest {
 
     @Test
     void map() throws Exception {
-        test("csv/insurance_sample.javas");
+        test("csv/insurance_sample.ion");
     }
 
     @Test
     void array() throws Exception {
-        test("csv/insurance_sample_array.javas");
+        test("csv/insurance_sample_array.ion");
     }
 
     void test(String file) throws Exception {

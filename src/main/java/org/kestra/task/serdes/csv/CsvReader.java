@@ -15,12 +15,12 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.task.serdes.serializers.ObjectsSerde;
+import org.kestra.core.serializers.FileSerde;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
-import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,7 +32,7 @@ import javax.validation.constraints.NotNull;
 @Getter
 @NoArgsConstructor
 @Documentation(
-    description = "Read a csv file and write it to a java serialized data file."
+    description = "Read a csv file and write it to an ion serialized data file."
 )
 public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
     @NotNull
@@ -92,14 +92,14 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
         de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader();
 
         // temp file
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".javas");
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
 
         // configuration
         AtomicInteger skipped = new AtomicInteger();
 
         try (
             CsvParser csvParser = csvReader.parse(new InputStreamReader(runContext.uriToInputStream(from), charset));
-            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile));
+            OutputStream output = new FileOutputStream(tempFile);
         ) {
             Flowable<Object> flowable = Flowable
                 .create(this.nextRow(csvParser), BackpressureStrategy.BUFFER)
@@ -118,7 +118,7 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
                         return r.getFields();
                     }
                 })
-                .doOnNext(row -> ObjectsSerde.write(output, row));
+                .doOnNext(row -> FileSerde.write(output, row));
 
             // metrics & finalize
             Single<Long> count = flowable.count();

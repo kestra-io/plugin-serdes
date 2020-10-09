@@ -13,12 +13,9 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.task.serdes.serializers.ObjectsSerde;
+import org.kestra.core.serializers.FileSerde;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.ObjectInputStream;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -35,7 +32,7 @@ import static org.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Documentation(
-    description = "Read a java serialized data file and write it to a new line delimited json file."
+    description = "Read an ion serialized data file and write it to a new line delimited json file."
 )
 public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> {
     @NotNull
@@ -71,13 +68,13 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
 
         try (
             BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
-            ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
         ) {
             ObjectMapper mapper = new ObjectMapper();
 
             if (this.newLine) {
                 Flowable<Object> flowable = Flowable
-                    .create(ObjectsSerde.reader(inputStream), BackpressureStrategy.BUFFER)
+                    .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
                     .doOnNext(o -> {
                         outfile.write(mapper.writeValueAsString(o) + "\n");
                     });
@@ -91,7 +88,7 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
                 AtomicLong lineCount = new AtomicLong();
 
                 List<Object> list = new ArrayList<>();
-                ObjectsSerde.reader(inputStream, throwConsumer(e -> {
+                FileSerde.reader(inputStream, throwConsumer(e -> {
                     list.add(e);
                     lineCount.incrementAndGet();
                 }));

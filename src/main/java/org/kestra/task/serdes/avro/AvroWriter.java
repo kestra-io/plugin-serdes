@@ -19,12 +19,9 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.task.serdes.serializers.ObjectsSerde;
+import org.kestra.core.serializers.FileSerde;
 
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
+import java.io.*;
 import java.net.URI;
 import java.util.AbstractMap;
 import java.util.List;
@@ -38,7 +35,7 @@ import javax.validation.constraints.NotNull;
 @Getter
 @NoArgsConstructor
 @Documentation(
-    description = "Read a provided file containing java serialized data and convert it to avro."
+    description = "Read a provided file containing ion serialized data and convert it to avro."
 )
 public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> {
     @NotNull
@@ -132,12 +129,12 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
         URI from = new URI(runContext.render(this.from));
 
         try (
-            ObjectInputStream inputStream = new ObjectInputStream(runContext.uriToInputStream(from));
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDdataFileWriter = dataFileWriter.create(schema, output);
         ) {
             Flowable<GenericData.Record> flowable = Flowable
-                .create(ObjectsSerde.reader(inputStream), BackpressureStrategy.BUFFER)
+                .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
                 .map(this.convertToAvro(schema))
                 .doOnNext(datum -> {
                     try {
@@ -154,7 +151,6 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
                         );
                     }
                 });
-
 
             // metrics & finalize
             Single<Long> count = flowable.count();

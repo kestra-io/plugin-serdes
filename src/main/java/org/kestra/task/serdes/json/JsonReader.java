@@ -14,7 +14,7 @@ import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
-import org.kestra.task.serdes.serializers.ObjectsSerde;
+import org.kestra.core.serializers.FileSerde;
 
 import java.io.*;
 import java.net.URI;
@@ -28,7 +28,7 @@ import javax.validation.constraints.NotNull;
 @Getter
 @NoArgsConstructor
 @Documentation(
-    description = "Read a json file and write it to a java serialized data file."
+    description = "Read a json file and write it to an ion serialized data file."
 )
 public class JsonReader extends Task implements RunnableTask<JsonReader.Output> {
     @NotNull
@@ -61,15 +61,15 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
         URI from = new URI(runContext.render(this.from));
 
         // temp file
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".javas");
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
 
         try (
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
-            ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(tempFile));
+            OutputStream output = new FileOutputStream(tempFile);
         ) {
             Flowable<Object> flowable = Flowable
                 .create(this.nextRow(input), BackpressureStrategy.BUFFER)
-                .doOnNext(row -> ObjectsSerde.write(output, row));
+                .doOnNext(row -> FileSerde.write(output, row));
 
             // metrics & finalize
             Single<Long> count = flowable.count();
