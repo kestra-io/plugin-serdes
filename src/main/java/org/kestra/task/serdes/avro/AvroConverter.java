@@ -218,7 +218,10 @@ public class AvroConverter {
 
     private Instant logicalTimestampMillis(Object data) {
         if (data instanceof String) {
-            return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat)).toInstant(ZoneOffset.UTC);
+            return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
+                .toInstant(ZoneOffset.UTC);
+        } else if (data instanceof Long) {
+            return Instant.ofEpochMilli((Long) data);
         } else {
             return (Instant) data;
         }
@@ -226,7 +229,10 @@ public class AvroConverter {
 
     private Instant logicalTimestampMicros(Object data) {
         if (data instanceof String) {
-            return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat)).toInstant(ZoneOffset.UTC);
+            return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
+                .toInstant(ZoneOffset.UTC);
+        } else if (data instanceof Long) {
+            return Instant.ofEpochSecond(0, (Long) data * 1000);
         } else {
             return (Instant) data;
         }

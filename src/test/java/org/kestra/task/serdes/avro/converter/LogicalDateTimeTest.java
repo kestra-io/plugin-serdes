@@ -1,7 +1,9 @@
 package org.kestra.task.serdes.avro.converter;
 
+import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
+import org.junit.jupiter.api.Test;
 import org.kestra.task.serdes.avro.AvroConverter;
 import org.kestra.task.serdes.avro.AvroConverterTest;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,6 +33,19 @@ public class LogicalDateTimeTest {
     void convert(CharSequence v, Instant expected) throws Exception {
         AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)));
         AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)));
+    }
+
+    static Stream<Arguments> sourceTimestamp() {
+        return Stream.of(
+            Arguments.of(1577362391123L, LogicalTypes.timestampMillis(), LocalDateTime.parse("2019-12-26T12:13:11.123+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC)),
+            Arguments.of(1577362391123456L, LogicalTypes.timestampMicros(), LocalDateTime.parse("2019-12-26T12:13:11.123456+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC))
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("sourceTimestamp")
+    void convertTimestamp(Long v, LogicalType logicalType, Instant expected) throws Exception {
+        AvroConverterTest.Utils.oneField(v, expected, logicalType.addToSchema(Schema.create(Schema.Type.LONG)));
     }
 
     static Stream<Arguments> withFormat() {
