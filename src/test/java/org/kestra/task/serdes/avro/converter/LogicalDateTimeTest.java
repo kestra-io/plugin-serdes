@@ -3,12 +3,11 @@ package org.kestra.task.serdes.avro.converter;
 import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
-import org.junit.jupiter.api.Test;
-import org.kestra.task.serdes.avro.AvroConverter;
-import org.kestra.task.serdes.avro.AvroConverterTest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.kestra.task.serdes.avro.AvroConverter;
+import org.kestra.task.serdes.avro.AvroConverterTest;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -38,13 +37,15 @@ public class LogicalDateTimeTest {
     static Stream<Arguments> sourceTimestamp() {
         return Stream.of(
             Arguments.of(1577362391123L, LogicalTypes.timestampMillis(), LocalDateTime.parse("2019-12-26T12:13:11.123+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC)),
-            Arguments.of(1577362391123456L, LogicalTypes.timestampMicros(), LocalDateTime.parse("2019-12-26T12:13:11.123456+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC))
+            Arguments.of(1577362391123456L, LogicalTypes.timestampMicros(), LocalDateTime.parse("2019-12-26T12:13:11.123456+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC)),
+            Arguments.of("1577362391123", LogicalTypes.timestampMillis(), LocalDateTime.parse("2019-12-26T12:13:11.123+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC)),
+            Arguments.of("1577362391123456", LogicalTypes.timestampMicros(), LocalDateTime.parse("2019-12-26T12:13:11.123456+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(ZoneOffset.UTC))
         );
     }
 
     @ParameterizedTest
     @MethodSource("sourceTimestamp")
-    void convertTimestamp(Long v, LogicalType logicalType, Instant expected) throws Exception {
+    void convertTimestamp(Object v, LogicalType logicalType, Instant expected) throws Exception {
         AvroConverterTest.Utils.oneField(v, expected, logicalType.addToSchema(Schema.create(Schema.Type.LONG)));
     }
 
