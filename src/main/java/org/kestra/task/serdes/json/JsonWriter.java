@@ -4,11 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.kestra.core.models.annotations.Documentation;
-import org.kestra.core.models.annotations.InputProperty;
-import org.kestra.core.models.annotations.OutputProperty;
+import org.kestra.core.models.annotations.PluginProperty;
 import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
@@ -31,34 +30,32 @@ import static org.kestra.core.utils.Rethrow.throwConsumer;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Documentation(
-    description = "Read an ion serialized data file and write it to a new line delimited json file."
+@Schema(
+    title = "Read an ion serialized data file and write it to a new line delimited json file."
 )
 public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> {
     @NotNull
-    @InputProperty(
-        description = "Source file URI",
-        dynamic = true
+    @Schema(
+        title = "Source file URI"
     )
+    @PluginProperty(dynamic = true)
     private String from;
 
     @Builder.Default
-    @InputProperty(
-        description = "The name of a supported charset",
-        body = "Default value is UTF-8.",
-        dynamic = false
+    @Schema(
+        title = "The name of a supported charset",
+        description = "Default value is UTF-8."
     )
+    @PluginProperty(dynamic = true)
     private String charset = StandardCharsets.UTF_8.name();
 
     @Builder.Default
-    @InputProperty(
-        description = "Is the file is a json new line (JSON-NL)",
-        body = {
-            "Is the file is a json with new line separator",
+    @Schema(
+        title = "Is the file is a json new line (JSON-NL)",
+        description = "Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
-        },
-        dynamic = false
     )
+    @PluginProperty(dynamic = false)
     private boolean newLine = true;
 
     @Override
@@ -108,8 +105,8 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
     @Builder
     @Getter
     public static class Output implements org.kestra.core.models.tasks.Output {
-        @OutputProperty(
-            description = "URI of a temporary result file"
+        @Schema(
+            title = "URI of a temporary result file"
         )
         private URI uri;
     }

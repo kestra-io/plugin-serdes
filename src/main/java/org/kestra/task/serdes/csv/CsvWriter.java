@@ -5,12 +5,11 @@ import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Consumer;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.commons.lang3.ArrayUtils;
-import org.kestra.core.models.annotations.Documentation;
-import org.kestra.core.models.annotations.InputProperty;
-import org.kestra.core.models.annotations.OutputProperty;
+import org.kestra.core.models.annotations.PluginProperty;
 import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
@@ -32,54 +31,54 @@ import javax.validation.constraints.NotNull;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Documentation(
-    description = "Read an ion serialized data file and write it to a csv file."
+@Schema(
+    title = "Read an ion serialized data file and write it to a csv file."
 )
 public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
     @NotNull
-    @InputProperty(
-        description = "Source file URI",
-        dynamic = true
+    @Schema(
+        title = "Source file URI"
     )
+    @PluginProperty(dynamic = true)
     private String from;
 
     @Builder.Default
-    @InputProperty(
-        description = "Specifies if the first line should be the header (default: false)"
+    @Schema(
+        title = "Specifies if the first line should be the header (default: false)"
     )
-    private Boolean header = true;
+    private final Boolean header = true;
 
     @Builder.Default
-    @InputProperty(
-        description = "The field separator character (default: ',' - comma)"
+    @Schema(
+        title = "The field separator character (default: ',' - comma)"
     )
-    private Character fieldSeparator = ",".charAt(0);
+    private final Character fieldSeparator = ",".charAt(0);
 
     @Builder.Default
-    @InputProperty(
-        description = "The text delimiter character (default: '\"' - double quotes)"
+    @Schema(
+        title = "The text delimiter character (default: '\"' - double quotes)"
     )
-    private Character textDelimiter = "\"".charAt(0);
+    private final Character textDelimiter = "\"".charAt(0);
 
     @Builder.Default
-    @InputProperty(
-        description = "The character used to separate rows"
+    @Schema(
+        title = "The character used to separate rows"
     )
-    private Character[] lineDelimiter = ArrayUtils.toObject("\n".toCharArray());
+    private final Character[] lineDelimiter = ArrayUtils.toObject("\n".toCharArray());
 
     @Builder.Default
-    @InputProperty(
-        description = "Whether fields should always be delimited using the textDelimiter option.",
-        body = "Default value is false"
+    @Schema(
+        title = "Whether fields should always be delimited using the textDelimiter option.",
+        description = "Default value is false"
     )
-    private Boolean alwaysDelimitText = false;
+    private final Boolean alwaysDelimitText = false;
 
     @Builder.Default
-    @InputProperty(
-        description = "The name of a supported charset",
-        body = "Default value is UTF-8."
+    @Schema(
+        title = "The name of a supported charset",
+        description = "Default value is UTF-8."
     )
-    private String charset = StandardCharsets.UTF_8.name();
+    private final String charset = StandardCharsets.UTF_8.name();
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -153,8 +152,8 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
     @Builder
     @Getter
     public static class Output implements org.kestra.core.models.tasks.Output {
-        @OutputProperty(
-            description = "URI of a temporary result file"
+        @Schema(
+            title = "URI of a temporary result file"
         )
         private URI uri;
     }

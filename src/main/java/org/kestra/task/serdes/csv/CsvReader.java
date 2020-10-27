@@ -6,11 +6,10 @@ import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableOnSubscribe;
 import io.reactivex.Single;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.kestra.core.models.annotations.Documentation;
-import org.kestra.core.models.annotations.InputProperty;
-import org.kestra.core.models.annotations.OutputProperty;
+import org.kestra.core.models.annotations.PluginProperty;
 import org.kestra.core.models.executions.metrics.Counter;
 import org.kestra.core.models.tasks.RunnableTask;
 import org.kestra.core.models.tasks.Task;
@@ -31,59 +30,58 @@ import javax.validation.constraints.NotNull;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Documentation(
-    description = "Read a csv file and write it to an ion serialized data file."
+@Schema(
+    title = "Read a csv file and write it to an ion serialized data file."
 )
 public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
     @NotNull
-    @InputProperty(
-        description = "Source file URI",
-        dynamic = true
-    )
+    @Schema(
+        title = "Source file URI")
+    @PluginProperty(dynamic = true)
     private String from;
 
     @Builder.Default
-    @InputProperty(
-        description = "Specifies if the first line should be the header (default: false)"
+    @Schema(
+        title = "Specifies if the first line should be the header (default: false)"
     )
-    private Boolean header = true;
+    private final Boolean header = true;
 
     @Builder.Default
-    @InputProperty(
-        description = "The field separator character (default: ',' - comma)"
+    @Schema(
+        title = "The field separator character (default: ',' - comma)"
     )
-    private Character fieldSeparator = ",".charAt(0);
+    private final Character fieldSeparator = ",".charAt(0);
 
     @Builder.Default
-    @InputProperty(
-        description = "The text delimiter character (default: '\"' - double quotes)"
+    @Schema(
+        title = "The text delimiter character (default: '\"' - double quotes)"
     )
-    private Character textDelimiter = "\"".charAt(0);
+    private final Character textDelimiter = "\"".charAt(0);
 
     @Builder.Default
-    @InputProperty(
-        description = "Specifies if empty rows should be skipped (default: true)"
+    @Schema(
+        title = "Specifies if empty rows should be skipped (default: true)"
     )
-    private Boolean skipEmptyRows = false;
+    private final Boolean skipEmptyRows = false;
 
     @Builder.Default
-    @InputProperty(
-        description = "Specifies if an exception should be thrown, if CSV data contains different field count (default: false)"
+    @Schema(
+        title = "Specifies if an exception should be thrown, if CSV data contains different field count (default: false)"
     )
-    private Boolean errorOnDifferentFieldCount = false;
+    private final Boolean errorOnDifferentFieldCount = false;
 
     @Builder.Default
-    @InputProperty(
-        description = "Number of lines to skip at the start of the file"
+    @Schema(
+        title = "Number of lines to skip at the start of the file"
     )
-    private Integer skipRows = 0;
+    private final Integer skipRows = 0;
 
     @Builder.Default
-    @InputProperty(
-        description = "The name of a supported charset",
-        body = "Default value is UTF-8."
+    @Schema(
+        title = "The name of a supported charset",
+        description = "Default value is UTF-8."
     )
-    private String charset = StandardCharsets.UTF_8.name();
+    private final String charset = StandardCharsets.UTF_8.name();
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -137,8 +135,8 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
     @Builder
     @Getter
     public static class Output implements org.kestra.core.models.tasks.Output {
-        @OutputProperty(
-            description = "URI of a temporary result file"
+        @Schema(
+            title = "URI of a temporary result file"
         )
         private URI uri;
     }
