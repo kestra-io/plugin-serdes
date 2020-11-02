@@ -50,7 +50,7 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
         description ="Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
-    private final boolean newLine = true;
+    private final Boolean newLine = true;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
