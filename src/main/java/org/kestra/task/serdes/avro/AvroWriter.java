@@ -19,13 +19,13 @@ import org.kestra.core.models.tasks.Task;
 import org.kestra.core.runners.RunContext;
 import org.kestra.core.serializers.FileSerde;
 
+import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.net.URI;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import javax.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
@@ -110,6 +110,14 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     )
     @PluginProperty(dynamic = true)
     private Character decimalSeparator;
+
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Whether to consider a field present in the data but not declared in the schema as an error",
+        description = "Default value is false"
+    )
+    @PluginProperty(dynamic = false)
+    protected Boolean strictSchema = Boolean.FALSE;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -229,6 +237,10 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
 
         if (this.decimalSeparator != null) {
             builder.decimalSeparator(this.decimalSeparator);
+        }
+
+        if (this.strictSchema != null) {
+            builder.strictSchema(this.strictSchema);
         }
 
         return builder.build();
