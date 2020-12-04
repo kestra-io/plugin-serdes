@@ -104,17 +104,17 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
                     @Override
                     public void accept(Object row) throws Exception {
                         if (row instanceof List) {
-                            List<String> casted = (List<String>) row;
+                            List<Object> casted = (List<Object>) row;
 
                             if (header) {
                                 throw new IllegalArgumentException("Invalid data of type List with header");
                             }
 
-                            for (final String value : casted) {
-                                csvAppender.appendField(value);
+                            for (final Object value : casted) {
+                                csvAppender.appendField(value.toString());
                             }
                         } else if (row instanceof Map) {
-                            Map<String, String> casted = (Map<String, String>) row;
+                            Map<String, Object> casted = (Map<String, Object>) row;
 
                             if (!first) {
                                 this.first = true;
@@ -126,8 +126,8 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
                                 }
                             }
 
-                            for (final String value : casted.values()) {
-                                csvAppender.appendField(value);
+                            for (final Object value : casted.values()) {
+                                csvAppender.appendField(value.toString());
                             }
                         }
 
