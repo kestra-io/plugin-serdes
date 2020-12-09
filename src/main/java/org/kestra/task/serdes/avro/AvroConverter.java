@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Builder
 public class AvroConverter {
@@ -91,7 +92,7 @@ public class AvroConverter {
         }
 
         if (this.strictSchema && schema.getFields().size() < data.size()) {
-            throw new IllegalStrictRowConversion(schema, data);
+            throw new IllegalStrictRowConversion(schema, schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList()), data.values());
         }
 
         return record;
@@ -103,6 +104,10 @@ public class AvroConverter {
         for (Schema.Field field : schema.getFields()) {
             map.put(field.name(), data.get(index));
             index++;
+        }
+
+        if (this.strictSchema && schema.getFields().size() < data.size()) {
+            throw new IllegalStrictRowConversion(schema, map.keySet(), data);
         }
 
         return this.fromMap(schema, map);
@@ -462,20 +467,23 @@ public class AvroConverter {
     @Getter
     public static class IllegalStrictRowConversion extends Exception {
         private Schema schema;
-        private Object data;
+        Collection<String> fields;
+        Collection values;
 
-        public IllegalStrictRowConversion(Schema schema, Map<String, Object> data) {
+        public IllegalStrictRowConversion(Schema schema, Collection<String> fields, Collection values) {
             super();
 
             this.schema = schema;
-            this.data = data;
+            this.fields = fields;
+            this.values = values;
         }
 
 
         @Override
         public String toString() {
             try {
-                return "Data contains more fields than schema : on row with data [" + trimExceptionMessage(data) + "] and schema [" + schema.toString() + "].";
+                return "Data contains more fields than schema : on row with " + fields.size() + " Fields [" + trimExceptionMessage(fields)
+                    + "], " + values.size() + " Values [" + trimExceptionMessage(values) + "] and Schema [" + schema.toString() + "].";
             } catch (JsonProcessingException e) {
                 return super.toString();
             }
