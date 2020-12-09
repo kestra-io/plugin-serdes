@@ -1,0 +1,53 @@
+{
+  "type": "record",
+  "name": "Nested",
+  "namespace": "org.kestra",
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "name",
+      "type": "string"
+    },
+    {
+      "name": "nameNullable",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    {
+      "name": "nested",
+      "type": {
+        "type": "record",
+        "name": "nestedRecord",
+        "fields": [
+          {
+            "name": "email",
+            "type": "string"
+          },
+          {
+            "name": "enum",
+            "type": {
+              "type": "enum",
+              "name": "Gender",
+              "symbols": [
+                "Female",
+                "Male"
+              ]
+            }
+          },
+          {
+            "name": "long",
+            "type": [
+              "long",
+              "null"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

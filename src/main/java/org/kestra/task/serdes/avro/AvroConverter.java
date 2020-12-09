@@ -11,6 +11,7 @@ import org.apache.avro.data.TimeConversions;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.lang3.StringUtils;
+import org.kestra.core.models.annotations.PluginProperty;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -19,7 +20,7 @@ import java.nio.ByteBuffer;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Builder
 public class AvroConverter {
@@ -58,6 +59,14 @@ public class AvroConverter {
     @Builder.Default
     private char decimalSeparator = '.';
 
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Whether to consider a field present in the data but not declared in the schema as an error",
+        description = "Default value is false"
+    )
+    @PluginProperty(dynamic = false)
+    protected Boolean strictSchema = Boolean.FALSE;
+
     public static GenericData genericData() {
         GenericData genericData = new GenericData();
         genericData.addLogicalTypeConversion(new Conversions.UUIDConversion());
@@ -71,7 +80,7 @@ public class AvroConverter {
         return genericData;
     }
 
-    public GenericData.Record fromMap(Schema schema, Map<String, Object> data) throws IllegalRowConvertion {
+    public GenericData.Record fromMap(Schema schema, Map<String, Object> data) throws IllegalRowConvertion, IllegalStrictRowConversion {
         GenericData.Record record = new GenericData.Record(schema);
 
         for (Schema.Field field : schema.getFields()) {
@@ -82,15 +91,23 @@ public class AvroConverter {
             }
         }
 
+        if (this.strictSchema && schema.getFields().size() < data.size()) {
+            throw new IllegalStrictRowConversion(schema, schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList()), data.values());
+        }
+
         return record;
     }
 
-    public GenericData.Record fromArray(Schema schema, List<String> data) throws IllegalRowConvertion {
+    public GenericData.Record fromArray(Schema schema, List<String> data) throws IllegalRowConvertion, IllegalStrictRowConversion {
         HashMap<String, Object> map = new HashMap<>();
         int index = 0;
         for (Schema.Field field : schema.getFields()) {
             map.put(field.name(), data.get(index));
             index++;
+        }
+
+        if (this.strictSchema && schema.getFields().size() < data.size()) {
+            throw new IllegalStrictRowConversion(schema, map.keySet(), data);
         }
 
         return this.fromMap(schema, map);
@@ -220,7 +237,8 @@ public class AvroConverter {
         if (data instanceof String) {
             try {
                 return Instant.ofEpochMilli(Long.parseLong((String) data));
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException ignored) {
+            }
 
             return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
                 .toInstant(ZoneOffset.UTC);
@@ -235,7 +253,8 @@ public class AvroConverter {
         if (data instanceof String) {
             try {
                 return Instant.ofEpochSecond(0, Long.parseLong((String) data) * 1000);
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException ignored) {
+            }
 
             return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
                 .toInstant(ZoneOffset.UTC);
@@ -439,6 +458,32 @@ public class AvroConverter {
         public String toString() {
             try {
                 return super.toString() + (field != null ? " on field '" + field.name() : "") + "' with data [" + trimExceptionMessage(data) + "]";
+            } catch (JsonProcessingException e) {
+                return super.toString();
+            }
+        }
+    }
+
+    @Getter
+    public static class IllegalStrictRowConversion extends Exception {
+        private Schema schema;
+        Collection<String> fields;
+        Collection values;
+
+        public IllegalStrictRowConversion(Schema schema, Collection<String> fields, Collection values) {
+            super();
+
+            this.schema = schema;
+            this.fields = fields;
+            this.values = values;
+        }
+
+
+        @Override
+        public String toString() {
+            try {
+                return "Data contains more fields than schema : on row with " + fields.size() + " Fields [" + trimExceptionMessage(fields)
+                    + "], " + values.size() + " Values [" + trimExceptionMessage(values) + "] and Schema [" + schema.toString() + "].";
             } catch (JsonProcessingException e) {
                 return super.toString();
             }

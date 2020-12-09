@@ -20,12 +20,12 @@ import org.kestra.task.serdes.SerdesUtils;
 import org.kestra.task.serdes.csv.CsvReader;
 import org.kestra.task.serdes.json.JsonReader;
 
+import javax.inject.Inject;
 import java.io.*;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.Consumer;
-import javax.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -114,12 +114,175 @@ public class AvroConverterTest {
         );
     }
 
+    @Test
+    void csvStrictSchema() throws Exception {
+        String read = SerdesUtils.readResource("csv/full.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema.csv");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        CsvReader reader = CsvReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(CsvReader.class.getName())
+            .from(csv.toString())
+            .fieldSeparator(",".charAt(0))
+            .header(true)
+            .build();
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .strictSchema(true)
+            .build();
+
+        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+            task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        });
+
+        assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
+        assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IllegalStrictRowConversion"));
+    }
+
+    @Test
+    void csvStrictSchemaArray() throws Exception {
+        String read = SerdesUtils.readResource("csv/full.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema_array.csv");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        CsvReader reader = CsvReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(CsvReader.class.getName())
+            .from(csv.toString())
+            .fieldSeparator(",".charAt(0))
+            .header(false)
+            .build();
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .strictSchema(true)
+            .build();
+
+        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+            task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        });
+
+        assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
+        assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IllegalStrictRowConversion"));
+    }
+
+    @Test
+    void csvNoStrictSchema() throws Exception {
+        String read = SerdesUtils.readResource("csv/full.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema.csv");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        CsvReader reader = CsvReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(CsvReader.class.getName())
+            .from(csv.toString())
+            .fieldSeparator(",".charAt(0))
+            .header(true)
+            .build();
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .build();
+
+        // No exception should be thrown
+        task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+    }
+
+    @Test
+    void jsonStrictSchema() throws Exception {
+        String read = SerdesUtils.readResource("csv/full.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema.jsonl");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        JsonReader reader = JsonReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(JsonReader.class.getName())
+            .from(csv.toString())
+            .build();
+        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .strictSchema(true)
+            .build();
+
+        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+            task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        });
+
+        assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
+        assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IllegalStrictRowConversion"));
+    }
+
+    @Test
+    void jsonStrictSchemaNested() throws Exception {
+        String read = SerdesUtils.readResource("csv/nested.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema_nested.jsonl");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        JsonReader reader = JsonReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(JsonReader.class.getName())
+            .from(csv.toString())
+            .build();
+        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .strictSchema(true)
+            .build();
+
+        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+            task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        });
+
+        assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
+        assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IllegalRowConvertion"));
+        assertThat(re.getCause().getCause().getCause().getClass().getSimpleName(), is("IllegalCellConversion"));
+        assertThat(re.getCause().getCause().getCause().getCause().getClass().getSimpleName(), is("IllegalStrictRowConversion"));
+    }
+
     public static class Utils {
-        public static void oneField(Object v, Object expected, Schema type) throws AvroConverter.IllegalRowConvertion {
+        public static void oneField(Object v, Object expected, Schema type) throws AvroConverter.IllegalRowConvertion, AvroConverter.IllegalStrictRowConversion {
             oneField(AvroConverter.builder().build(), v, expected, type);
         }
 
-        public static void oneField(AvroConverter avroConverter, Object v, Object expected, Schema type) throws AvroConverter.IllegalRowConvertion {
+        public static void oneField(AvroConverter avroConverter, Object v, Object expected, Schema type) throws AvroConverter.IllegalRowConvertion, AvroConverter.IllegalStrictRowConversion {
             Schema schema = oneFieldSchema(type);
 
             HashMap<String, Object> map = new HashMap<>();

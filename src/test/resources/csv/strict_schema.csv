@@ -1,0 +1,3 @@
+id,name,nameNullable,email,enum,long,double,boolean,date,timeMillis,timestampMillis,timestampMicros,addedField
+4814976,Viva,,alidgertwood0@nbcnews.com,Female,-867174862080523000,1783477.3480111,true,2017/11/16,5:14,2017-02-07T11:23:39Z,2013-02-05T11:07:59Z,12
+1010871,Voomm,,pbickardike1@ask.com,Female,-543538211523588000,336497.290186367,false,2013/10/23,20:13,2013-02-22T17:23:16Z,2014-03-31T03:58:14Z,13
