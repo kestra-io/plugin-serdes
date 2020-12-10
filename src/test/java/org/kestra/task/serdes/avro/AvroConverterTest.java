@@ -4,14 +4,13 @@ import com.google.common.collect.ImmutableMap;
 import io.micronaut.test.annotation.MicronautTest;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
+import org.apache.avro.SchemaParseException;
+import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.BinaryDecoder;
-import org.apache.avro.io.BinaryEncoder;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.io.*;
 import org.junit.jupiter.api.Test;
 import org.kestra.core.runners.RunContextFactory;
 import org.kestra.core.storages.StorageInterface;
@@ -29,6 +28,7 @@ import java.util.function.Consumer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @MicronautTest
@@ -275,6 +275,82 @@ public class AvroConverterTest {
         assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IllegalRowConvertion"));
         assertThat(re.getCause().getCause().getCause().getClass().getSimpleName(), is("IllegalCellConversion"));
         assertThat(re.getCause().getCause().getCause().getCause().getClass().getSimpleName(), is("IllegalStrictRowConversion"));
+    }
+
+    @Test
+    void jsonNoAliases() throws Exception {
+        String read = SerdesUtils.readResource("csv/portfolio_without_aliases.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/portfolio.json");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        JsonReader reader = JsonReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(JsonReader.class.getName())
+            .from(csv.toString())
+            .newLine(Boolean.FALSE)
+            .build();
+        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .build();
+
+        RuntimeException spe = assertThrows(SchemaParseException.class, () -> {
+            task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        });
+
+        assertThat(spe.getMessage(), is("Illegal character in: nbJH_DTP-Helpdesk"));
+    }
+
+    @Test
+    void jsonAliases() throws Exception {
+        String read = SerdesUtils.readResource("csv/portfolio_aliases.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/portfolio.json");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        JsonReader reader = JsonReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(JsonReader.class.getName())
+            .from(csv.toString())
+            .newLine(Boolean.FALSE)
+            .build();
+        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .build();
+
+        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+
+        assertThat(
+            AvroWriterTest.avroSize(this.storageInterface.get(avroRunOutput.getUri())),
+            is(AvroWriterTest.avroSize(
+                new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
+                    .getResource("csv/portfolio_aliases.avro"))
+                    .toURI())))
+            )
+        );
+
+        DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
+        DataFileStream<GenericRecord> dataFileReader = new DataFileStream<>(this.storageInterface.get(avroRunOutput.getUri()), datumReader);
+        dataFileReader.forEach(genericRecord -> {
+            GenericRecord scenario = ((GenericRecord) ((GenericRecord) genericRecord.get("it")).get("selectedScenario"));
+            assertThat(scenario.get("nbJH_DTP_Sales"), notNullValue());
+            assertThat(scenario.get("nbJH_DTP_Cloud_Connectivity"), notNullValue());
+            assertThat(scenario.get("nbJH_DTP_Helpdesk"), notNullValue());
+        });
     }
 
     public static class Utils {

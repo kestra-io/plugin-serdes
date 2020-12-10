@@ -1,0 +1,58 @@
+{
+  "type": "record",
+  "name": "Aliases",
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "portfolio",
+      "type": "string"
+    },
+    {
+      "name": "portfolioId",
+      "type": "string"
+    },
+    {
+      "name": "it",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "namespace": "aliases",
+          "name": "It",
+          "fields": [
+            {
+              "name": "selectedScenario",
+              "type": [
+                "null",
+                {
+                  "type": "record",
+                  "namespace": "aliases.it",
+                  "name": "SelectedScenario",
+                  "fields": [
+                    {
+                      "name": "nbJH_DTP-Helpdesk",
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    {
+                      "name": "nbJH_DTP-Cloud&Connectivity",
+                      "type": [
+                        "null",
+                        "int"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
