@@ -38,7 +38,7 @@
                         "null",
                         "string"
                       ],
-                      "aliases" : [ "nbJH_DTP-Helpdesk" ]
+                      "aliases": ["nbJH_DTP-Helpdesk"]
                     },
                     {
                       "name": "nbJH_DTP_Cloud_Connectivity",
@@ -46,7 +46,15 @@
                         "null",
                         "int"
                       ],
-                      "aliases" : [ "nbJH_DTP-Cloud&Connectivity" ]
+                      "aliases": ["nbJH_DTP-Cloud&Connectivity"]
+                    },
+                    {
+                      "name": "nbJH_DTP_Sales",
+                      "type": [
+                        "null",
+                        "int"
+                      ],
+                      "aliases": ["nbjh_sales"]
                     }
                   ]
                 }

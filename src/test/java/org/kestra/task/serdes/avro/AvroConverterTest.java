@@ -5,14 +5,12 @@ import io.micronaut.test.annotation.MicronautTest;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.SchemaParseException;
+import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.BinaryDecoder;
-import org.apache.avro.io.BinaryEncoder;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.io.*;
 import org.junit.jupiter.api.Test;
 import org.kestra.core.runners.RunContextFactory;
 import org.kestra.core.storages.StorageInterface;
@@ -30,6 +28,7 @@ import java.util.function.Consumer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @MicronautTest
@@ -343,6 +342,15 @@ public class AvroConverterTest {
                     .toURI())))
             )
         );
+
+        DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
+        DataFileStream<GenericRecord> dataFileReader = new DataFileStream<>(this.storageInterface.get(avroRunOutput.getUri()), datumReader);
+        dataFileReader.forEach(genericRecord -> {
+            GenericRecord scenario = ((GenericRecord) ((GenericRecord) genericRecord.get("it")).get("selectedScenario"));
+            assertThat(scenario.get("nbJH_DTP_Sales"), notNullValue());
+            assertThat(scenario.get("nbJH_DTP_Cloud_Connectivity"), notNullValue());
+            assertThat(scenario.get("nbJH_DTP_Helpdesk"), notNullValue());
+        });
     }
 
     public static class Utils {

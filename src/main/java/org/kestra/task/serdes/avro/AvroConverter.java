@@ -83,7 +83,9 @@ public class AvroConverter {
     private Object getValueFromNameOrAliases(Schema.Field field, Map<String, Object> data) {
         Object value = data.get(field.name());
 
-        if (value != null || field.aliases() == null) return value;
+        if (value != null || field.aliases() == null) {
+            return value;
+        }
 
         return field.aliases().stream()
             .map(alias -> data.get(alias))
