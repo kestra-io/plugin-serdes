@@ -80,12 +80,24 @@ public class AvroConverter {
         return genericData;
     }
 
+    private Object getValueFromNameOrAliases(Schema.Field field, Map<String, Object> data) {
+        Object value = data.get(field.name());
+
+        if (value != null || field.aliases() == null) return value;
+
+        return field.aliases().stream()
+            .map(alias -> data.get(alias))
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+    }
+
     public GenericData.Record fromMap(Schema schema, Map<String, Object> data) throws IllegalRowConvertion, IllegalStrictRowConversion {
         GenericData.Record record = new GenericData.Record(schema);
 
         for (Schema.Field field : schema.getFields()) {
             try {
-                record.put(field.name(), convert(field.schema(), data.get(field.name())));
+                record.put(field.name(), convert(field.schema(), getValueFromNameOrAliases(field, data)));
             } catch (IllegalCellConversion e) {
                 throw new IllegalRowConvertion(data, e, field);
             }
