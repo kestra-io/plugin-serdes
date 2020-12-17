@@ -43,6 +43,8 @@ dependencies {
     api 'de.siegmar:fastcsv:1.0.3'
     api 'org.apache.avro:avro:1.10.0'
     api 'io.reactivex.rxjava2:rxjava:2.2.19'
+    api group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-xml', version: '2.10.1'
+    api group: 'org.json', name: 'json', version: '20201115'
 }
 
 
