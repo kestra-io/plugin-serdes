@@ -77,8 +77,8 @@ class CsvWriterTest {
             String out = CharStreams.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri())));
 
             assertThat(out, containsString("\"string\";\"int\""));
-            assertThat(out, containsString("\"3.2\";\"2020"));
-            assertThat(out, containsString("\"3.4\";\"2020"));
+            assertThat(out, containsString("\"3.2\";\"" + ZonedDateTime.now().getYear()));
+            assertThat(out, containsString("\"3.4\";\"" + ZonedDateTime.now().getYear()));
         }
     }
 
@@ -121,8 +121,8 @@ class CsvWriterTest {
 
             String out = CharStreams.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri())));
 
-            assertThat(out, containsString("\"3.2\";\"2020"));
-            assertThat(out, containsString("\"3.4\";\"2020"));
+            assertThat(out, containsString("\"3.2\";\"" + ZonedDateTime.now().getYear()));
+            assertThat(out, containsString("\"3.4\";\"" + ZonedDateTime.now().getYear()));
         }
     }
 }
