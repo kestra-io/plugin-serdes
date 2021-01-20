@@ -14,6 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.kestra.core.models.annotations.PluginProperty;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
@@ -369,6 +370,8 @@ public class AvroConverter {
             return Long.valueOf((String) data);
         } else if (data instanceof Integer) {
             return (long) ((int) data);
+        } else if (data instanceof BigInteger) {
+            return ((BigInteger) data).longValue();
         } else {
             return (long) data;
         }

@@ -3,24 +3,19 @@ package org.kestra.task.serdes.xml;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.google.common.collect.ImmutableMap;
-import io.micronaut.test.annotation.MicronautTest;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 import org.kestra.core.runners.RunContextFactory;
 import org.kestra.core.storages.StorageInterface;
 import org.kestra.core.utils.TestsUtils;
 import org.kestra.task.serdes.SerdesUtils;
-import org.kestra.task.serdes.avro.AvroWriter;
-import org.kestra.task.serdes.json.JsonReader;
 import org.kestra.task.serdes.json.JsonWriter;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 import javax.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;

@@ -2,11 +2,8 @@ package org.kestra.task.serdes.csv;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
-import io.micronaut.test.annotation.MicronautTest;
-import org.apache.commons.lang3.ArrayUtils;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
-import org.kestra.core.models.executions.metrics.Counter;
-import org.kestra.core.runners.RunContext;
 import org.kestra.core.runners.RunContextFactory;
 import org.kestra.core.serializers.FileSerde;
 import org.kestra.core.storages.StorageInterface;
@@ -23,7 +20,6 @@ import javax.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.is;
 import static org.kestra.core.utils.Rethrow.throwConsumer;
 
 @MicronautTest
