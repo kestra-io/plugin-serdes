@@ -27,8 +27,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @MicronautTest
@@ -351,6 +350,76 @@ public class AvroConverterTest {
             assertThat(scenario.get("nbJH_DTP_Cloud_Connectivity"), notNullValue());
             assertThat(scenario.get("nbJH_DTP_Helpdesk"), notNullValue());
         });
+    }
+
+    @Test
+    void rowWithBadSeparator() throws Exception {
+        String read = SerdesUtils.readResource("csv/full.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/row_with_bad_separator.csv");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        CsvReader reader = CsvReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(CsvReader.class.getName())
+            .from(csv.toString())
+            .fieldSeparator(",".charAt(0))
+            .header(true)
+            .build();
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .build();
+
+        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+            task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        });
+
+        assertThat(re.getMessage(), containsString("Check field format and fields separator"));
+        assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
+        assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IllegalRowConvertion"));
+        assertThat(re.getCause().getCause().getCause().getClass().getSimpleName(), is("IllegalCellConversion"));
+        assertThat(re.getCause().getCause().getCause().getCause().getClass().getSimpleName(), is("NumberFormatException"));
+    }
+
+    @Test
+    void rowWithMissingFieldsAndGoodSeparator() throws Exception {
+        String read = SerdesUtils.readResource("csv/full.avsc");
+
+        File sourceFile = SerdesUtils.resourceToFile("csv/row_with_missing_fields_and_good_separator.csv");
+        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        CsvReader reader = CsvReader.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(CsvReader.class.getName())
+            .from(csv.toString())
+            .fieldSeparator(",".charAt(0))
+            .header(false)
+            .build();
+        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        AvroWriter task = AvroWriter.builder()
+            .id(AvroConverterTest.class.getSimpleName())
+            .type(AvroWriter.class.getName())
+            .from(readerRunOutput.getUri().toString())
+            .schema(read)
+            .dateFormat("yyyy/MM/dd")
+            .timeFormat("H:mm")
+            .build();
+
+        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+            task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        });
+
+        assertThat(re.getMessage(), containsString("Bad separator or missing field(s) ?"));
+        assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
+        assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IndexOutOfBoundsException"));
     }
 
     public static class Utils {
