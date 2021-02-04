@@ -1,0 +1,4 @@
+id,name,nameNullable,email,enum,long,double,boolean,date,timeMillis,timestampMillis,timestampMicros
+4814976,Viva,,alidgertwood0@nbcnews.com,Female,-867174862080523000,1783477.3480111,true,2017/11/16,5:14,2017-02-07T11:23:39Z,2013-02-05T11:07:59Z
+6782048;Ailane;;atallman2@behance.net;Female;811100629418909000;3960012.24870472;false;2018/12/29;5:48;2014-06-26T14:00:40Z;2013-05-29T14:52:27Z
+989670,Livetube,,bhalden3@latimes.com,Male,-296867021871686000,-827942.531367063,true,2017/04/11,4:40,2015-11-27T07:07:59Z,2019-01-09T23:21:09Z
