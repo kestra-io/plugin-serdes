@@ -47,6 +47,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "The avro schema associated to the data"
     )
+    @AvroSchemaValidation
     @PluginProperty(dynamic = true)
     private String schema;
 
@@ -88,6 +89,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
         description = "Default value is yyyy-MM-dd[XXX]."
     )
     @PluginProperty(dynamic = true)
+    @DateFormatValidation
     private String dateFormat;
 
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -95,6 +97,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
         description = "Default value is HH:mm[:ss][.SSSSSS][XXX]"
     )
     @PluginProperty(dynamic = true)
+    @DateFormatValidation
     private String timeFormat;
 
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -102,6 +105,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
         description = "Default value is yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]"
     )
     @PluginProperty(dynamic = true)
+    @DateFormatValidation
     private String datetimeFormat;
 
     @io.swagger.v3.oas.annotations.media.Schema(

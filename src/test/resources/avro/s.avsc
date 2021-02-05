@@ -1,0 +1,97 @@
+{
+    "type": "record",
+    "name": "Root",
+    "fields": [
+        {
+            "name": "rootfield",
+            "type": [
+                "null",
+                {
+                    "type": "record",
+                    "namespace": "root",
+                    "name": "Diag",
+                    "fields": [
+                        {
+                            "name": "arecordfield",
+                            "doc": "doc in a record",
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        },
+                        {
+                            "name": "anarrayfield",
+                            "doc": "a nested array field",
+                            "type": [
+                                "null",
+                                {
+                                    "type": "array",
+                                    "items": "string"
+                                }
+                            ],
+                            "default": null
+                        },
+                        {
+                            "name": "amapfield",
+                            "doc": "doc for a map",
+                            "type": {
+                                "type": "map",
+                                "values": "string"
+                            }
+                        },
+                        {
+                            "name": "subField",
+                            "type": [
+                                "null",
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "record",
+                                        "namespace": "subField.namespace",
+                                        "name": "subField",
+                                        "fields": [
+                                            {
+                                                "doc": "doc for a nested string field",
+                                                "name": "astringsubfield",
+                                                "type": [
+                                                    "null",
+                                                    "string"
+                                                ]
+                                            },
+                                            {
+                                                "doc": "doc for another nested string field",
+                                                "name": "anotherstringsubfield",
+                                                "type": [
+                                                    "null",
+                                                    "string"
+                                                ]
+                                            },
+                                            {
+                                                "doc": "doc for an enum field",
+                                                "name": "anenumfield",
+                                                "namespace": "anenumnamespace",
+                                                "type": {
+                                                  "type": "enum",
+                                                  "name": "enumfield",
+                                                  "symbols" : ["SPADES", "HEARTS", "DIAMONDS", "CLUBS"]
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "doc": "a string root field",
+            "name": "stringrootfield",
+            "type": [
+                "null",
+                "string"
+            ]
+        }
+    ]
+}
