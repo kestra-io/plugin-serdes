@@ -1,7 +1,7 @@
 {
   "type": "record",
   "name": "Nested",
-  "namespace": "org.kestra",
+  "namespace": "io.kestra",
   "fields": [
     {
       "name": "id",
