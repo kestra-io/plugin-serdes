@@ -20,6 +20,7 @@ import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -59,6 +60,9 @@ public class AvroConverter {
 
     @Builder.Default
     private char decimalSeparator = '.';
+
+    @Builder.Default
+    private String timeZoneId = ZoneId.systemDefault().toString();
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -255,8 +259,14 @@ public class AvroConverter {
             } catch (NumberFormatException ignored) {
             }
 
-            return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
-                .toInstant(ZoneOffset.UTC);
+            try {
+                return ZonedDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
+                    .toInstant();
+            } catch (DateTimeParseException e) {
+                return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
+                    .atZone(ZoneId.of(this.timeZoneId))
+                    .toInstant();
+            }
         } else if (data instanceof Long) {
             return Instant.ofEpochMilli((Long) data);
         } else {
@@ -271,8 +281,14 @@ public class AvroConverter {
             } catch (NumberFormatException ignored) {
             }
 
-            return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
-                .toInstant(ZoneOffset.UTC);
+            try {
+                return ZonedDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
+                    .toInstant();
+            } catch (DateTimeParseException e) {
+                return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
+                    .atZone(ZoneId.of(this.timeZoneId))
+                    .toInstant();
+            }
         } else if (data instanceof Long) {
             return Instant.ofEpochSecond(0, (Long) data * 1000);
         } else {

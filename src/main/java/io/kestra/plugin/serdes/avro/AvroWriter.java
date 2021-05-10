@@ -1,7 +1,13 @@
 package io.kestra.plugin.serdes.avro;
 
-import com.google.api.client.json.JsonString;
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.validations.DateFormat;
+import io.kestra.core.validations.JsonString;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
@@ -14,20 +20,14 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
-import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.executions.metrics.Counter;
-import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.FileSerde;
 
-import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.net.URI;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
