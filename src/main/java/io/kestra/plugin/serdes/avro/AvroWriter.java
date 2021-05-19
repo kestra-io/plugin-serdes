@@ -23,7 +23,9 @@ import org.apache.avro.io.DatumWriter;
 
 import java.io.*;
 import java.net.URI;
+import java.time.ZoneId;
 import java.util.AbstractMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -54,69 +56,73 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     @PluginProperty(dynamic = true)
     private String schema;
 
+    @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Values to consider as True",
-        description = "Default values are \"t\", \"true\", \"enabled\", \"1\", \"on\", \"yes\""
+        title = "Values to consider as True"
     )
     @PluginProperty(dynamic = true)
-    private List<String> trueValues;
+    private final List<String> trueValues = Arrays.asList("t", "true", "enabled", "1", "on", "yes");
 
+    @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Values to consider as False",
-        description = "Default values are \"f\", \"false\", \"disabled\", \"0\", \"off\", \"no\", \"\""
+        title = "Values to consider as False"
     )
     @PluginProperty(dynamic = true)
-    private List<String> falseValues;
+    private final List<String> falseValues = Arrays.asList("f", "false", "disabled", "0", "off", "no", "");
 
+    @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Values to consider as null",
-        description = "Default values are \"\",\n" +
-            "        \"#N/A\",\n" +
-            "        \"#N/A N/A\",\n" +
-            "        \"#NA\",\n" +
-            "        \"-1.#IND\",\n" +
-            "        \"-1.#QNAN\",\n" +
-            "        \"-NaN\",\n" +
-            "        \"1.#IND\",\n" +
-            "        \"1.#QNAN\",\n" +
-            "        \"NA\",\n" +
-            "        \"n/a\",\n" +
-            "        \"nan\",\n" +
-            "        \"null\""
+        title = "Values to consider as null"
     )
     @PluginProperty(dynamic = true)
-    private List<String> nullValues;
+    private final List<String> nullValues = Arrays.asList(
+        "",
+        "#N/A",
+        "#N/A N/A",
+        "#NA",
+        "-1.#IND",
+        "-1.#QNAN",
+        "-NaN",
+        "1.#IND",
+        "1.#QNAN",
+        "NA",
+        "n/a",
+        "nan",
+        "null"
+    );
 
+    @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Format to use when parsing date",
-        description = "Default value is yyyy-MM-dd[XXX]."
-    )
-    @PluginProperty(dynamic = true)
-    @DateFormat
-    private String dateFormat;
-
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Format to use when parsing time",
-        description = "Default value is HH:mm[:ss][.SSSSSS][XXX]"
+        title = "Format to use when parsing date"
     )
     @PluginProperty(dynamic = true)
     @DateFormat
-    private String timeFormat;
+    private final String dateFormat = "yyyy-MM-dd[XXX]";
 
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Format to use when parsing time"
+    )
+    @PluginProperty(dynamic = true)
+    @DateFormat
+    private final String timeFormat = "HH:mm[:ss][.SSSSSS][XXX]";
+
+    @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Format to use when parsing datetime",
         description = "Default value is yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]"
     )
     @PluginProperty(dynamic = true)
     @DateFormat
-    private String datetimeFormat;
+    private final String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]";
 
+    @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
         description = "Default value is '.'"
     )
     @PluginProperty(dynamic = true)
-    private Character decimalSeparator;
+    private final Character decimalSeparator = '.';
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -125,6 +131,14 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     )
     @PluginProperty(dynamic = false)
     protected Boolean strictSchema = Boolean.FALSE;
+
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Timezone to use when no timezone can be parsed on the source.",
+        description = "If null, the timezone will be `UTC` Default value is system timezone"
+    )
+    @PluginProperty(dynamic = false)
+    private final String timeZoneId = ZoneId.systemDefault().toString();
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -216,7 +230,8 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     }
 
     private AvroConverter converter() {
-        AvroConverter.AvroConverterBuilder builder = AvroConverter.builder();
+        AvroConverter.AvroConverterBuilder builder = AvroConverter.builder()
+            .timeZoneId(this.timeZoneId);
 
         if (this.trueValues != null) {
             builder.trueValues(this.trueValues);

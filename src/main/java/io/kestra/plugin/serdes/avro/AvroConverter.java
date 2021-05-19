@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.experimental.SuperBuilder;
 import org.apache.avro.Conversions;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -24,16 +25,16 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Builder
+@SuperBuilder
 public class AvroConverter {
     @Builder.Default
-    private List<String> trueValues = Arrays.asList("t", "true", "enabled", "1", "on", "yes");
+    protected final List<String> trueValues = Arrays.asList("t", "true", "enabled", "1", "on", "yes");
 
     @Builder.Default
-    private List<String> falseValues = Arrays.asList("f", "false", "disabled", "0", "off", "no", "");
+    protected final List<String> falseValues = Arrays.asList("f", "false", "disabled", "0", "off", "no", "");
 
     @Builder.Default
-    private List<String> nullValues = Arrays.asList(
+    protected final List<String> nullValues = Arrays.asList(
         "",
         "#N/A",
         "#N/A N/A",
@@ -50,19 +51,19 @@ public class AvroConverter {
     );
 
     @Builder.Default
-    private String dateFormat = "yyyy-MM-dd[XXX]";
+    protected final String dateFormat = "yyyy-MM-dd[XXX]";
 
     @Builder.Default
-    private String timeFormat = "HH:mm[:ss][.SSSSSS][XXX]";
+    protected final String timeFormat = "HH:mm[:ss][.SSSSSS][XXX]";
 
     @Builder.Default
-    private String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]";
+    protected final String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]";
 
     @Builder.Default
-    private char decimalSeparator = '.';
+    protected final char decimalSeparator = '.';
 
     @Builder.Default
-    private String timeZoneId = ZoneId.systemDefault().toString();
+    protected final String timeZoneId = ZoneId.systemDefault().toString();
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -85,7 +86,7 @@ public class AvroConverter {
         return genericData;
     }
 
-    private Object getValueFromNameOrAliases(Schema.Field field, Map<String, Object> data) {
+    protected Object getValueFromNameOrAliases(Schema.Field field, Map<String, Object> data) {
         Object value = data.get(field.name());
 
         if (value != null || field.aliases() == null) {
@@ -93,7 +94,7 @@ public class AvroConverter {
         }
 
         return field.aliases().stream()
-            .map(alias -> data.get(alias))
+            .map(data::get)
             .filter(Objects::nonNull)
             .findFirst()
             .orElse(null);
@@ -133,7 +134,7 @@ public class AvroConverter {
     }
 
     @SuppressWarnings("unchecked")
-    private Object convert(Schema schema, Object data) throws IllegalCellConversion {
+    protected Object convert(Schema schema, Object data) throws IllegalCellConversion {
         try {
             if (schema.getLogicalType() != null && schema.getLogicalType().getName().equals("decimal")) { // logical
                 return this.logicalDecimal(schema, data);
@@ -185,7 +186,7 @@ public class AvroConverter {
         }
     }
 
-    private String convertDecimalSeparator(String value) {
+    protected String convertDecimalSeparator(String value) {
         if (this.decimalSeparator == '.') {
             return value;
         }
@@ -194,7 +195,7 @@ public class AvroConverter {
     }
 
     @SuppressWarnings("UnpredictableBigDecimalConstructorCall")
-    private BigDecimal logicalDecimal(Schema schema, Object data) {
+    protected BigDecimal logicalDecimal(Schema schema, Object data) {
         int scale = ((LogicalTypes.Decimal) schema.getLogicalType()).getScale();
         int precision = ((LogicalTypes.Decimal) schema.getLogicalType()).getPrecision();
         double multiply = Math.pow(10D, precision - scale * 1D);
@@ -220,7 +221,7 @@ public class AvroConverter {
         return value;
     }
 
-    private UUID logicalUuid(Object data) {
+    protected UUID logicalUuid(Object data) {
         if (data instanceof String) {
             return UUID.fromString((String) data);
         } else {
@@ -228,7 +229,7 @@ public class AvroConverter {
         }
     }
 
-    private LocalDate logicalDate(Object data) {
+    protected LocalDate logicalDate(Object data) {
         if (data instanceof String) {
             return LocalDate.parse((String) data, DateTimeFormatter.ofPattern(this.dateFormat));
         } else {
@@ -236,7 +237,7 @@ public class AvroConverter {
         }
     }
 
-    private LocalTime logicalTimeMillis(Object data) {
+    protected LocalTime logicalTimeMillis(Object data) {
         if (data instanceof String) {
             return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(this.timeFormat));
         } else {
@@ -244,7 +245,7 @@ public class AvroConverter {
         }
     }
 
-    private LocalTime logicalTimeMicros(Object data) {
+    protected LocalTime logicalTimeMicros(Object data) {
         if (data instanceof String) {
             return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(this.timeFormat));
         } else {
@@ -252,21 +253,14 @@ public class AvroConverter {
         }
     }
 
-    private Instant logicalTimestampMillis(Object data) {
+    protected Instant logicalTimestampMillis(Object data) {
         if (data instanceof String) {
             try {
                 return Instant.ofEpochMilli(Long.parseLong((String) data));
             } catch (NumberFormatException ignored) {
             }
 
-            try {
-                return ZonedDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
-                    .toInstant();
-            } catch (DateTimeParseException e) {
-                return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
-                    .atZone(ZoneId.of(this.timeZoneId))
-                    .toInstant();
-            }
+            return this.parseDateTime((String) data);
         } else if (data instanceof Long) {
             return Instant.ofEpochMilli((Long) data);
         } else {
@@ -274,21 +268,29 @@ public class AvroConverter {
         }
     }
 
-    private Instant logicalTimestampMicros(Object data) {
+    protected Instant parseDateTime(String data){
+        try {
+            return ZonedDateTime.parse(data, DateTimeFormatter.ofPattern(this.datetimeFormat))
+                .toInstant();
+        } catch (DateTimeParseException e) {
+            LocalDateTime localDateTime = LocalDateTime.parse(data, DateTimeFormatter.ofPattern(this.datetimeFormat));
+
+            if (this.timeZoneId != null) {
+                return localDateTime.atZone(ZoneId.of(this.timeZoneId)).toInstant();
+            } else {
+                return localDateTime.toInstant(ZoneOffset.UTC);
+            }
+        }
+    }
+
+    protected Instant logicalTimestampMicros(Object data) {
         if (data instanceof String) {
             try {
                 return Instant.ofEpochSecond(0, Long.parseLong((String) data) * 1000);
             } catch (NumberFormatException ignored) {
             }
 
-            try {
-                return ZonedDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
-                    .toInstant();
-            } catch (DateTimeParseException e) {
-                return LocalDateTime.parse((String) data, DateTimeFormatter.ofPattern(this.datetimeFormat))
-                    .atZone(ZoneId.of(this.timeZoneId))
-                    .toInstant();
-            }
+            return this.parseDateTime((String) data);
         } else if (data instanceof Long) {
             return Instant.ofEpochSecond(0, (Long) data * 1000);
         } else {
@@ -297,7 +299,7 @@ public class AvroConverter {
     }
 
     @SuppressWarnings("unchecked")
-    private List<Object> complexArray(Schema schema, Object data) throws IllegalCellConversion {
+    protected List<Object> complexArray(Schema schema, Object data) throws IllegalCellConversion {
         Schema elementType = schema.getElementType();
 
         Collection<Object> list = (Collection<Object>) data;
@@ -310,7 +312,7 @@ public class AvroConverter {
         return result;
     }
 
-    private Object complexUnion(Schema schema, Object data) {
+    protected Object complexUnion(Schema schema, Object data) {
         for (Schema current : schema.getTypes()) {
             try {
                 return this.convert(current, data);
@@ -321,7 +323,7 @@ public class AvroConverter {
         throw new IllegalArgumentException("Invalid data for schema \"" + schema.getType() + "\"");
     }
 
-    private GenericData.Fixed complexFixed(Schema schema, Object data) {
+    protected GenericData.Fixed complexFixed(Schema schema, Object data) {
         ByteBuffer value = this.primitiveBytes(data);
         int fixedSize = schema.getFixedSize();
 
@@ -336,7 +338,7 @@ public class AvroConverter {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<Utf8, Object> complexMap(Schema schema, Object data) throws IllegalCellConversion {
+    protected Map<Utf8, Object> complexMap(Schema schema, Object data) throws IllegalCellConversion {
         Schema valueType = schema.getValueType();
 
         Map<Object, Object> list = (Map<Object, Object>) data;
@@ -352,7 +354,7 @@ public class AvroConverter {
         return result;
     }
 
-    private GenericData.EnumSymbol complexEnum(Schema schema, Object data) {
+    protected GenericData.EnumSymbol complexEnum(Schema schema, Object data) {
         String value = this.primitiveString(data);
         List<String> symbols = schema.getEnumSymbols();
 
@@ -363,7 +365,7 @@ public class AvroConverter {
         return new GenericData.EnumSymbol(schema, value);
     }
 
-    private Integer primitiveNull(Object data) {
+    protected Integer primitiveNull(Object data) {
         if (data instanceof String && this.contains(this.nullValues, (String) data)) {
             return null;
         } else if (data == null) {
@@ -373,7 +375,7 @@ public class AvroConverter {
         }
     }
 
-    private Integer primitiveInt(Object data) {
+    protected Integer primitiveInt(Object data) {
         if (data instanceof String) {
             return Integer.valueOf((String) data);
         } else {
@@ -381,7 +383,7 @@ public class AvroConverter {
         }
     }
 
-    private Long primitiveLong(Object data) {
+    protected Long primitiveLong(Object data) {
         if (data instanceof String) {
             return Long.valueOf((String) data);
         } else if (data instanceof Integer) {
@@ -393,7 +395,7 @@ public class AvroConverter {
         }
     }
 
-    private Float primitiveFloat(Object data) {
+    protected Float primitiveFloat(Object data) {
         if (data instanceof String) {
             return Float.valueOf(convertDecimalSeparator(((String) data)));
         } else if (data instanceof Integer) {
@@ -405,7 +407,7 @@ public class AvroConverter {
         }
     }
 
-    private Double primitiveDouble(Object data) {
+    protected Double primitiveDouble(Object data) {
         if (data instanceof String) {
             return Double.valueOf(convertDecimalSeparator(((String) data)));
         } else if (data instanceof Integer) {
@@ -439,11 +441,11 @@ public class AvroConverter {
         return ByteBuffer.wrap(this.primitiveString(data).getBytes());
     }
 
-    private boolean contains(List<String> list, String data) {
+    protected boolean contains(List<String> list, String data) {
         return list.stream().anyMatch(s -> s.equalsIgnoreCase(data));
     }
 
-    private static String trimExceptionMessage(Object data) throws JsonProcessingException {
+    protected static String trimExceptionMessage(Object data) throws JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
         String s = mapper.writeValueAsString(data);
 
@@ -456,7 +458,7 @@ public class AvroConverter {
 
     @Getter
     public static class IllegalRow extends Exception {
-        private Object data;
+        private final Object data;
 
         public IllegalRow(Object data, Throwable e) {
             super(e);
@@ -482,8 +484,8 @@ public class AvroConverter {
 
     @Getter
     public static class IllegalRowConvertion extends Exception {
-        private Schema.Field field;
-        private Object data;
+        private final Schema.Field field;
+        private final Object data;
 
         public IllegalRowConvertion(Map<String, Object> data, Throwable e, Schema.Field field) {
             super(e);
@@ -505,11 +507,11 @@ public class AvroConverter {
 
     @Getter
     public static class IllegalStrictRowConversion extends Exception {
-        private Schema schema;
-        Collection<String> fields;
-        Collection values;
+        private final Schema schema;
+        private final Collection<String> fields;
+        private final Collection<?> values;
 
-        public IllegalStrictRowConversion(Schema schema, Collection<String> fields, Collection values) {
+        public IllegalStrictRowConversion(Schema schema, Collection<String> fields, Collection<?> values) {
             super();
 
             this.schema = schema;
@@ -531,8 +533,8 @@ public class AvroConverter {
 
     @Getter
     public static class IllegalCellConversion extends Exception {
-        private Object data;
-        private Schema schema;
+        private final Object data;
+        private final Schema schema;
 
         public IllegalCellConversion(Schema schema, Object data, Throwable e) {
             super(e);
