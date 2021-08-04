@@ -1,6 +1,8 @@
 package io.kestra.plugin.serdes.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
@@ -47,7 +49,7 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
         description = "Default value is UTF-8."
     )
     @PluginProperty(dynamic = true)
-    private String charset = StandardCharsets.UTF_8.name();
+    private final String charset = StandardCharsets.UTF_8.name();
 
     @Builder.Default
     @Schema(
@@ -56,7 +58,7 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
     @PluginProperty(dynamic = false)
-    private boolean newLine = true;
+    private final boolean newLine = true;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -67,7 +69,9 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
             BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
         ) {
-            ObjectMapper mapper = new ObjectMapper();
+            ObjectMapper mapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .registerModule(new Jdk8Module());
 
             if (this.newLine) {
                 Flowable<Object> flowable = Flowable
@@ -108,6 +112,6 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
         @Schema(
             title = "URI of a temporary result file"
         )
-        private URI uri;
+        private final URI uri;
     }
 }

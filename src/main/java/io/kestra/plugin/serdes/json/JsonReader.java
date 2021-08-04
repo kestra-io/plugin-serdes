@@ -1,6 +1,8 @@
 package io.kestra.plugin.serdes.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableOnSubscribe;
@@ -88,11 +90,13 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
         @Schema(
             title = "URI of a temporary result file"
         )
-        private URI uri;
+        private final URI uri;
     }
 
     private FlowableOnSubscribe<Object> nextRow(BufferedReader inputStream) {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .registerModule(new Jdk8Module());
 
         return s -> {
             if (newLine) {
@@ -105,9 +109,7 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
 
                 if (objects instanceof Collection) {
                     ((Collection<?>) objects)
-                        .forEach(value -> {
-                            s.onNext(value);
-                        });
+                        .forEach(s::onNext);
                 } else {
                     s.onNext(objects);
                 }
