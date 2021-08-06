@@ -60,7 +60,7 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
         URI from = new URI(runContext.render(this.from));
 
         // temp file
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        File tempFile = runContext.tempFile(".ion").toFile();
 
         try (
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));

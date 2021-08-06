@@ -62,7 +62,7 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".jsonl");
+        File tempFile = runContext.tempFile(".jsonl").toFile();
         URI from = new URI(runContext.render(this.from));
 
         try (

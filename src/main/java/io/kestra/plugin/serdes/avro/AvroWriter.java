@@ -143,7 +143,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     @Override
     public Output run(RunContext runContext) throws Exception {
         // temp file
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".avro");
+        File tempFile = runContext.tempFile(".avro").toFile();
         BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
 
         // avro writer

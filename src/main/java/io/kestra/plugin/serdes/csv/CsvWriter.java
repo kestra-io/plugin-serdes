@@ -83,7 +83,7 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
     @Override
     public Output run(RunContext runContext) throws Exception {
         // temp file
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".csv");
+        File tempFile = runContext.tempFile(".csv").toFile();
 
         // writer
         de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter();

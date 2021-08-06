@@ -90,7 +90,7 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
         de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader();
 
         // temp file
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        File tempFile = runContext.tempFile(".ion").toFile();
 
         // configuration
         AtomicInteger skipped = new AtomicInteger();

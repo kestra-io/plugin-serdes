@@ -57,7 +57,7 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
         URI from = new URI(runContext.render(this.from));
 
         // temp file
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        File tempFile = runContext.tempFile(".ion").toFile();
 
         try (
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
@@ -113,6 +113,6 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
         @Schema(
             title = "URI of a temporary result file"
         )
-        private URI uri;
+        private final URI uri;
     }
 }
