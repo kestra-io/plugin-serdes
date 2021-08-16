@@ -111,7 +111,7 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
                             }
 
                             for (final Object value : casted) {
-                                csvAppender.appendField(value.toString());
+                                csvAppender.appendField(value != null ? value.toString() : null);
                             }
                         } else if (row instanceof Map) {
                             Map<String, Object> casted = (Map<String, Object>) row;
@@ -127,7 +127,7 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
                             }
 
                             for (final Object value : casted.values()) {
-                                csvAppender.appendField(value.toString());
+                                csvAppender.appendField(value != null ? value.toString() : null);
                             }
                         }
 
