@@ -42,31 +42,31 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Specifies if the first line should be the header (default: false)"
+        title = "Specifies if the first line should be the header"
     )
     private final Boolean header = true;
 
     @Builder.Default
     @Schema(
-        title = "The field separator character (default: ',' - comma)"
+        title = "The field separator character"
     )
     private final Character fieldSeparator = ",".charAt(0);
 
     @Builder.Default
     @Schema(
-        title = "The text delimiter character (default: '\"' - double quotes)"
+        title = "The text delimiter character"
     )
     private final Character textDelimiter = "\"".charAt(0);
 
     @Builder.Default
     @Schema(
-        title = "Specifies if empty rows should be skipped (default: true)"
+        title = "Specifies if empty rows should be skipped"
     )
     private final Boolean skipEmptyRows = false;
 
     @Builder.Default
     @Schema(
-        title = "Specifies if an exception should be thrown, if CSV data contains different field count (default: false)"
+        title = "Specifies if an exception should be thrown, if CSV data contains different field count"
     )
     private final Boolean errorOnDifferentFieldCount = false;
 
@@ -78,8 +78,7 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
 
     @Builder.Default
     @Schema(
-        title = "The name of a supported charset",
-        description = "Default value is UTF-8."
+        title = "The name of a supported charset"
     )
     private final String charset = StandardCharsets.UTF_8.name();
 

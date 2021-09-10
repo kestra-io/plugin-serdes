@@ -44,19 +44,19 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Specifies if the first line should be the header (default: false)"
+        title = "Specifies if the first line should be the header"
     )
     private final Boolean header = true;
 
     @Builder.Default
     @Schema(
-        title = "The field separator character (default: ',' - comma)"
+        title = "The field separator character"
     )
     private final Character fieldSeparator = ",".charAt(0);
 
     @Builder.Default
     @Schema(
-        title = "The text delimiter character (default: '\"' - double quotes)"
+        title = "The text delimiter character"
     )
     private final Character textDelimiter = "\"".charAt(0);
 
@@ -68,15 +68,13 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Whether fields should always be delimited using the textDelimiter option.",
-        description = "Default value is false"
+        title = "Whether fields should always be delimited using the textDelimiter option."
     )
     private final Boolean alwaysDelimitText = false;
 
     @Builder.Default
     @Schema(
-        title = "The name of a supported charset",
-        description = "Default value is UTF-8."
+        title = "The name of a supported charset"
     )
     private final String charset = StandardCharsets.UTF_8.name();
 
