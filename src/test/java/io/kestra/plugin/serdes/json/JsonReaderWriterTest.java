@@ -1,24 +1,30 @@
 package io.kestra.plugin.serdes.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import org.junit.jupiter.api.Test;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 import io.kestra.plugin.serdes.avro.AvroWriter;
+import io.kestra.plugin.serdes.csv.CsvWriter;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URI;
+import java.time.*;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
 
+import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
@@ -100,5 +106,43 @@ class JsonReaderWriterTest {
 
         assertThat(objects.size(), is(1));
         assertThat(objects.get(0).get("id"), is(4814976));
+    }
+
+    @Test
+    void ion() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try(OutputStream output = new FileOutputStream(tempFile)) {
+            List.of(
+                    ImmutableMap.builder()
+                        .put("String", "string")
+                        .put("Int", 2)
+                        .put("Float", 3.2F)
+                        .put("Double", 3.2D)
+                        .put("Instant", Instant.now())
+                        .put("ZonedDateTime", ZonedDateTime.now())
+                        .put("LocalDateTime", LocalDateTime.now())
+                        .put("OffsetDateTime", OffsetDateTime.now())
+                        .put("LocalDate", LocalDate.now())
+                        .put("LocalTime", LocalTime.now())
+                        .put("OffsetTime", OffsetTime.now())
+                        .put("Date", new Date())
+                        .build()
+                )
+                .forEach(throwConsumer(row -> FileSerde.write(output, row)));
+
+            URI uri = storageInterface.put(URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+            JsonWriter writer = JsonWriter.builder()
+                .id(AvroWriter.class.getSimpleName())
+                .type(CsvWriter.class.getName())
+                .from(uri.toString())
+                .build();
+            JsonWriter.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+            assertThat(
+                IOUtils.toString(this.storageInterface.get(run.getUri()), Charsets.UTF_8),
+                is("{\"String\":\"string\",\"Int\":2,\"Float\":3.200000047683716,\"Double\":3.2,\"Instant\":\"2021-10-22T17:17:51.828Z\",\"ZonedDateTime\":\"2021-10-22T19:17:51.832574+02:00\",\"LocalDateTime\":\"2021-10-22T19:17:51.833451\",\"OffsetDateTime\":\"2021-10-22T19:17:51.833556+02:00\",\"LocalDate\":\"2021-10-22\",\"LocalTime\":\"19:17:51.833618\",\"OffsetTime\":\"19:17:51.833722+02:00\",\"Date\":\"2021-10-22T17:17:51.833Z\"}")
+            );
+        }
     }
 }

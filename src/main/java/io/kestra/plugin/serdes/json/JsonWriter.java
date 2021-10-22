@@ -1,6 +1,8 @@
 package io.kestra.plugin.serdes.json;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.reactivex.BackpressureStrategy;
@@ -22,6 +24,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.validation.constraints.NotNull;
 
@@ -70,6 +73,9 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
         ) {
             ObjectMapper mapper = new ObjectMapper()
+                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+                .setSerializationInclusion(JsonInclude.Include.ALWAYS)
+                .setTimeZone(TimeZone.getDefault())
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module());
 
