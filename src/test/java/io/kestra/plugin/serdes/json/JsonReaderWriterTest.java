@@ -118,14 +118,14 @@ class JsonReaderWriterTest {
                         .put("Int", 2)
                         .put("Float", 3.2F)
                         .put("Double", 3.2D)
-                        .put("Instant", Instant.now())
-                        .put("ZonedDateTime", ZonedDateTime.now())
-                        .put("LocalDateTime", LocalDateTime.now())
-                        .put("OffsetDateTime", OffsetDateTime.now())
-                        .put("LocalDate", LocalDate.now())
-                        .put("LocalTime", LocalTime.now())
-                        .put("OffsetTime", OffsetTime.now())
-                        .put("Date", new Date())
+                        .put("Instant", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant())
+                        .put("ZonedDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00"))
+                        .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime())
+                        .put("OffsetDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime())
+                        .put("LocalDate", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDate())
+                        .put("LocalTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalTime())
+                        .put("OffsetTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime().toOffsetTime())
+                        .put("Date", Date.from(ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant()))
                         .build()
                 )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
@@ -136,12 +136,27 @@ class JsonReaderWriterTest {
                 .id(AvroWriter.class.getSimpleName())
                 .type(CsvWriter.class.getName())
                 .from(uri.toString())
+                .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
                 .build();
             JsonWriter.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             assertThat(
                 IOUtils.toString(this.storageInterface.get(run.getUri()), Charsets.UTF_8),
-                is("{\"String\":\"string\",\"Int\":2,\"Float\":3.200000047683716,\"Double\":3.2,\"Instant\":\"2021-10-22T17:17:51.828Z\",\"ZonedDateTime\":\"2021-10-22T19:17:51.832574+02:00\",\"LocalDateTime\":\"2021-10-22T19:17:51.833451\",\"OffsetDateTime\":\"2021-10-22T19:17:51.833556+02:00\",\"LocalDate\":\"2021-10-22\",\"LocalTime\":\"19:17:51.833618\",\"OffsetTime\":\"19:17:51.833722+02:00\",\"Date\":\"2021-10-22T17:17:51.833Z\"}")
+                is("{" +
+                    "\"String\":\"string\"," +
+                    "\"Int\":2," +
+                    "\"Float\":3.200000047683716," +
+                    "\"Double\":3.2," +
+                    "\"Instant\":\"2021-05-05T10:21:12.123Z\"," +
+                    "\"ZonedDateTime\":\"2021-05-05T11:21:12.123456+01:00\"," +
+                    "\"LocalDateTime\":\"2021-05-05T12:21:12.123456\"," +
+                    "\"OffsetDateTime\":\"2021-05-05T11:21:12.123456+01:00\"," +
+                    "\"LocalDate\":\"2021-05-05\"," +
+                    "\"LocalTime\":\"12:21:12.123456\"," +
+                    "\"OffsetTime\":\"12:21:12.123456+02:00\"," +
+                    "\"Date\":\"2021-05-05T10:21:12.123Z\"" +
+                    "}\n"
+                )
             );
         }
     }

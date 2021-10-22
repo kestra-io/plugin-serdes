@@ -22,6 +22,7 @@ import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
@@ -63,6 +64,13 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
     @PluginProperty(dynamic = false)
     private final boolean newLine = true;
 
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Timezone to use when no timezone can be parsed on the source."
+    )
+    @PluginProperty(dynamic = true)
+    private final String timeZoneId = ZoneId.systemDefault().toString();
+
     @Override
     public Output run(RunContext runContext) throws Exception {
         File tempFile = runContext.tempFile(".jsonl").toFile();
@@ -75,7 +83,7 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
             ObjectMapper mapper = new ObjectMapper()
                 .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
                 .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-                .setTimeZone(TimeZone.getDefault())
+                .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId))))
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module());
 
