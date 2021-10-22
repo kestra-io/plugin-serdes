@@ -1,0 +1,54 @@
+{
+  "type": "record",
+  "name": "all",
+  "fields": [
+    {
+      "name": "String",
+      "type": "string"
+    },
+    {
+      "name": "Int",
+      "type": "int"
+    },
+    {
+      "name": "Float",
+      "type": "float"
+    },
+    {
+      "name": "Double",
+      "type": "double"
+    },
+    {
+      "name": "Instant",
+      "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+    },
+    {
+      "name": "ZonedDateTime",
+      "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+    },
+    {
+      "name": "LocalDateTime",
+      "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+    },
+    {
+      "name": "OffsetDateTime",
+      "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+    },
+    {
+      "name": "LocalDate",
+      "type": [{"type": "int", "logicalType": "date"}]
+    },
+    {
+      "name": "LocalTime",
+      "type": [{"type": "int", "logicalType": "time-millis"}]
+    },
+    {
+      "name": "OffsetTime",
+      "type": [{"type": "int", "logicalType": "time-millis"}]
+    },
+    {
+      "name": "Date",
+      "type": [{"type": "int", "logicalType": "date"}]
+    }
+  ]
+}

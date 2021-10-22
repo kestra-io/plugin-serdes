@@ -11,6 +11,7 @@ import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverterTest;
 
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.stream.Stream;
 
@@ -25,13 +26,19 @@ class LogicalDateTest {
     Stream<Arguments> source() {
         return Stream.of(
             Arguments.of("2019-12-26", LocalDate.parse("2019-12-26", DateTimeFormatter.ISO_DATE)),
-            Arguments.of("2011-12-03+01:00", LocalDate.parse("2011-12-03+01:00", DateTimeFormatter.ISO_DATE))
+            Arguments.of("2011-12-03+01:00", LocalDate.parse("2011-12-03+01:00", DateTimeFormatter.ISO_DATE)),
+            Arguments.of(LocalDate.parse("2011-12-03+01:00", DateTimeFormatter.ISO_DATE), LocalDate.parse("2011-12-03+01:00", DateTimeFormatter.ISO_DATE)),
+            Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
+            Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
+            Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toOffsetDateTime(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
+            Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toLocalDate(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
+            Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toLocalDateTime(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE))
         );
     }
 
     @ParameterizedTest
     @MethodSource("source")
-    void convert(CharSequence v, LocalDate expected) throws Exception {
+    void convert(Object v, LocalDate expected) throws Exception {
         AvroConverterTest.Utils.oneField(v, expected, schema);
     }
 

@@ -82,6 +82,8 @@ public class AvroConverter {
         genericData.addLogicalTypeConversion(new TimeConversions.TimeMillisConversion());
         genericData.addLogicalTypeConversion(new TimeConversions.TimestampMicrosConversion());
         genericData.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
+        genericData.addLogicalTypeConversion(new TimeConversions.LocalTimestampMicrosConversion());
+        genericData.addLogicalTypeConversion(new TimeConversions.LocalTimestampMillisConversion());
 
         return genericData;
     }
@@ -150,6 +152,10 @@ public class AvroConverter {
                 return this.logicalTimestampMillis(data);
             } else if (schema.getLogicalType() != null && schema.getLogicalType().getName().equals("timestamp-micros")) {
                 return this.logicalTimestampMicros(data);
+            } else if (schema.getLogicalType() != null && schema.getLogicalType().getName().equals("local-timestamp-millis")) {
+                return this.logicalTimestampMillis(data).atZone(zoneId()).toLocalDateTime();
+            } else if (schema.getLogicalType() != null && schema.getLogicalType().getName().equals("local-timestamp-micros")) {
+                return this.logicalTimestampMicros(data).atZone(zoneId()).toLocalDateTime();
             } else if (schema.getType() == Schema.Type.RECORD) { // complex
                 return fromMap(schema, (Map<String, Object>) data);
             } else if (schema.getType() == Schema.Type.ARRAY) {
@@ -232,6 +238,23 @@ public class AvroConverter {
     protected LocalDate logicalDate(Object data) {
         if (data instanceof String) {
             return LocalDate.parse((String) data, DateTimeFormatter.ofPattern(this.dateFormat));
+        } else if (data instanceof Date) {
+            Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(this.zoneId()));
+            calendar.setTime((Date) data);
+
+            return LocalDate.of(
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            );
+        } else if (data instanceof ZonedDateTime) {
+            return ((ZonedDateTime) data).toLocalDate();
+        } else if (data instanceof OffsetDateTime) {
+            return ((OffsetDateTime) data).toLocalDate();
+        } else if (data instanceof LocalDateTime) {
+            return ((LocalDateTime) data).toLocalDate();
+        } else if (data instanceof Instant) {
+            return ((Instant) data).atZone(zoneId()).toLocalDate();
         } else {
             return (LocalDate) data;
         }
@@ -240,14 +263,22 @@ public class AvroConverter {
     protected LocalTime logicalTimeMillis(Object data) {
         if (data instanceof String) {
             return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(this.timeFormat));
-        } else {
-            return (LocalTime) data;
         }
+
+        return convertJavaTime(data);
     }
 
     protected LocalTime logicalTimeMicros(Object data) {
         if (data instanceof String) {
             return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(this.timeFormat));
+        }
+
+        return convertJavaTime(data);
+    }
+
+    protected LocalTime convertJavaTime(Object data) {
+        if (data instanceof OffsetTime) {
+            return ((OffsetTime) data).toLocalTime();
         } else {
             return (LocalTime) data;
         }
@@ -263,9 +294,29 @@ public class AvroConverter {
             return this.parseDateTime((String) data);
         } else if (data instanceof Long) {
             return Instant.ofEpochMilli((Long) data);
-        } else {
-            return (Instant) data;
         }
+
+        return convertJavaDateTime(data);
+    }
+
+    protected Instant convertJavaDateTime(Object data) {
+        if (data instanceof Long) {
+            return Instant.ofEpochSecond(0, (Long) data * 1000);
+        }
+
+        if (data instanceof LocalDateTime) {
+            return ((LocalDateTime) data).atZone(this.zoneId()).toInstant();
+        }
+
+        if (data instanceof ZonedDateTime) {
+            return ((ZonedDateTime) data).toInstant();
+        }
+
+        if (data instanceof OffsetDateTime) {
+            return ((OffsetDateTime) data).toInstant();
+        }
+
+        return (Instant) data;
     }
 
     protected Instant parseDateTime(String data){
@@ -293,9 +344,9 @@ public class AvroConverter {
             return this.parseDateTime((String) data);
         } else if (data instanceof Long) {
             return Instant.ofEpochSecond(0, (Long) data * 1000);
-        } else {
-            return (Instant) data;
         }
+
+        return convertJavaDateTime(data);
     }
 
     @SuppressWarnings("unchecked")
@@ -359,7 +410,7 @@ public class AvroConverter {
         List<String> symbols = schema.getEnumSymbols();
 
         if (!symbols.contains(value)) {
-            throw new IllegalArgumentException("Invalid enum value, found " + value + ", expexted " + symbols);
+            throw new IllegalArgumentException("Invalid enum value, found " + value + ", expected " + symbols);
         }
 
         return new GenericData.EnumSymbol(schema, value);
@@ -443,6 +494,10 @@ public class AvroConverter {
 
     protected boolean contains(List<String> list, String data) {
         return list.stream().anyMatch(s -> s.equalsIgnoreCase(data));
+    }
+
+    protected ZoneId zoneId() {
+        return this.timeZoneId != null ? ZoneId.of(this.timeZoneId) : ZoneOffset.UTC;
     }
 
     protected static String trimExceptionMessage(Object data) throws JsonProcessingException {
