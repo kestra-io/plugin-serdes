@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.csv;
 
 import de.siegmar.fastcsv.writer.CsvAppender;
 import io.kestra.core.validations.DateFormat;
+import io.kestra.plugin.serdes.AbstractTextWriter;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
@@ -39,7 +40,7 @@ import javax.validation.constraints.NotNull;
 @Schema(
     title = "Read an ion serialized data file and write it to a csv file."
 )
-public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
+public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWriter.Output> {
     @NotNull
     @Schema(
         title = "Source file URI"
@@ -83,60 +84,6 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
     )
     private final String charset = StandardCharsets.UTF_8.name();
 
-    @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Format to use for date"
-    )
-    @PluginProperty(dynamic = true)
-    @DateFormat
-    private final String dateFormat = "yyyy-MM-dd";
-
-    @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Format to use for time"
-    )
-    @PluginProperty(dynamic = true)
-    @DateFormat
-    private final String timeFormat = "HH:mm:ss";
-
-
-    @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Format to use for zoned time"
-    )
-    @PluginProperty(dynamic = true)
-    @DateFormat
-    private final String zonedTimeFormat = "HH:mm:ssXXX";
-
-    @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Format to use for datetime"
-    )
-    @PluginProperty(dynamic = true)
-    @DateFormat
-    private final String datetimeFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS";
-
-    @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Format to use for zoned datetime"
-    )
-    @PluginProperty(dynamic = true)
-    @DateFormat
-    private final String zonedDatetimeFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX";
-
-    @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Timezone to use when no timezone can be parsed on the source."
-    )
-    @PluginProperty(dynamic = true)
-    private final String timeZoneId = ZoneId.systemDefault().toString();
-
-    private transient DateTimeFormatter dateFormatter;
-    private transient DateTimeFormatter timeFormatter;
-    private transient DateTimeFormatter zonedTimeFormatter;
-    private transient DateTimeFormatter datetimeFormatter;
-    private transient DateTimeFormatter zonedDatetimeFormatter;
-    private transient ZoneId zoneId;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -150,12 +97,7 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
         URI from = new URI(runContext.render(this.from));
 
         // formatter
-        dateFormatter = DateTimeFormatter.ofPattern(runContext.render(this.dateFormat));
-        timeFormatter = DateTimeFormatter.ofPattern(runContext.render(this.timeFormat));
-        zonedTimeFormatter = DateTimeFormatter.ofPattern(runContext.render(this.zonedTimeFormat));
-        datetimeFormatter = DateTimeFormatter.ofPattern(runContext.render(this.datetimeFormat));
-        zonedDatetimeFormatter = DateTimeFormatter.ofPattern(runContext.render(this.zonedDatetimeFormat));
-        zoneId = ZoneId.of(runContext.render(this.timeZoneId));
+        this.init(runContext);
 
         try (
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
@@ -177,7 +119,7 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
                             }
 
                             for (final Object value : casted) {
-                                csvAppender.appendField(value != null ? value.toString() : null);
+                                csvAppender.appendField(convert(value));
                             }
                         } else if (row instanceof Map) {
                             Map<String, Object> casted = (Map<String, Object>) row;
@@ -213,25 +155,6 @@ public class CsvWriter extends Task implements RunnableTask<CsvWriter.Output> {
             .builder()
             .uri(runContext.putTempFile(tempFile))
             .build();
-    }
-
-
-    private String convert(Object value) {
-        if (value == null) {
-            return null;
-        } else if (value instanceof Instant || value instanceof Date) {
-            return this.datetimeFormatter.withZone(zoneId).format((TemporalAccessor) value);
-        } else if (value instanceof OffsetDateTime || value instanceof ZonedDateTime) {
-            return this.zonedDatetimeFormatter.format((TemporalAccessor) value);
-        } else if (value instanceof LocalDate) {
-            return this.dateFormatter.format((TemporalAccessor) value);
-        } else if (value instanceof LocalTime) {
-            return this.timeFormatter.format((TemporalAccessor) value);
-        } else if (value instanceof OffsetTime) {
-            return this.zonedTimeFormatter.format((TemporalAccessor) value);
-        } else {
-            return value.toString();
-        }
     }
 
     @Builder

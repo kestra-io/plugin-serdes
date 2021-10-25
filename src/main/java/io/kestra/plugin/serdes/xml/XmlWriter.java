@@ -1,9 +1,12 @@
 package io.kestra.plugin.serdes.xml;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.ser.ToXmlGenerator;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -18,8 +21,10 @@ import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.validation.constraints.NotNull;
 
@@ -57,6 +62,13 @@ public class XmlWriter extends Task implements RunnableTask<XmlWriter.Output> {
     @PluginProperty(dynamic = true)
     private final String rootName = "items";
 
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Timezone to use when no timezone can be parsed on the source."
+    )
+    @PluginProperty(dynamic = true)
+    private final String timeZoneId = ZoneId.systemDefault().toString();
+
     @Override
     public XmlWriter.Output run(RunContext runContext) throws Exception {
         File tempFile = runContext.tempFile(".xml").toFile();
@@ -67,7 +79,15 @@ public class XmlWriter extends Task implements RunnableTask<XmlWriter.Output> {
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
         ) {
             XmlMapper mapper = new XmlMapper();
-            mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+            mapper
+                .enable(SerializationFeature.INDENT_OUTPUT)
+                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+                .setSerializationInclusion(JsonInclude.Include.ALWAYS)
+                .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId))))
+                .registerModule(new JavaTimeModule())
+                .registerModule(new Jdk8Module());
+
 
             ObjectWriter objectWriter = mapper.writer()
                 .withRootName(runContext.render(this.rootName))
