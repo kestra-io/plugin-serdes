@@ -124,7 +124,7 @@ public class AvroConverter {
         HashMap<String, Object> map = new HashMap<>();
         int index = 0;
         for (Schema.Field field : schema.getFields()) {
-            map.put(field.name(), data.get(index));
+            map.put(field.name(), data.size() > index ? data.get(index) : null);
             index++;
         }
 
@@ -524,16 +524,10 @@ public class AvroConverter {
         @Override
         public String toString() {
             try {
-                return super.toString()
-                    + (mayBeBadSeparatorOrMissingField() ? " Bad separator or missing field(s) ? " : "")
-                    + " with data [" + trimExceptionMessage(data) + "]";
+                return super.toString() + " with data [" + trimExceptionMessage(data) + "]";
             } catch (JsonProcessingException e) {
                 return super.toString();
             }
-        }
-
-        private boolean mayBeBadSeparatorOrMissingField() {
-            return this.getCause() instanceof IndexOutOfBoundsException;
         }
     }
 
@@ -601,18 +595,10 @@ public class AvroConverter {
         @Override
         public String toString() {
             try {
-                return super.toString()
-                    + (mayBeBadSeparator() ? " -> Check field format and fields separator " : "")
-                    + " on cols with data [" + trimExceptionMessage(data) + "] and schema [" + schema.toString() + "]";
+                return super.toString() + " on cols with data [" + trimExceptionMessage(data) + "] and schema [" + schema.toString() + "]";
             } catch (JsonProcessingException e) {
                 return super.toString();
             }
-        }
-
-        private boolean mayBeBadSeparator() {
-            // NumberFormatException : if the first field in schema is not a string and a bad separator is used,
-            // all the data row is read as a unique field (the first one) causing potentially a NumberFormatException
-            return this.getCause() instanceof NumberFormatException;
         }
     }
 }

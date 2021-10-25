@@ -381,7 +381,7 @@ public class AvroConverterTest {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 
-        assertThat(re.getMessage(), containsString("Check field format and fields separator"));
+        assertThat(re.getMessage(), containsString("and schema [\"int\"] on field 'id'"));
         assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
         assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IllegalRowConvertion"));
         assertThat(re.getCause().getCause().getCause().getClass().getSimpleName(), is("IllegalCellConversion"));
@@ -417,9 +417,9 @@ public class AvroConverterTest {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 
-        assertThat(re.getMessage(), containsString("Bad separator or missing field(s) ?"));
+        assertThat(re.getMessage(), containsString("on cols with data [null] and schema [\"double\"] on field 'double' with data "));
         assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
-        assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IndexOutOfBoundsException"));
+        assertThat(re.getCause().getCause().getCause().getCause().getClass().getSimpleName(), is("NullPointerException"));
     }
 
     public static class Utils {
