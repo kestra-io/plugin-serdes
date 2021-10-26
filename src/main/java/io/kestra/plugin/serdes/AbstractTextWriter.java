@@ -42,7 +42,7 @@ public abstract class AbstractTextWriter extends Task {
     )
     @PluginProperty(dynamic = true)
     @DateFormat
-    private final String dateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX";
+    private final String dateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS[XXX]";
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -73,7 +73,7 @@ public abstract class AbstractTextWriter extends Task {
     protected String convert(Object value) {
         if (value == null) {
             return null;
-        } else if (value instanceof Instant || value instanceof Date) {
+        } else if (value instanceof Instant || value instanceof Date || value instanceof LocalDateTime) {
             return this.dateTimeFormatter.withZone(zoneId).withZone(ZoneOffset.UTC).format((TemporalAccessor) value);
         } else if (value instanceof OffsetDateTime || value instanceof ZonedDateTime) {
             return this.dateTimeFormatter.withZone(zoneId).format((TemporalAccessor) value);

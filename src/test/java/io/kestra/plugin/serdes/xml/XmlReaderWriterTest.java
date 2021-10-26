@@ -21,6 +21,7 @@ import java.io.*;
 import java.net.URI;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
 import javax.inject.Inject;
@@ -105,7 +106,7 @@ class XmlReaderWriterTest {
                         .put("Double", 3.2D)
                         .put("Instant", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant())
                         .put("ZonedDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00"))
-                        .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime())
+                        .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime().truncatedTo(ChronoUnit.MINUTES))
                         .put("OffsetDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime())
                         .put("LocalDate", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDate())
                         .put("LocalTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalTime())
@@ -135,7 +136,7 @@ class XmlReaderWriterTest {
                     "<Double>3.2</Double>\n    " +
                     "<Instant>2021-05-05T10:21:12.123Z</Instant>\n    " +
                     "<ZonedDateTime>2021-05-05T11:21:12.123456+01:00</ZonedDateTime>\n    " +
-                    "<LocalDateTime>2021-05-05T12:21:12.123456</LocalDateTime>\n    " +
+                    "<LocalDateTime>2021-05-05T12:21:00</LocalDateTime>\n    " +
                     "<OffsetDateTime>2021-05-05T11:21:12.123456+01:00</OffsetDateTime>\n    " +
                     "<LocalDate>2021-05-05</LocalDate>\n    " +
                     "<LocalTime>12:21:12.123456</LocalTime>\n    " +

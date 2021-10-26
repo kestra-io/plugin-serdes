@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import java.io.*;
 import java.net.URI;
 import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -139,7 +140,7 @@ class CsvWriterTest {
                         .put("Double", 3.2D)
                         .put("Instant", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant())
                         .put("ZonedDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00"))
-                        .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime())
+                        .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime().truncatedTo(ChronoUnit.MINUTES))
                         .put("OffsetDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime())
                         .put("LocalDate", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDate())
                         .put("LocalTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalTime())
@@ -170,7 +171,7 @@ class CsvWriterTest {
                     "\"3.2\"," +
                     "\"2021-05-05T10:21:12.123Z\"," +
                     "\"2021-05-05T11:21:12.123+01:00\"," +
-                    "\"2021-05-05T12:21:12.123456\"," +
+                    "\"2021-05-05T12:21:00.000\"," +
                     "\"2021-05-05T11:21:12.123+01:00\"," +
                     "\"2021-05-05\"," +
                     "\"12:21:12\"," +
