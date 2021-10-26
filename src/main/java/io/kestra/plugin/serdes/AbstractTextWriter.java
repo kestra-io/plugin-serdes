@@ -51,9 +51,16 @@ public abstract class AbstractTextWriter extends Task {
     @PluginProperty(dynamic = true)
     private final String timeZoneId = ZoneId.systemDefault().toString();
 
+    @Getter(AccessLevel.NONE)
     private transient DateTimeFormatter dateFormatter;
+
+    @Getter(AccessLevel.NONE)
     private transient DateTimeFormatter timeFormatter;
+
+    @Getter(AccessLevel.NONE)
     private transient DateTimeFormatter dateTimeFormatter;
+
+    @Getter(AccessLevel.NONE)
     private transient ZoneId zoneId;
 
     protected void init(RunContext runContext) throws IllegalVariableEvaluationException {
