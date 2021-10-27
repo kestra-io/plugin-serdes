@@ -62,12 +62,15 @@ public class AvroReaderWriterTest {
             )
             .build();
 
-        AvroWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+        AvroWriter.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-        byte[] out = IOUtils.toByteArray(storageInterface.get(writerRunOutput.getUri()));
-        File resultTestFile = SerdesUtils.resourceToFile(file);
-
-        assertThat(out,is(IOUtils.toByteArray(new FileInputStream(resultTestFile)))
+        assertThat(
+            AvroWriterTest.avroSize(this.storageInterface.get(run.getUri())),
+            is(AvroWriterTest.avroSize(
+                new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
+                        .getResource("csv/insurance_sample.avro"))
+                    .toURI())))
+            )
         );
     }
 

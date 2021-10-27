@@ -47,7 +47,6 @@ public class AvroReaderTest {
 
         AvroReader.Output run = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
-        byte[] out = IOUtils.toByteArray(storageInterface.get(run.getUri()));
         File resultTestFile = SerdesUtils.resourceToFile(file.replace("avro","ion"));
 
         assertThat(
