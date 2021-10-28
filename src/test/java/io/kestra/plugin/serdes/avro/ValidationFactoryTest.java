@@ -54,5 +54,15 @@ class ValidationFactoryTest {
                 .build()
         );
         assertThat(validator.isPresent(), is(true));
+
+        validator = modelValidator.isValid(
+            AvroWriter.builder()
+                .id("unit")
+                .from("unit")
+                .type(AvroWriter.class.getName())
+                .schema("{{ test }}")
+                .build()
+        );
+        assertThat(validator.isPresent(), is(false));
     }
 }

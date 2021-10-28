@@ -16,10 +16,17 @@ public class ValidatorFactory {
                 return true; // nulls are allowed according to spec
             }
 
+            // pebble variable so can't validate
+            if (value.contains("{{") && value.contains("}}")) {
+                return true;
+            }
+
             try {
                 final Schema.Parser parser = new Schema.Parser();
                 parser.parse(value);
             } catch (SchemaParseException e) {
+                context.messageTemplate("invalid avro schema '({validatedValue})': " + e.getMessage());
+
                 return false;
             }
             return true;

@@ -51,7 +51,6 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "The avro schema associated to the data"
     )
-    @JsonString
     @AvroSchemaValidation
     @PluginProperty(dynamic = true)
     private String schema;
