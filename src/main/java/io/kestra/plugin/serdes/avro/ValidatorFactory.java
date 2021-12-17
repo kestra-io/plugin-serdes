@@ -5,7 +5,7 @@ import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Factory
 public class ValidatorFactory {

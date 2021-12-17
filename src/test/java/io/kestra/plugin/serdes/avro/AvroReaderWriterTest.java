@@ -12,7 +12,7 @@ import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.io.*;
 import java.net.URI;
 import java.util.Objects;

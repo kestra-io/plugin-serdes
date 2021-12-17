@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Objects;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 public class SerdesUtils {
     @Inject

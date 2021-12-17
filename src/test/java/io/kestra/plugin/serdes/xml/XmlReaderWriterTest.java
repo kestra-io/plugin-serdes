@@ -24,7 +24,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;

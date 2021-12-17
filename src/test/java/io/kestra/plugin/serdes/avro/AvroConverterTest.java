@@ -19,7 +19,7 @@ import io.kestra.plugin.serdes.SerdesUtils;
 import io.kestra.plugin.serdes.csv.CsvReader;
 import io.kestra.plugin.serdes.json.JsonReader;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.io.*;
 import java.net.URI;
 import java.util.HashMap;
