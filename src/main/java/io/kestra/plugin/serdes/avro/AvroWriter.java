@@ -157,7 +157,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
         try (
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
-            DataFileWriter<GenericRecord> schemaDdataFileWriter = dataFileWriter.create(schema, output);
+            DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output);
         ) {
             Flowable<GenericData.Record> flowable = Flowable
                 .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
@@ -183,6 +183,8 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
             Long lineCount = count.blockingGet();
             runContext.metric(Counter.of("records", lineCount));
 
+            schemaDataFileWriter.flush();
+            dataFileWriter.flush();
             output.flush();
         }
 
