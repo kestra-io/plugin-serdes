@@ -76,7 +76,7 @@ class XmlReaderWriterTest {
 
         assertThat(
             IOUtils.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
-            is(IOUtils.toString(new FileInputStream(resultFile)))
+            is(IOUtils.toString(new FileInputStream(resultFile), Charsets.UTF_8))
         );
     }
 
@@ -90,7 +90,7 @@ class XmlReaderWriterTest {
 
         assertThat(
             IOUtils.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
-            is(IOUtils.toString(new FileInputStream(resultFile)))
+            is(IOUtils.toString(new FileInputStream(resultFile), Charsets.UTF_8))
         );
     }
 

@@ -157,7 +157,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
         try (
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
-            DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output);
+            DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
             Flowable<GenericData.Record> flowable = Flowable
                 .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
@@ -231,7 +231,7 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     }
 
     private AvroConverter converter() {
-        AvroConverter.AvroConverterBuilder builder = AvroConverter.builder()
+        AvroConverter.AvroConverterBuilder<?, ?> builder = AvroConverter.builder()
             .timeZoneId(this.timeZoneId);
 
         if (this.trueValues != null) {
