@@ -26,7 +26,7 @@ public class PrimitiveDoubleTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, double expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.DOUBLE));
+        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.DOUBLE), false);
     }
 
     static Stream<Arguments> separator() {
@@ -58,6 +58,6 @@ public class PrimitiveDoubleTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v) {
-        AvroConverterTest.Utils.oneFieldFailed(v, Schema.create(Schema.Type.DOUBLE));
+        AvroConverterTest.Utils.oneFieldFailed(v, Schema.create(Schema.Type.DOUBLE), false);
     }
 }

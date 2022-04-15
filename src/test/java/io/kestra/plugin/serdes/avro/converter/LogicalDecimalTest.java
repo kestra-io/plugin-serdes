@@ -4,16 +4,12 @@ import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverterTest;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.math.BigDecimal;
 import java.util.stream.Stream;
-
-import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 
 public class LogicalDecimalTest {
     static Stream<Arguments> source() {
@@ -34,7 +30,7 @@ public class LogicalDecimalTest {
     @MethodSource("source")
     void convert(Object v, BigDecimal expected, Integer precision, Integer scale) throws Exception {
         Schema schema = LogicalTypes.decimal(precision, scale).addToSchema(Schema.create(Schema.Type.BYTES));
-        AvroConverterTest.Utils.oneField(v, expected, schema);
+        AvroConverterTest.Utils.oneField(v, expected, schema, false);
     }
 
     static Stream<Arguments> separator() {

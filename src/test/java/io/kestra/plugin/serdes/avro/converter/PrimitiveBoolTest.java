@@ -27,6 +27,6 @@ public class PrimitiveBoolTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, boolean expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.BOOLEAN));
+        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.BOOLEAN), false);
     }
 }

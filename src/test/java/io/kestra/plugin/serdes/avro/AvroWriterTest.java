@@ -62,6 +62,7 @@ class AvroWriterTest {
             .id(AvroWriterTest.class.getSimpleName())
             .type(AvroWriter.class.getName())
             .from(source.toString())
+            .inferAllFields(false)
             .schema(
                 Files.asCharSource(
                     new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader().getResource("csv/insurance_sample.avsc")).toURI()),

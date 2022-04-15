@@ -31,8 +31,10 @@ public class LogicalDateTimeTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, Instant expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)));
-        AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)));
+        AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
+            false);
+        AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
+            false);
     }
 
     static Stream<Arguments> sourceTimestamp() {
@@ -47,7 +49,7 @@ public class LogicalDateTimeTest {
     @ParameterizedTest
     @MethodSource("sourceTimestamp")
     void convertTimestamp(Object v, LogicalType logicalType, Instant expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, logicalType.addToSchema(Schema.create(Schema.Type.LONG)));
+        AvroConverterTest.Utils.oneField(v, expected, logicalType.addToSchema(Schema.create(Schema.Type.LONG)), false);
     }
 
     static Stream<Arguments> withFormat() {
@@ -78,6 +80,7 @@ public class LogicalDateTimeTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v) {
-        AvroConverterTest.Utils.oneFieldFailed(v, LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)));
+        AvroConverterTest.Utils.oneFieldFailed(v, LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
+            false);
     }
 }

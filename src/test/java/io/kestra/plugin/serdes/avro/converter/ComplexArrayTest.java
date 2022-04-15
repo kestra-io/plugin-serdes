@@ -22,7 +22,7 @@ public class ComplexArrayTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, List<Object> expected, Schema type) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, SchemaBuilder.array().items(type));
+        AvroConverterTest.Utils.oneField(v, expected, SchemaBuilder.array().items(type), false);
     }
 
     static Stream<Arguments> failedSource() {
@@ -36,6 +36,6 @@ public class ComplexArrayTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v, Schema type) {
-        AvroConverterTest.Utils.oneFieldFailed(v, SchemaBuilder.array().items(type));
+        AvroConverterTest.Utils.oneFieldFailed(v, SchemaBuilder.array().items(type), false);
     }
 }

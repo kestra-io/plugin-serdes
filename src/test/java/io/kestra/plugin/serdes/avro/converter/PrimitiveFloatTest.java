@@ -26,7 +26,7 @@ public class PrimitiveFloatTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, float expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.FLOAT));
+        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.FLOAT), false);
     }
 
     static Stream<Arguments> separator() {
@@ -58,6 +58,6 @@ public class PrimitiveFloatTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v) {
-        AvroConverterTest.Utils.oneFieldFailed(v, Schema.create(Schema.Type.FLOAT));
+        AvroConverterTest.Utils.oneFieldFailed(v, Schema.create(Schema.Type.FLOAT), false);
     }
 }

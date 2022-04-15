@@ -71,7 +71,15 @@ public class AvroConverter {
         description = "Default value is false"
     )
     @PluginProperty(dynamic = false)
-    protected Boolean strictSchema = Boolean.FALSE;
+    protected Boolean strictSchema = false;
+
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Try to infer all fields",
+        description = "By default, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`, disabled it to only infer bool & null fields."
+    )
+    @PluginProperty(dynamic = false)
+    protected Boolean inferAllFields = true;
 
     public static GenericData genericData() {
         GenericData genericData = new GenericData();
@@ -138,6 +146,16 @@ public class AvroConverter {
     @SuppressWarnings("unchecked")
     protected Object convert(Schema schema, Object data) throws IllegalCellConversion {
         try {
+            if (this.inferAllFields) {
+                if (data instanceof String && this.contains(this.nullValues, (String) data)) {
+                    return null;
+                } else if (data instanceof String && this.contains(this.trueValues, (String) data)) {
+                    return true;
+                } else if (data instanceof String && this.contains(this.falseValues, (String) data)) {
+                    return false;
+                }
+            }
+
             if (schema.getLogicalType() != null && schema.getLogicalType().getName().equals("decimal")) { // logical
                 return this.logicalDecimal(schema, data);
             } else if (schema.getLogicalType() != null && schema.getLogicalType().getName().equals("uuid")) {

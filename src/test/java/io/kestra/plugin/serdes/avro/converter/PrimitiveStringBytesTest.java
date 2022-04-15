@@ -28,12 +28,13 @@ public class PrimitiveStringBytesTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, String expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, new Utf8(expected.getBytes()), Schema.create(Schema.Type.STRING));
+        AvroConverterTest.Utils.oneField(v, new Utf8(expected.getBytes()), Schema.create(Schema.Type.STRING), false);
     }
 
     @ParameterizedTest
     @MethodSource("source")
     static void convertBytes(Object v, String expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, ByteBuffer.wrap(new Utf8(expected.getBytes()).getBytes()), Schema.create(Schema.Type.BYTES));
+        AvroConverterTest.Utils.oneField(v, ByteBuffer.wrap(new Utf8(expected.getBytes()).getBytes()), Schema.create(Schema.Type.BYTES),
+            false);
     }
 }

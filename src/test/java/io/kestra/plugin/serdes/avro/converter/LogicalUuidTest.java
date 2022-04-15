@@ -22,7 +22,7 @@ public class LogicalUuidTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(CharSequence v, UUID expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, schema);
+        AvroConverterTest.Utils.oneField(v, expected, schema, false);
     }
 
     static Stream<Arguments> failedSource() {
@@ -35,6 +35,6 @@ public class LogicalUuidTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v) {
-        AvroConverterTest.Utils.oneFieldFailed(v, schema);
+        AvroConverterTest.Utils.oneFieldFailed(v, schema, false);
     }
 }

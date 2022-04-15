@@ -21,7 +21,7 @@ public class PrimitiveIntTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, int expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.INT));
+        AvroConverterTest.Utils.oneField(v, expected, Schema.create(Schema.Type.INT), false);
     }
 
     static Stream<Arguments> failedSource() {
@@ -37,6 +37,6 @@ public class PrimitiveIntTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v) {
-        AvroConverterTest.Utils.oneFieldFailed(v, Schema.create(Schema.Type.INT));
+        AvroConverterTest.Utils.oneFieldFailed(v, Schema.create(Schema.Type.INT), false);
     }
 }

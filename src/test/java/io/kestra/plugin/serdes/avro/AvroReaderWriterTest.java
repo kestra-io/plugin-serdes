@@ -54,6 +54,7 @@ public class AvroReaderWriterTest {
             .id(AvroWriterTest.class.getSimpleName())
             .type(AvroWriter.class.getName())
             .from(readerRunOutput.getUri().toString())
+            .inferAllFields(false)
             .schema(
                 Files.asCharSource(
                     new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader().getResource(file.replace("avro","avsc"))).toURI()),

@@ -133,6 +133,14 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Try to infer all fields",
+        description = "By default, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`, disabled it to only infer bool & null fields."
+    )
+    @PluginProperty(dynamic = false)
+    protected Boolean inferAllFields = true;
+
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
         title = "Timezone to use when no timezone can be parsed on the source.",
         description = "If null, the timezone will be `UTC` Default value is system timezone"
     )
@@ -264,6 +272,10 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
 
         if (this.strictSchema != null) {
             builder.strictSchema(this.strictSchema);
+        }
+
+        if (this.inferAllFields != null) {
+            builder.inferAllFields(this.inferAllFields);
         }
 
         return builder.build();

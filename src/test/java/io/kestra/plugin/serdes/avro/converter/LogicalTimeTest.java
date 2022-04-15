@@ -25,8 +25,10 @@ public class LogicalTimeTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(CharSequence v, LocalTime expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timeMicros().addToSchema(Schema.create(Schema.Type.LONG)));
-        AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT)));
+        AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timeMicros().addToSchema(Schema.create(Schema.Type.LONG)),
+            false);
+        AvroConverterTest.Utils.oneField(v, expected, LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT)),
+            false);
     }
 
     static Stream<Arguments> failedSource() {
@@ -39,6 +41,7 @@ public class LogicalTimeTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v) {
-        AvroConverterTest.Utils.oneFieldFailed(v, LogicalTypes.timeMicros().addToSchema(Schema.create(Schema.Type.LONG)));
+        AvroConverterTest.Utils.oneFieldFailed(v, LogicalTypes.timeMicros().addToSchema(Schema.create(Schema.Type.LONG)),
+            false);
     }
 }

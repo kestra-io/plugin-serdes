@@ -30,6 +30,6 @@ public class ComplexUnionTest {
             .stream()
             .map(Schema::create)
             .collect(Collectors.toList())
-        ));
+        ), false);
     }
 }

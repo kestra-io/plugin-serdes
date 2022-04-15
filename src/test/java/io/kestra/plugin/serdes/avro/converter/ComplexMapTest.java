@@ -25,7 +25,7 @@ public class ComplexMapTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, Map<Utf8, Object> expected, Schema type) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, SchemaBuilder.map().values(type));
+        AvroConverterTest.Utils.oneField(v, expected, SchemaBuilder.map().values(type), false);
     }
 
     static Stream<Arguments> failedSource() {
@@ -38,6 +38,6 @@ public class ComplexMapTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v, Schema type) {
-        AvroConverterTest.Utils.oneFieldFailed(v, SchemaBuilder.map().values(type));
+        AvroConverterTest.Utils.oneFieldFailed(v, SchemaBuilder.map().values(type), false);
     }
 }

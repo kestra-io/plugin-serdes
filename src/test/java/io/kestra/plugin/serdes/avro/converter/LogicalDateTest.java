@@ -39,7 +39,7 @@ class LogicalDateTest {
     @ParameterizedTest
     @MethodSource("source")
     void convert(Object v, LocalDate expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, expected, schema);
+        AvroConverterTest.Utils.oneField(v, expected, schema, false);
     }
 
     static Stream<Arguments> withFormat() {
@@ -68,6 +68,6 @@ class LogicalDateTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v) {
-        AvroConverterTest.Utils.oneFieldFailed(v, schema);
+        AvroConverterTest.Utils.oneFieldFailed(v, schema, false);
     }
 }

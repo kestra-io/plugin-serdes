@@ -25,7 +25,7 @@ public class ComplexFixedTest {
     void convert(Object v, String expected, int length) throws Exception {
         Schema schema = SchemaBuilder.fixed("fixed").size(length);
 
-        AvroConverterTest.Utils.oneField(v, new GenericData.Fixed(schema, expected.getBytes()), schema);
+        AvroConverterTest.Utils.oneField(v, new GenericData.Fixed(schema, expected.getBytes()), schema, false);
     }
 
     static Stream<Arguments> failedSource() {
@@ -39,6 +39,6 @@ public class ComplexFixedTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v, int length) {
-        AvroConverterTest.Utils.oneFieldFailed(v, SchemaBuilder.fixed("fixed").size(length));
+        AvroConverterTest.Utils.oneFieldFailed(v, SchemaBuilder.fixed("fixed").size(length), false);
     }
 }

@@ -25,7 +25,7 @@ public class ComplexEnumTest {
     @MethodSource("source")
     void convert(Object v, String expected, List<String> values) throws Exception {
         Schema schema = SchemaBuilder.enumeration("enumeration").symbols(values.toArray(String[]::new));
-        AvroConverterTest.Utils.oneField(v, new GenericData.EnumSymbol(schema, expected), schema);
+        AvroConverterTest.Utils.oneField(v, new GenericData.EnumSymbol(schema, expected), schema, false);
     }
 
     static Stream<Arguments> failedSource() {
@@ -38,6 +38,7 @@ public class ComplexEnumTest {
     @ParameterizedTest
     @MethodSource("failedSource")
     void failed(Object v, List<String> values) {
-        AvroConverterTest.Utils.oneFieldFailed(v, SchemaBuilder.enumeration("enumeration").symbols(values.toArray(String[]::new)));
+        AvroConverterTest.Utils.oneFieldFailed(v, SchemaBuilder.enumeration("enumeration").symbols(values.toArray(String[]::new)),
+            false);
     }
 }
