@@ -24,10 +24,7 @@ import org.apache.avro.io.DatumWriter;
 import java.io.*;
 import java.net.URI;
 import java.time.ZoneId;
-import java.util.AbstractMap;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import javax.validation.constraints.NotNull;
 
@@ -179,7 +176,8 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
                                 .getFields()
                                 .stream()
                                 .map(field -> new AbstractMap.SimpleEntry<>(field.name(), datum.get(field.name())))
-                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
+                                // https://bugs.openjdk.java.net/browse/JDK-8148463
+                                .collect(HashMap::new, (m, v) -> m.put(v.getKey(), v.getValue()), HashMap::putAll),
                             e,
                             null
                         );
