@@ -131,10 +131,11 @@ public class AvroWriter extends Task implements RunnableTask<AvroWriter.Output> 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Try to infer all fields",
-        description = "By default, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`, disabled it to only infer bool & null fields."
+        description = "If true, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`." +
+            "If false, we will infer bool & null only on field declared on schema as `null` and `bool`."
     )
     @PluginProperty(dynamic = false)
-    protected Boolean inferAllFields = true;
+    protected Boolean inferAllFields = false;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
