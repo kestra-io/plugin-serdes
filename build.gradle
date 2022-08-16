@@ -45,8 +45,14 @@ dependencies {
     // kestra
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
 
+    compileOnly group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.11'
+
     api 'de.siegmar:fastcsv:1.0.3'
     api 'org.apache.avro:avro:1.11.1'
+    api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.12.3'
+    api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.3.4') {
+        exclude group: 'org.slf4j'
+    }
     api 'io.reactivex.rxjava2:rxjava:2.2.21'
     api 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
     api group: 'org.json', name: 'json', version: '20220320'

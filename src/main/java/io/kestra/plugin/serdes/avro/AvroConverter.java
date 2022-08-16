@@ -2,8 +2,10 @@ package io.kestra.plugin.serdes.avro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.Conversions;
 import org.apache.avro.LogicalTypes;
@@ -12,7 +14,6 @@ import org.apache.avro.data.TimeConversions;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.lang3.StringUtils;
-import io.kestra.core.models.annotations.PluginProperty;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -26,74 +27,28 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @SuperBuilder
-public class AvroConverter {
-    @Builder.Default
-    protected final List<String> trueValues = Arrays.asList("t", "true", "enabled", "1", "on", "yes");
-
-    @Builder.Default
-    protected final List<String> falseValues = Arrays.asList("f", "false", "disabled", "0", "off", "no", "");
-
-    @Builder.Default
-    protected final List<String> nullValues = Arrays.asList(
-        "",
-        "#N/A",
-        "#N/A N/A",
-        "#NA",
-        "-1.#IND",
-        "-1.#QNAN",
-        "-NaN",
-        "1.#IND",
-        "1.#QNAN",
-        "NA",
-        "n/a",
-        "nan",
-        "null"
-    );
-
-    @Builder.Default
-    protected final String dateFormat = "yyyy-MM-dd[XXX]";
-
-    @Builder.Default
-    protected final String timeFormat = "HH:mm[:ss][.SSSSSS][XXX]";
-
-    @Builder.Default
-    protected final String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]";
-
-    @Builder.Default
-    protected final char decimalSeparator = '.';
-
-    @Builder.Default
-    protected final String timeZoneId = ZoneId.systemDefault().toString();
-
-    @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Whether to consider a field present in the data but not declared in the schema as an error",
-        description = "Default value is false"
-    )
-    @PluginProperty(dynamic = false)
-    protected Boolean strictSchema = false;
-
-    @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
-        title = "Try to infer all fields",
-        description = "By default, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`, disabled it to only infer bool & null fields."
-    )
-    @PluginProperty(dynamic = false)
-    protected Boolean inferAllFields = true;
+@ToString
+@EqualsAndHashCode
+@Getter
+@NoArgsConstructor
+public class AvroConverter extends AbstractAvroConverter {
+    private static GenericData GENERIC_DATA;
 
     public static GenericData genericData() {
-        GenericData genericData = new GenericData();
-        genericData.addLogicalTypeConversion(new Conversions.UUIDConversion());
-        genericData.addLogicalTypeConversion(new Conversions.DecimalConversion());
-        genericData.addLogicalTypeConversion(new TimeConversions.DateConversion());
-        genericData.addLogicalTypeConversion(new TimeConversions.TimeMicrosConversion());
-        genericData.addLogicalTypeConversion(new TimeConversions.TimeMillisConversion());
-        genericData.addLogicalTypeConversion(new TimeConversions.TimestampMicrosConversion());
-        genericData.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
-        genericData.addLogicalTypeConversion(new TimeConversions.LocalTimestampMicrosConversion());
-        genericData.addLogicalTypeConversion(new TimeConversions.LocalTimestampMillisConversion());
+        if (AvroConverter.GENERIC_DATA == null) {
+            AvroConverter.GENERIC_DATA = new GenericData();
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.DateConversion());
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimeMicrosConversion());
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimeMillisConversion());
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMicrosConversion());
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.LocalTimestampMicrosConversion());
+            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.LocalTimestampMillisConversion());
+        }
 
-        return genericData;
+        return AvroConverter.GENERIC_DATA;
     }
 
     protected Object getValueFromNameOrAliases(Schema.Field field, Map<String, Object> data) {

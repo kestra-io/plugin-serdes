@@ -6,7 +6,6 @@ import org.apache.avro.LogicalType;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.data.TimeConversions.*;
-import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 
@@ -114,18 +113,18 @@ public class AvroDeserializer {
     }
 
     private static Object unionDeserializer(Object value, Schema schema) {
-        return AvroDeserializer.objectDeserializer(value, schema
+        return schema
             .getTypes()
             .stream()
-            .filter(type -> {
+            .map(type -> {
                 try {
-                    return new GenericData().validate(type, value);
+                    return AvroDeserializer.objectDeserializer(value, type);
                 } catch (Exception e) {
                     return  false;
                 }
             })
             .findFirst()
-            .orElseThrow());
+            .orElseThrow();
     }
 
     private static Map<String, ?> mapDeserializer(Map<String, ?> value, Schema schema) {
@@ -146,16 +145,19 @@ public class AvroDeserializer {
     }
 
     private static Instant timestampMicrosDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        switch (primitiveType) {
-            case LONG:
-                return AvroDeserializer.TIMESTAMP_MICROS_CONVERSION.fromLong((Long) value, schema, logicalType);
-            default:
-                throw new IllegalStateException("Unexpected value: " + primitiveType);
+        if (value instanceof Instant) {
+            return (Instant) value;
+        } else if (primitiveType == Type.LONG) {
+            return AvroDeserializer.TIMESTAMP_MICROS_CONVERSION.fromLong((Long) value, schema, logicalType);
         }
+
+        throw new IllegalStateException("Unexpected value: " + primitiveType);
     }
 
     private static Instant timestampMillisDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        if (primitiveType == Type.LONG) {
+        if (value instanceof Instant) {
+            return (Instant) value;
+        } else if (primitiveType == Type.LONG) {
             return AvroDeserializer.TIMESTAMP_MILLIS_CONVERSION.fromLong((Long) value, schema, logicalType);
         }
 
@@ -163,16 +165,19 @@ public class AvroDeserializer {
     }
 
     private static LocalDateTime localTimestampMicrosDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        switch (primitiveType) {
-            case LONG:
-                return AvroDeserializer.LOCAL_TIMESTAMP_MICROS_CONVERSION.fromLong((Long) value, schema, logicalType);
-            default:
-                throw new IllegalStateException("Unexpected value: " + primitiveType);
+        if (value instanceof LocalDateTime) {
+            return (LocalDateTime) value;
+        } else if (primitiveType == Type.LONG) {
+            return AvroDeserializer.LOCAL_TIMESTAMP_MICROS_CONVERSION.fromLong((Long) value, schema, logicalType);
         }
+
+        throw new IllegalStateException("Unexpected value: " + primitiveType);
     }
 
     private static LocalDateTime localTimestampMillisDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        if (primitiveType == Type.LONG) {
+        if (value instanceof LocalDateTime) {
+            return (LocalDateTime) value;
+        } else if (primitiveType == Type.LONG) {
             return AvroDeserializer.LOCAL_TIMESTAMP_MILLIS_CONVERSION.fromLong((Long) value, schema, logicalType);
         }
 
@@ -180,7 +185,9 @@ public class AvroDeserializer {
     }
 
     private static LocalTime timeMicrosDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        if (primitiveType == Type.LONG) {
+        if (value instanceof LocalTime) {
+            return (LocalTime) value;
+        } else if (primitiveType == Type.LONG) {
             return AvroDeserializer.TIME_MICROS_CONVERSION.fromLong((Long) value, schema, logicalType);
         }
 
@@ -188,7 +195,9 @@ public class AvroDeserializer {
     }
 
     private static LocalTime timeMillisDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        if (primitiveType == Type.INT) {
+        if (value instanceof LocalTime) {
+            return (LocalTime) value;
+        } else if (primitiveType == Type.INT) {
             return AvroDeserializer.TIME_MILLIS_CONVERSION.fromInt((Integer) value, schema, logicalType);
         }
 
@@ -196,7 +205,9 @@ public class AvroDeserializer {
     }
 
     private static LocalDate dateDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        if (primitiveType == Type.INT) {
+        if (value instanceof LocalDate) {
+            return (LocalDate) value;
+        } else if (primitiveType == Type.INT) {
             return AvroDeserializer.DATE_CONVERSION.fromInt((Integer) value, schema, logicalType);
         }
 
@@ -204,7 +215,9 @@ public class AvroDeserializer {
     }
 
     private static UUID uuidDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        if (primitiveType == Type.STRING) {
+        if (value instanceof UUID) {
+            return (UUID) value;
+        } else if (primitiveType == Type.STRING) {
             return AvroDeserializer.UUID_CONVERSION.fromCharSequence((CharSequence) value, schema, logicalType);
         }
 
@@ -212,13 +225,14 @@ public class AvroDeserializer {
     }
 
     private static BigDecimal decimalDeserializer(Object value, Schema schema, Type primitiveType, LogicalType logicalType) {
-        switch (primitiveType) {
-            case BYTES:
-                return AvroDeserializer.DECIMAL_CONVERSION.fromBytes((ByteBuffer) value, schema, logicalType);
-            case FIXED:
-                return AvroDeserializer.DECIMAL_CONVERSION.fromFixed((GenericFixed) value, schema, logicalType);
-            default:
-                throw new IllegalStateException("Unexpected value: " + primitiveType);
+        if (value instanceof BigDecimal) {
+            return (BigDecimal) value;
+        } else if (primitiveType == Type.BYTES) {
+            return AvroDeserializer.DECIMAL_CONVERSION.fromBytes((ByteBuffer) value, schema, logicalType);
+        } else if (primitiveType == Type.FIXED) {
+            return AvroDeserializer.DECIMAL_CONVERSION.fromFixed((GenericFixed) value, schema, logicalType);
         }
+
+        throw new IllegalStateException("Unexpected value: " + primitiveType);
     }
 }
