@@ -45,7 +45,7 @@ dependencies {
     // kestra
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
 
-    compileOnly group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.11'
+    compileOnly group: 'ch.qos.logback', name: 'logback-classic', version: '1.4.0'
 
     api 'de.siegmar:fastcsv:1.0.3'
     api 'org.apache.avro:avro:1.11.1'
