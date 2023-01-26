@@ -1,0 +1,24 @@
+{
+  "type": "record",
+  "name": "TestNull",
+  "fields": [
+    {
+      "name": "var1",
+      "type": "string"
+    },
+    {
+      "name": "var2",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    {
+      "name": "var3",
+      "type": [
+        "double",
+        "null"
+      ]
+    }
+  ]
+}

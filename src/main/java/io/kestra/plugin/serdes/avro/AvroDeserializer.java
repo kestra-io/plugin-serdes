@@ -113,18 +113,27 @@ public class AvroDeserializer {
     }
 
     private static Object unionDeserializer(Object value, Schema schema) {
-        return schema
-            .getTypes()
-            .stream()
-            .map(type -> {
-                try {
-                    return AvroDeserializer.objectDeserializer(value, type);
-                } catch (Exception e) {
-                    return  false;
-                }
-            })
-            .findFirst()
-            .orElseThrow();
+        // first, if value is null, check if the null type exist to avoid generating a NPE
+        if(value == null) {
+            if (schema.getTypes().stream().anyMatch(t -> t.getType() == Type.NULL)) {
+                return null;
+            }
+            else {
+                throw new NullPointerException("value is null but the schema type is not nullable: " + schema);
+            }
+        }
+
+        // then, evaluate each type and return the first that didn't generate an exception
+        for(var type  : schema.getTypes()) {
+            // try to deserialized by each type and return the first that works
+            try {
+                return AvroDeserializer.objectDeserializer(value, type);
+            }
+            catch(Exception e) {
+                // do nothing : try the next one
+            }
+        }
+        throw new IllegalArgumentException("Unable to deserialize objet " + value + " with schema " + schema);
     }
 
     private static Map<String, ?> mapDeserializer(Map<String, ?> value, Schema schema) {
