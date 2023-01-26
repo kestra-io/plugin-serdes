@@ -115,7 +115,7 @@ public class AvroDeserializer {
     private static Object unionDeserializer(Object value, Schema schema) {
         // first, if value is null, check if the null type exist to avoid generating a NPE
         if(value == null) {
-            if(schema.getTypes().stream().map(s -> s.getType()).anyMatch(t -> Type.NULL == (t))) {
+            if (schema.getTypes().stream().anyMatch(t -> t.getType() == Type.NULL)) {
                 return null;
             }
             else {
