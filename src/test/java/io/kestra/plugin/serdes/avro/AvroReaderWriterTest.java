@@ -37,6 +37,11 @@ public class AvroReaderWriterTest {
         test("csv/insurance_sample.avro");
     }
 
+    @Test
+    void nullValues() throws Exception {
+        test("avro/null.avro");
+    }
+
     private void test(String file) throws Exception {
         File sourceFile = SerdesUtils.resourceToFile(file);
         URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
@@ -57,7 +62,7 @@ public class AvroReaderWriterTest {
             .inferAllFields(false)
             .schema(
                 Files.asCharSource(
-                    new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader().getResource(file.replace("avro","avsc"))).toURI()),
+                    new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader().getResource(file.replace(".avro",".avsc"))).toURI()),
                     Charsets.UTF_8
                 ).read()
             )
@@ -69,7 +74,7 @@ public class AvroReaderWriterTest {
             AvroWriterTest.avroSize(this.storageInterface.get(run.getUri())),
             is(AvroWriterTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
-                        .getResource("csv/insurance_sample.avro"))
+                        .getResource(file))
                     .toURI())))
             )
         );

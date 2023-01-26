@@ -156,7 +156,6 @@ public abstract class AbstractAvroConverter extends Task {
     @SuppressWarnings("unchecked")
     protected Function<Object, GenericData.Record> convertToAvro(Schema schema) {
         AvroConverter converter = this.converter();
-        GenericData.Record record = new GenericData.Record(schema);
 
         return row -> {
             try {
@@ -170,7 +169,7 @@ public abstract class AbstractAvroConverter extends Task {
                     return converter.fromMap(schema, casted);
                 }
 
-                return record;
+                throw new IllegalArgumentException("Unable to convert row of type: " + row.getClass());
             } catch (Throwable e) {
                 throw new AvroConverter.IllegalRow(
                     row,
