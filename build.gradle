@@ -57,7 +57,7 @@ dependencies {
 
     api 'de.siegmar:fastcsv:1.0.3'
     api 'org.apache.avro:avro:1.11.1'
-    api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.12.3'
+    api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.13.0'
     api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.3.5') {
         exclude group: 'org.slf4j'
     }
