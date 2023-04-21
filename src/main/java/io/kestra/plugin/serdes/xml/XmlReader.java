@@ -12,12 +12,14 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import org.json.XMLParserConfiguration;
 
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.validation.constraints.NotNull;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
@@ -28,7 +30,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read a xml file and write it to an ion serialized data file."
+    title = "Read a XML file and write it to an ion serialized data file."
 )
 public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
     @NotNull
@@ -43,13 +45,21 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
+    @PluginProperty
     private final String charset = StandardCharsets.UTF_8.name();
 
     @Schema(
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
+    @PluginProperty
     private String query;
+
+    @Schema(
+        title = "XML parser configuration."
+    )
+    @PluginProperty
+    private ParserConfiguration parserConfiguration;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -63,12 +73,16 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
             OutputStream output = new FileOutputStream(tempFile);
         ) {
-            JSONObject jsonObject = XML.toJSONObject(input);
+            XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
+            if (parserConfiguration != null) {
+                xmlParserConfiguration = xmlParserConfiguration.withForceList(parserConfiguration.getForceList());
+            }
+            JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
             Object result = result(jsonObject);
 
             if (result instanceof JSONObject) {
                 Map<String, Object> map = ((JSONObject) result).toMap();
-                FileSerde.write(output, ((JSONObject) result).toMap());
+                FileSerde.write(output, map);
                 runContext.metric(Counter.of("records", map.size()));
             } else if (result instanceof JSONArray) {
                 List<Object> list = ((JSONArray) result).toList();
@@ -96,16 +110,6 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
             return  jsonObject;
         }
     }
-//
-//    private Object write(RunContext runContext, Object result, OutputStream output) {
-//        if (result instanceof JSONArray) {
-//            List<Object> list = ((JSONArray) result).toList();
-//            list.forEach(throwConsumer(o -> {
-//                FileSerde.write(output, o);
-//            }));
-//            runContext.metric(Counter.of("records", list.size()));
-//        }
-//    }
 
     @Builder
     @Getter
@@ -114,5 +118,16 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
             title = "URI of a temporary result file"
         )
         private final URI uri;
+    }
+
+    @Builder
+    @Data
+    @Schema(title = "XML parser configuration.")
+    public static class ParserConfiguration {
+        @Schema(
+            title = "List of XML tags that must be parsed as lists."
+        )
+        @PluginProperty
+        private Set<String> forceList;
     }
 }
