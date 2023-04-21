@@ -36,7 +36,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read an ion serialized data file and write it to a xml file."
+    title = "Read an ion serialized data file and write it to a XML file."
 )
 public class XmlWriter extends Task implements RunnableTask<XmlWriter.Output> {
     @NotNull
@@ -63,7 +63,7 @@ public class XmlWriter extends Task implements RunnableTask<XmlWriter.Output> {
     private final String rootName = "items";
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
     @PluginProperty(dynamic = true)
