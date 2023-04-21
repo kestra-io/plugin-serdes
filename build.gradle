@@ -120,7 +120,8 @@ nexusPublishing {
 jar {
     manifest {
         attributes(
-                "X-Kestra-Title": project.name,
+                "X-Kestra-Name": project.name,
+                "X-Kestra-Title": "Serialization",
                 "X-Kestra-Group": project.group + ".serdes",
                 "X-Kestra-Description": project.description,
                 "X-Kestra-Version": project.version
