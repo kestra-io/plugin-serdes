@@ -48,7 +48,7 @@ public class AvroReaderWriterTest {
 
 
         AvroReader reader = AvroReader.builder()
-            .id(AvroReaderTest.class.getSimpleName())
+            .id(AvroReaderWriterTest.class.getSimpleName())
             .type(AvroReader.class.getName())
             .from(source.toString())
             .build();
