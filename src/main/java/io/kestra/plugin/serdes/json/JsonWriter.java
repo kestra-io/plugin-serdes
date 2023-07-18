@@ -5,19 +5,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
+import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -27,7 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.validation.constraints.NotNull;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -73,7 +73,8 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        File tempFile = runContext.tempFile(".jsonl").toFile();
+        String suffix = this.newLine ? ".jsonl" : ".json";
+        File tempFile = runContext.tempFile(suffix).toFile();
         URI from = new URI(runContext.render(this.from));
 
         try (
