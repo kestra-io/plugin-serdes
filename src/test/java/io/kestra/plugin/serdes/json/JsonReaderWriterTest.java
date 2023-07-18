@@ -12,17 +12,19 @@ import io.kestra.plugin.serdes.SerdesUtils;
 import io.kestra.plugin.serdes.avro.AvroWriter;
 import io.kestra.plugin.serdes.csv.CsvWriter;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import jakarta.inject.Inject;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.net.URI;
-import java.time.*;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -75,6 +77,23 @@ class JsonReaderWriterTest {
         assertThat(
             mapper.readTree(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
             is(mapper.readTree(new InputStreamReader(new FileInputStream(sourceFile))))
+        );
+        assertThat(
+            FilenameUtils.getExtension(writerRunOutput.getUri().getPath()),
+            is("jsonl")
+        );
+    }
+
+    @Test
+    void notNewLine() throws Exception {
+        File sourceFile = SerdesUtils.resourceToFile("csv/full.jsonl");
+
+        JsonReader.Output readerRunOutput = this.reader(sourceFile, true);
+        JsonWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
+
+        assertThat(
+            FilenameUtils.getExtension(writerRunOutput.getUri().getPath()),
+            is("json")
         );
     }
 
