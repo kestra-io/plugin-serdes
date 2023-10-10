@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.time.ZoneId;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -51,6 +52,7 @@ public class IonToExcelTest {
             .type(IonToExcel.class.getName())
             .sheetsTitle("Worksheet")
             .from(ionOutput.getUris().get("Worksheet").toString())
+            .timeZoneId(ZoneId.systemDefault().toString())
             .header(header)
             .build();
         IonToExcel.Output excelOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
