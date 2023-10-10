@@ -1,0 +1,257 @@
+package io.kestra.plugin.serdes.excel;
+
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.utils.ListUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.PositiveOrZero;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.URI;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static io.kestra.core.utils.Rethrow.throwConsumer;
+import static io.kestra.core.utils.Rethrow.throwFunction;
+
+@SuperBuilder
+@ToString
+@EqualsAndHashCode
+@Getter
+@NoArgsConstructor
+@Schema(
+    title = "Read data from Excel into a row-wise ION-serialized format"
+)
+public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> {
+    @NotBlank
+    @Schema(
+        title = "Source file URI"
+    )
+    @PluginProperty(dynamic = true)
+    private String from;
+
+    @Schema(
+        title = "The sheet title to be included",
+        anyOf = {
+            List.class, String.class
+        }
+    )
+    @PluginProperty
+    private List<String> sheetsTitle;
+
+    @Schema(
+        title = "The name of a supported character set",
+        defaultValue = "UTF-8"
+    )
+    @PluginProperty
+    @Builder.Default
+    private String charset = "UTF-8";
+
+    @Schema(
+        title = "Determines how values should be rendered in the output",
+        description = "Possible values: FORMATTED_VALUE, UNFORMATTED_VALUE, FORMULA",
+        defaultValue = "UNFORMATTED_VALUE"
+    )
+    @PluginProperty
+    @Builder.Default
+    private String valueRender = "UNFORMATTED_VALUE";
+
+    @Schema(
+        title = "How dates, times, and durations should be represented in the output",
+        description = "Possible values: SERIAL_NUMBER, FORMATTED_STRING",
+        defaultValue = "UNFORMATTED_VALUE"
+    )
+    @Builder.Default
+    @PluginProperty
+    private String dateTimeRender = "UNFORMATTED_VALUE";
+
+    @Schema(
+        title = "Whether the first row should be treated as the header",
+        defaultValue = "true"
+    )
+    @PluginProperty
+    @Builder.Default
+    private boolean header = true;
+
+    @Schema(
+        title = "Specifies if empty rows should be skipped",
+        defaultValue = "false"
+    )
+    @PluginProperty
+    @Builder.Default
+    private boolean skipEmptyRows = false;
+
+    @Schema(
+        title = "Number of lines to skip at the start of the file. Useful if a table has a title and explanation if the first few rows",
+        defaultValue = "0"
+    )
+    @PositiveOrZero
+    @PluginProperty
+    @Builder.Default
+    private int skipRows = 0;
+
+    @Override
+    public Output run(RunContext runContext) throws Exception {
+        URI from = new URI(runContext.render(this.from));
+
+        XSSFWorkbook workbook = new XSSFWorkbook(runContext.uriToInputStream(from));
+        List<Sheet> sheets = new ArrayList<>();
+        workbook.sheetIterator().forEachRemaining(sheets::add);
+
+        List<String> includedSheetsTitle = ListUtils.emptyOnNull(this.sheetsTitle)
+            .stream()
+            .map(throwFunction(runContext::render))
+            .toList();
+
+        List<Sheet> selectedSheets = sheets.stream()
+            .filter(sheet -> includedSheetsTitle.isEmpty() || includedSheetsTitle.contains(sheet.getSheetName()))
+            .toList();
+
+        runContext.metric(Counter.of("sheets", sheets.size()));
+
+        // read values
+        Map<String, URI> uris = new HashMap<>();
+        AtomicInteger rowsCount = new AtomicInteger();
+
+        AtomicInteger skipped = new AtomicInteger();
+        for (Sheet sheet : selectedSheets) {
+            List<Object> values = new ArrayList<>();
+
+            sheet.rowIterator().forEachRemaining(row -> {
+                List<Object> rowValues = new ArrayList<>();
+                if (this.skipRows > 0 && skipped.get() < this.skipRows) {
+                    skipped.incrementAndGet();
+                    return;
+                }
+
+                for (int i = row.getFirstCellNum(); i < row.getLastCellNum(); i++) {
+                    Cell cell = row.getCell(i);
+                    if (cell != null) {
+                        if (this.valueRender.equals("FORMATTED_VALUE")) {
+                            extractValue(rowValues, cell);
+                        } else if (this.valueRender.equals("FORMULA")) {
+                            switch (cell.getCachedFormulaResultType()) {
+                                case NUMERIC -> rowValues.add(convertNumeric(cell));
+                                case STRING -> rowValues.add(cleanString(cell.getRichStringCellValue().getString()));
+                            }
+                        } else {
+                            extractValue(rowValues, cell);
+                        }
+                    }
+                }
+                values.add(rowValues);
+            });
+
+            rowsCount.addAndGet(values.size());
+
+            uris.put(sheet.getSheetName(), convertToIon(runContext, values));
+        }
+
+        return Output.builder()
+            .uris(uris)
+            .size(rowsCount.get())
+            .build();
+    }
+
+    public void extractValue(List<Object> rowValues, Cell cell) {
+        switch (cell.getCellType()) {
+            case STRING -> rowValues.add(cell.getStringCellValue());
+            case BOOLEAN -> rowValues.add(cell.getBooleanCellValue());
+            case NUMERIC -> rowValues.add(convertNumeric(cell));
+            case FORMULA -> {
+                switch (cell.getCachedFormulaResultType()){
+                    case NUMERIC -> rowValues.add(convertNumeric(cell));
+                    case STRING -> cleanString(cell.getRichStringCellValue().getString());
+                }
+            }
+            case BLANK -> {
+                if (!this.skipEmptyRows) {
+                    rowValues.add(cell.getStringCellValue());
+                }
+            }
+            default -> {
+            }
+        }
+    }
+
+    private URI convertToIon(RunContext runContext, List<Object> values) throws IOException {
+        if (header) {
+            List<Object> headers = (List<Object>) values.remove(0);
+            List<Object> convertedSheet = new LinkedList<>();
+
+            for (Object value : values) {
+                List<Object> list = (List<Object>) value;
+                Map<Object, Object> row = new LinkedHashMap<>();
+
+                for (int j = 0, headerPosition = 0; j < headers.size(); j++) {
+                    Object header = headers.get(headerPosition++);
+                    row.put(header, list.get(j));
+                }
+
+                convertedSheet.add(row);
+            }
+
+            return runContext.putTempFile(this.store(runContext, convertedSheet));
+        }
+
+        return runContext.putTempFile(this.store(runContext, values));
+    }
+
+    private String cleanString(String str) {
+		return str.replace("\n", "").replace("\r", "");
+	}
+
+    private Object convertNumeric(Cell cell) {
+        if(DateUtil.isCellDateFormatted(cell)) {
+            return switch (this.dateTimeRender) {
+                case "SERIAL_NUMBER" -> cell.getNumericCellValue();
+                case "FORMATTED_STRING" -> {
+                    DataFormatter dataFormatter = new DataFormatter();
+                    yield dataFormatter.formatCellValue(cell);
+                }
+                default -> cell.getDateCellValue();
+            };
+        }
+        return cell.getNumericCellValue();
+    }
+
+    @Builder
+    @Getter
+    public static class Output implements io.kestra.core.models.tasks.Output {
+        @Schema(
+            title = "URIs of files serialized in ION format from specific sheets",
+            description = "Because this task can simultaneously read data from multiple sheets, " +
+                "it will parse them in the key-value pair format: sheet_name: file_uri. " +
+                "Therefore, to access data from Sheet1, use the output syntax: \"{{ outputs.task_id.uris.Sheet1 }}\""
+        )
+        private Map<String, URI> uris;
+
+        @Schema(
+            title = "The number of fetched rows"
+        )
+        private int size;
+    }
+
+    private File store(RunContext runContext, Collection<Object> values) throws IOException {
+        File tempFile = runContext.tempFile(".ion").toFile();
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            values.forEach(throwConsumer(row -> FileSerde.write(output, row)));
+        }
+        return tempFile;
+    }
+}
