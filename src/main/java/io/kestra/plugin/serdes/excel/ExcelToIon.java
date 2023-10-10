@@ -46,17 +46,13 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     private String from;
 
     @Schema(
-        title = "The sheet title to be included",
-        anyOf = {
-            List.class, String.class
-        }
+        title = "The sheets title to be included"
     )
     @PluginProperty
     private List<String> sheetsTitle;
 
     @Schema(
-        title = "The name of a supported character set",
-        defaultValue = "UTF-8"
+        title = "The name of a supported character set"
     )
     @PluginProperty
     @Builder.Default
@@ -64,41 +60,36 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
     @Schema(
         title = "Determines how values should be rendered in the output",
-        description = "Possible values: FORMATTED_VALUE, UNFORMATTED_VALUE, FORMULA",
-        defaultValue = "UNFORMATTED_VALUE"
+        description = "Possible values: FORMATTED_VALUE, UNFORMATTED_VALUE, FORMULA"
     )
     @PluginProperty
     @Builder.Default
-    private String valueRender = "UNFORMATTED_VALUE";
+    private ValueRender valueRender = ValueRender.UNFORMATTED_VALUE;
 
     @Schema(
         title = "How dates, times, and durations should be represented in the output",
-        description = "Possible values: SERIAL_NUMBER, FORMATTED_STRING",
-        defaultValue = "UNFORMATTED_VALUE"
+        description = "Possible values: SERIAL_NUMBER, FORMATTED_STRING"
     )
     @Builder.Default
     @PluginProperty
-    private String dateTimeRender = "UNFORMATTED_VALUE";
+    private DateTimeRender dateTimeRender = DateTimeRender.UNFORMATTED_VALUE;
 
     @Schema(
-        title = "Whether the first row should be treated as the header",
-        defaultValue = "true"
+        title = "Whether the first row should be treated as the header"
     )
     @PluginProperty
     @Builder.Default
     private boolean header = true;
 
     @Schema(
-        title = "Specifies if empty rows should be skipped",
-        defaultValue = "false"
+        title = "Specifies if empty rows should be skipped"
     )
     @PluginProperty
     @Builder.Default
     private boolean skipEmptyRows = false;
 
     @Schema(
-        title = "Number of lines to skip at the start of the file. Useful if a table has a title and explanation if the first few rows",
-        defaultValue = "0"
+        title = "Number of lines to skip at the start of the file. Useful if a table has a title and explanation in the first few rows"
     )
     @PositiveOrZero
     @PluginProperty
@@ -142,12 +133,12 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                 for (int i = row.getFirstCellNum(); i < row.getLastCellNum(); i++) {
                     Cell cell = row.getCell(i);
                     if (cell != null) {
-                        if (this.valueRender.equals("FORMATTED_VALUE")) {
+                        if (this.valueRender.equals(ValueRender.FORMATTED_VALUE)) {
                             extractValue(rowValues, cell);
-                        } else if (this.valueRender.equals("FORMULA")) {
+                        } else if (this.valueRender.equals(ValueRender.FORMULA)) {
                             switch (cell.getCachedFormulaResultType()) {
                                 case NUMERIC -> rowValues.add(convertNumeric(cell));
-                                case STRING -> rowValues.add(cleanString(cell.getRichStringCellValue().getString()));
+                                case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
                             }
                         } else {
                             extractValue(rowValues, cell);
@@ -176,7 +167,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
             case FORMULA -> {
                 switch (cell.getCachedFormulaResultType()){
                     case NUMERIC -> rowValues.add(convertNumeric(cell));
-                    case STRING -> cleanString(cell.getRichStringCellValue().getString());
+                    case STRING -> cell.getRichStringCellValue().getString();
                 }
             }
             case BLANK -> {
@@ -212,15 +203,11 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         return runContext.putTempFile(this.store(runContext, values));
     }
 
-    private String cleanString(String str) {
-		return str.replace("\n", "").replace("\r", "");
-	}
-
     private Object convertNumeric(Cell cell) {
         if(DateUtil.isCellDateFormatted(cell)) {
             return switch (this.dateTimeRender) {
-                case "SERIAL_NUMBER" -> cell.getNumericCellValue();
-                case "FORMATTED_STRING" -> {
+                case SERIAL_NUMBER -> cell.getNumericCellValue();
+                case FORMATTED_STRING -> {
                     DataFormatter dataFormatter = new DataFormatter();
                     yield dataFormatter.formatCellValue(cell);
                 }

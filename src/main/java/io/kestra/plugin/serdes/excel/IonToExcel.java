@@ -18,18 +18,20 @@ import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.openxmlformats.schemas.spreadsheetml.x2006.main.impl.CTCellFormulaImpl;
 
 import javax.validation.constraints.NotNull;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoField;
-import java.time.temporal.TemporalField;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -65,54 +67,18 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
     private String sheetsTitle = "Sheet";
 
     @Schema(
-        title = "Format to use for date columns",
-        defaultValue = "yyyy-MM-dd"
-    )
-    @Builder.Default
-    @PluginProperty(dynamic = true)
-    private String dateFormat = "yyyy-MM-dd";
-
-    @Schema(
-        title = "Format to use for ZonedDateTime data type",
-        defaultValue = "yyyy-MM-dd'T'HH:mm:ss.SSS[XXX]"
-    )
-    @Builder.Default
-    @PluginProperty(dynamic = true)
-    private String dateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS[XXX]";
-
-    @Schema(
-        title = "Whether header should be written as the first file",
-        defaultValue = "true"
+        title = "Whether header should be written as the first line"
     )
     @Builder.Default
     @PluginProperty
     private boolean header = true;
 
-    @Schema(
-        title = "Format to use for time data type",
-        defaultValue = "HH:mm:ss.SSS[XXX]"
-    )
-    @Builder.Default
-    @PluginProperty(dynamic = true)
-    private String timeFormat = "HH:mm:ss.SSS[XXX]";
-
-    @Schema(
-        title = "Timezone to use when no timezone can be parsed from the source data",
-        defaultValue = "Europe/Berlin"
-    )
-    @Builder.Default
-    @PluginProperty(dynamic = true)
-    private String timeZoneId = "Europe/Berlin";
-
     @Override
     public Output run(RunContext runContext) throws Exception {
-        // temp file
         File tempFile = runContext.tempFile(".xlsx").toFile();
 
-        // reader
         URI from = new URI(runContext.render(this.from));
 
-        // formatter
         this.init(runContext);
 
         try (
@@ -129,8 +95,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                     @SuppressWarnings("unchecked")
                     @Override
                     public void accept(Object row) {
-                        if (row instanceof List) {
-                            List<Object> casted = (List<Object>) row;
+                        if (row instanceof List casted) {
                             XSSFRow xssfRow = sheet.createRow(rowAt++);
 
                             if (header) {
@@ -143,15 +108,14 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                                 ++cellAt;
                             }
 
-                        } else if (row instanceof Map) {
-                            Map<String, Object> casted = (Map<String, Object>) row;
+                        } else if (row instanceof Map casted) {
                             XSSFRow xssfRow = sheet.createRow(rowAt++);
 
                             if (!first) {
                                 this.first = true;
                                 if (header) {
                                     int cellAt = 0;
-                                    for (final String value : casted.keySet()) {
+                                    for (final Object value : casted.keySet()) {
                                         createCell(workbook, sheet, value, xssfRow, cellAt++);
                                     }
                                     xssfRow = sheet.createRow(rowAt++);
@@ -187,12 +151,12 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
         if (value instanceof Number) {
 
-            if (value instanceof Double) {
-                cell.setCellValueImpl((Double) value);
-            } else if (value instanceof Integer) {
-                cell.setCellValueImpl((Integer) value);
-            } else {
-                cell.setCellValueImpl((Float) value);
+            if (value instanceof Double doubleValue) {
+                cell.setCellValueImpl(doubleValue);
+            } else if (value instanceof Integer intValue) {
+                cell.setCellValueImpl(intValue);
+            } else if (value instanceof Float floatValue) {
+                cell.setCellValueImpl(floatValue);
             }
 
             cell.setCellType(CellType.NUMERIC);
@@ -210,11 +174,11 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         } else if (value instanceof Instant instant) {
             CellStyle cellStyle = workbook.createCellStyle();
             DataFormat dataFormat = workbook.createDataFormat();
-            cellStyle.setDataFormat(dataFormat.getFormat(this.dateFormat));
+            cellStyle.setDataFormat(dataFormat.getFormat(getDateFormat()));
             sheet.setDefaultColumnStyle(cell.getColumnIndex(), cellStyle);
 
-            if (this.timeZoneId != null) {
-                LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(this.timeZoneId));
+            if (getTimeZoneId() != null) {
+                LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(getTimeZoneId()));
                 cell.setCellValue(DateUtil.getExcelDate(date));
             } else {
                 Date date = Date.from(instant);
