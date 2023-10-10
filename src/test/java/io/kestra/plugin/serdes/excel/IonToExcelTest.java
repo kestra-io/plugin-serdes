@@ -52,7 +52,6 @@ public class IonToExcelTest {
             .type(IonToExcel.class.getName())
             .sheetsTitle("Worksheet")
             .from(ionOutput.getUris().get("Worksheet").toString())
-            .timeZoneId(ZoneId.systemDefault().toString())
             .header(header)
             .build();
         IonToExcel.Output excelOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
