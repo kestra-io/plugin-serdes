@@ -46,7 +46,7 @@ public class ExcelToIonTest {
                 .build();
             ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(ionOutput.getUris().get("Worksheet"))));
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, ionOutput.getUris().get("Worksheet"))));
 
             assertThat(out, containsString("policyID:333743"));
             assertThat(out, containsString("point_latitude:30.102261"));

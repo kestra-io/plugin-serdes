@@ -56,7 +56,7 @@ public class IonToExcelTest {
             .build();
         IonToExcel.Output excelOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(excelOutput.getUri()));
+        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(null, excelOutput.getUri()));
         XSSFWorkbook expected = new XSSFWorkbook(new FileInputStream(sourceFile));
         assertThat(actual, WorkbookMatcher.sameWorkbook(expected));
     }

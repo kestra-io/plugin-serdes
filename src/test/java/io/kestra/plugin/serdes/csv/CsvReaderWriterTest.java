@@ -57,7 +57,7 @@ class CsvReaderWriterTest {
         CsvWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
         assertThat(
-            CharStreams.toString(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
+            CharStreams.toString(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri()))),
             is(CharStreams.toString(new InputStreamReader(new FileInputStream(sourceFile))))
         );
     }
