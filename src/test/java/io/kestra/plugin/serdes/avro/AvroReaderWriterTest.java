@@ -71,7 +71,7 @@ public class AvroReaderWriterTest {
         AvroWriter.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get(run.getUri())),
+            AvroWriterTest.avroSize(this.storageInterface.get(null, run.getUri())),
             is(AvroWriterTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
                         .getResource(file))

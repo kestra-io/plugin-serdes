@@ -52,6 +52,7 @@ class AvroWriterTest {
 
     void test(String file) throws Exception {
         URI source = storageInterface.put(
+            null,
             new URI("/" + FriendlyId.createFriendlyId()),
             new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
                 .getResource(file))
@@ -74,7 +75,7 @@ class AvroWriterTest {
         AvroWriter.Output run = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get(run.getUri())),
+            AvroWriterTest.avroSize(this.storageInterface.get(null, run.getUri())),
             is(AvroWriterTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
                     .getResource("csv/insurance_sample.avro"))
@@ -114,7 +115,7 @@ class AvroWriterTest {
                 )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
-            URI uri = storageInterface.put(URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+            URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
             AvroWriter writer = AvroWriter.builder()
                 .id(AvroWriter.class.getSimpleName())
