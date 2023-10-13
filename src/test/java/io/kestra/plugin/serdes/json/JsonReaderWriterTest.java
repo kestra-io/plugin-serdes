@@ -75,7 +75,7 @@ class JsonReaderWriterTest {
         JsonWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri(), true);
 
         assertThat(
-            mapper.readTree(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
+            mapper.readTree(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri()))),
             is(mapper.readTree(new InputStreamReader(new FileInputStream(sourceFile))))
         );
         assertThat(
@@ -105,7 +105,7 @@ class JsonReaderWriterTest {
         JsonWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
 
         assertThat(
-            mapper.readTree(new InputStreamReader(storageInterface.get(writerRunOutput.getUri()))),
+            mapper.readTree(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri()))),
             is(mapper.readTree(new InputStreamReader(new FileInputStream(sourceFile))))
         );
     }
@@ -119,7 +119,7 @@ class JsonReaderWriterTest {
 
 
         List<Map> objects = Arrays.asList(mapper.readValue(
-            new InputStreamReader(storageInterface.get(writerRunOutput.getUri())),
+            new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri())),
             Map[].class
         ));
 
@@ -149,7 +149,7 @@ class JsonReaderWriterTest {
                 )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
-            URI uri = storageInterface.put(URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+            URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
             JsonWriter writer = JsonWriter.builder()
                 .id(AvroWriter.class.getSimpleName())
@@ -160,7 +160,7 @@ class JsonReaderWriterTest {
             JsonWriter.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             assertThat(
-                IOUtils.toString(this.storageInterface.get(run.getUri()), Charsets.UTF_8),
+                IOUtils.toString(this.storageInterface.get(null, run.getUri()), Charsets.UTF_8),
                 is("{" +
                     "\"String\":\"string\"," +
                     "\"Int\":2," +

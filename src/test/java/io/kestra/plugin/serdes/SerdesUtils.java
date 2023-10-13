@@ -36,6 +36,7 @@ public class SerdesUtils {
 
     public URI resourceToStorageObject(File file) throws URISyntaxException, IOException {
         return storageInterface.put(
+            null,
             new URI("/" + FriendlyId.createFriendlyId()),
             new FileInputStream(file)
         );
