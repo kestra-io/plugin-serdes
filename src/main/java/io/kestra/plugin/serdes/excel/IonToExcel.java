@@ -163,19 +163,22 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         } else if (value instanceof Boolean) {
             cell.setCellType(CellType.BOOLEAN);
         } else if (value instanceof Date date) {
+
+
             cell.setCellValue(DateUtil.getExcelDate(date));
             cell.setCellType(CellType.NUMERIC);
         } else if (value instanceof LocalDate date) {
+            sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+
             cell.setCellValue(DateUtil.getExcelDate(date));
             cell.setCellType(CellType.NUMERIC);
         } else if (value instanceof LocalDateTime date) {
+            sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+
             cell.setCellValue(DateUtil.getExcelDate(date));
             cell.setCellType(CellType.NUMERIC);
         } else if (value instanceof Instant instant) {
-            CellStyle cellStyle = workbook.createCellStyle();
-            DataFormat dataFormat = workbook.createDataFormat();
-            cellStyle.setDataFormat(dataFormat.getFormat(getDateFormat()));
-            sheet.setDefaultColumnStyle(cell.getColumnIndex(), cellStyle);
+            sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
 
             if (getTimeZoneId() != null) {
                 LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(getTimeZoneId()));
@@ -189,6 +192,13 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             cell.setCellValue(String.valueOf(value));
             cell.setCellType(CellType.STRING);
         }
+    }
+
+    private CellStyle getCellStyle(Workbook workbook) {
+        CellStyle cellStyle = workbook.createCellStyle();
+        DataFormat dataFormat = workbook.createDataFormat();
+        cellStyle.setDataFormat(dataFormat.getFormat(getDateFormat()));
+        return cellStyle;
     }
 
     @Builder
