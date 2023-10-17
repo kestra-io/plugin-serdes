@@ -37,7 +37,7 @@
 
 > Plugin to serialize and deserialize data 
 
-![Kestra orchestrator](https://kestra.io/ui.gif)
+![Kestra orchestrator](https://kestra.io/video.gif)
 
 
 ## Documentation
