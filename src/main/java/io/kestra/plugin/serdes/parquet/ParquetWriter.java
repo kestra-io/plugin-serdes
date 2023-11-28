@@ -16,6 +16,7 @@ import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
+import org.xerial.snappy.Snappy;
 
 import java.io.*;
 import java.net.URI;
@@ -45,46 +46,50 @@ public class ParquetWriter extends AbstractAvroConverter implements RunnableTask
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "The compression to used"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     CompressionCodec compressionCodec = CompressionCodec.GZIP;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target row group size"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private Version version = Version.V2;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target row group size"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private Long rowGroupSize = (long) org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target page size"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private Integer pageSize = org.apache.parquet.hadoop.ParquetWriter.DEFAULT_PAGE_SIZE;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Max dictionary page size"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private Integer dictionaryPageSize = org.apache.parquet.hadoop.ParquetWriter.DEFAULT_PAGE_SIZE;
 
     static {
         ParquetTools.handleLogger();
+
+        // This will init the Snappy native library early, it is needed to avoid init it during the run() method
+        // as it downloads a native library inside the temporary directory
+        // which can be forbidden if Java Security is enabled in EE.
+        Snappy.getNativeLibraryVersion();
     }
 
     @Override
     public Output run(RunContext runContext) throws Exception {
         // temp file
         File tempFile = runContext.tempFile(".parquet").toFile();
-        BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
 
         // avro options
         Schema.Parser parser = new Schema.Parser();
@@ -119,8 +124,6 @@ public class ParquetWriter extends AbstractAvroConverter implements RunnableTask
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));
-
-            output.flush();
         }
 
         return Output

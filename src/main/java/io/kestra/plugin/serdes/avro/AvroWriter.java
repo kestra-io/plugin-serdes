@@ -11,6 +11,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
+import org.xerial.snappy.Snappy;
 
 import java.io.*;
 import java.net.URI;
@@ -31,6 +32,13 @@ public class AvroWriter extends AbstractAvroConverter implements RunnableTask<Av
     )
     @PluginProperty(dynamic = true)
     private String from;
+
+    static {
+        // This will init the Snappy native library early, it is needed to avoid init it during the run() method
+        // as it downloads a native library inside the temporary directory
+        // which can be forbidden if Java Security is enabled in EE.
+        Snappy.getNativeLibraryVersion();
+    }
 
     @Override
     public Output run(RunContext runContext) throws Exception {
