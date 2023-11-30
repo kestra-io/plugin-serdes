@@ -1,26 +1,27 @@
 package io.kestra.plugin.serdes.xml;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.XML;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import lombok.extern.slf4j.Slf4j;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.XML;
 import org.json.XMLParserConfiguration;
 
+import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.validation.constraints.NotNull;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -32,6 +33,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Schema(
     title = "Read a XML file and write it to an ion serialized data file."
 )
+@Slf4j
 public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
     @NotNull
     @Schema(
@@ -49,8 +51,7 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
     private final String charset = StandardCharsets.UTF_8.name();
 
     @Schema(
-        title = "The name of a supported charset",
-        description = "Default value is UTF-8."
+        title = "XPath use to query in the XML file."
     )
     @PluginProperty
     private String query;
@@ -73,28 +74,31 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
             OutputStream output = new FileOutputStream(tempFile);
         ) {
-            XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
-            if (parserConfiguration != null) {
-                xmlParserConfiguration = xmlParserConfiguration.withForceList(parserConfiguration.getForceList());
-            }
-            JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
-            Object result = result(jsonObject);
+            if(input.ready()) {
+                XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
+                if (parserConfiguration != null) {
+                    xmlParserConfiguration = xmlParserConfiguration.withForceList(parserConfiguration.getForceList());
+                }
+                JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
 
-            if (result instanceof JSONObject) {
-                Map<String, Object> map = ((JSONObject) result).toMap();
-                FileSerde.write(output, map);
-                runContext.metric(Counter.of("records", map.size()));
-            } else if (result instanceof JSONArray) {
-                List<Object> list = ((JSONArray) result).toList();
-                list.forEach(throwConsumer(o -> {
-                    FileSerde.write(output, o);
-                }));
-                runContext.metric(Counter.of("records", list.size()));
-            } else {
-                FileSerde.write(output, result);
-            }
+                Object result = result(jsonObject);
 
-            output.flush();
+                if (result instanceof JSONObject) {
+                    Map<String, Object> map = ((JSONObject) result).toMap();
+                    FileSerde.write(output, map);
+                    runContext.metric(Counter.of("records", map.size()));
+                } else if (result instanceof JSONArray) {
+                    List<Object> list = ((JSONArray) result).toList();
+                    list.forEach(throwConsumer(o -> {
+                        FileSerde.write(output, o);
+                    }));
+                    runContext.metric(Counter.of("records", list.size()));
+                } else {
+                    FileSerde.write(output, result);
+                }
+
+                output.flush();
+            }
         }
 
         return Output
@@ -105,9 +109,14 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
 
     private Object result(JSONObject jsonObject) {
         if (this.query != null) {
-            return jsonObject.query(this.query);
+            try {
+                return jsonObject.query(this.query);
+            } catch (Exception e) {
+                log.debug("JsonObject query failed, Object maybe null or empty.");
+                return null;
+            }
         } else {
-            return  jsonObject;
+            return jsonObject;
         }
     }
 
