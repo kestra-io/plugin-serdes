@@ -25,6 +25,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -152,13 +153,29 @@ class XmlReaderWriterTest {
     // Assert that there is no exception throw when reading an empty file
     void readEmpty() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty.xml");
-        this.reader(sourceFile, "/random/stuff");
+        XmlReader.Output reader = this.reader(sourceFile, "/random/stuff");
+        String tagContent = new BufferedReader(new
+            InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+        assertThat(tagContent, is(""));
     }
 
     @Test
     // Assert that there is no exception throw when reading an empty file
-    void readEmptyTag() throws Exception {
+    void readEmptyTagBadQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
-        this.reader(sourceFile, "/random/stuff");
+        XmlReader.Output reader = this.reader(sourceFile, "/random/stuff");
+        String tagContent = new BufferedReader(new
+            InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+        assertThat(tagContent, is(""));
+    }
+
+    @Test
+    // Assert that there is no exception throw when reading an empty file
+    void readEmptyTagGoodQuery() throws Exception {
+        File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
+        XmlReader.Output reader = this.reader(sourceFile, "/catalog");
+        String tagContent = new BufferedReader(new
+            InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+        assertThat(tagContent, is("\"\""));
     }
 }

@@ -51,8 +51,7 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
     private final String charset = StandardCharsets.UTF_8.name();
 
     @Schema(
-        title = "The name of a supported charset",
-        description = "Default value is UTF-8."
+        title = "XPath use to query in the XML file."
     )
     @PluginProperty
     private String query;
