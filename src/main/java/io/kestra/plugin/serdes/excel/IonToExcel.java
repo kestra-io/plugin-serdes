@@ -24,6 +24,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -84,7 +86,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         try (
             BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
             XSSFWorkbook workbook = new XSSFWorkbook();
-            FileOutputStream outputStream = new FileOutputStream(tempFile);
+            FileOutputStream outputStream = new FileOutputStream(tempFile)
             ) {
             XSSFSheet sheet = workbook.createSheet(sheetsTitle);
             Flowable<Object> flowable = Flowable.create(FileSerde.reader(reader), BackpressureStrategy.BUFFER)
@@ -150,21 +152,26 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         XSSFCell cell = xssfRow.createCell(rowNumber);
 
         if (value instanceof Number) {
-
             if (value instanceof Double doubleValue) {
                 cell.setCellValueImpl(doubleValue);
             } else if (value instanceof Integer intValue) {
                 cell.setCellValueImpl(intValue);
             } else if (value instanceof Float floatValue) {
                 cell.setCellValueImpl(floatValue);
+            } else if (value instanceof Long longValue) {
+                cell.setCellValueImpl(longValue);
+            } else if (value instanceof BigDecimal bigDecimalValue) {
+                cell.setCellValueImpl(bigDecimalValue.doubleValue());
+            } else if (value instanceof BigInteger bigIntegerValue) {
+                cell.setCellValue(bigIntegerValue.toString());
+                cell.setCellType(CellType.STRING);
+                return;
             }
 
             cell.setCellType(CellType.NUMERIC);
         } else if (value instanceof Boolean) {
             cell.setCellType(CellType.BOOLEAN);
         } else if (value instanceof Date date) {
-
-
             cell.setCellValue(DateUtil.getExcelDate(date));
             cell.setCellType(CellType.NUMERIC);
         } else if (value instanceof LocalDate date) {
