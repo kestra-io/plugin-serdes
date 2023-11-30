@@ -4,18 +4,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
-import io.kestra.core.serializers.FileSerde;
-import io.kestra.core.utils.IdUtils;
-import io.kestra.plugin.serdes.avro.AvroWriter;
-import io.kestra.plugin.serdes.csv.CsvWriter;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Test;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
+import io.kestra.plugin.serdes.avro.AvroWriter;
+import io.kestra.plugin.serdes.csv.CsvWriter;
 import io.kestra.plugin.serdes.json.JsonWriter;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import jakarta.inject.Inject;
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.net.URI;
@@ -24,7 +25,6 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
-import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -146,5 +146,19 @@ class XmlReaderWriterTest {
                 )
             );
         }
+    }
+
+    @Test
+    // Assert that there is no exception throw when reading an empty file
+    void readEmpty() throws Exception {
+        File sourceFile = SerdesUtils.resourceToFile("xml/empty.xml");
+        this.reader(sourceFile, "/random/stuff");
+    }
+
+    @Test
+    // Assert that there is no exception throw when reading an empty file
+    void readEmptyTag() throws Exception {
+        File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
+        this.reader(sourceFile, "/random/stuff");
     }
 }
