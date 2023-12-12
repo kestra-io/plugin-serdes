@@ -4,7 +4,9 @@ import bad.robot.excel.matchers.WorkbookMatcher;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
@@ -14,10 +16,15 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 
 @MicronautTest
 public class IonToExcelTest {
@@ -73,7 +80,50 @@ public class IonToExcelTest {
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
         ExcelToIon.Output output = reader.run(runContext);
 
-        assertThat(output.getSize(), is(2));
+        assertThat(output.getSize(), is(2L));
     }
 
+    @Test
+    void large() throws Exception {
+        final Long ROWS_COUNT = 10000L;
+
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+
+        Map<String, Object> map = new HashMap<>();
+        for (int i = 0; i < 100; i++) {
+            map.put("key" + i, "value" + 1);
+            map.put("int", 1);
+        }
+
+        try (FileOutputStream outputStream = new FileOutputStream(tempFile)) {
+            for (int i = 0; i < ROWS_COUNT; i++) {
+                FileSerde.write(outputStream, map);
+            }
+        }
+
+        URI put = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+        IonToExcel writer = IonToExcel.builder()
+            .id(IonToExcel.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(put.toString())
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        IonToExcel.Output output = writer.run(runContext);
+
+        assertThat(output.getUri(), is(notNullValue()));
+        assertThat(output.getSize(), is(ROWS_COUNT));
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(output.getUri().toString())
+            .build();
+
+        runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        ExcelToIon.Output outputWriter = reader.run(runContext);
+
+        assertThat(outputWriter.getSize(), is(ROWS_COUNT + 1));
+    }
 }
