@@ -14,12 +14,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFCell;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.streaming.SXSSFCell;
+import org.apache.poi.xssf.streaming.SXSSFRow;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 
-import javax.validation.constraints.NotNull;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -34,6 +33,7 @@ import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import javax.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
@@ -85,20 +85,20 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
         try (
             BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
-            XSSFWorkbook workbook = new XSSFWorkbook();
+            SXSSFWorkbook workbook = new SXSSFWorkbook(1);
             FileOutputStream outputStream = new FileOutputStream(tempFile)
-            ) {
-            XSSFSheet sheet = workbook.createSheet(sheetsTitle);
+        ) {
+            SXSSFSheet sheet = workbook.createSheet(sheetsTitle);
             Flowable<Object> flowable = Flowable.create(FileSerde.reader(reader), BackpressureStrategy.BUFFER)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
                     private int rowAt = 0;
 
-                    @SuppressWarnings("unchecked")
+                    @SuppressWarnings("rawtypes")
                     @Override
                     public void accept(Object row) {
                         if (row instanceof List casted) {
-                            XSSFRow xssfRow = sheet.createRow(rowAt++);
+                            SXSSFRow xssfRow = sheet.createRow(rowAt++);
 
                             if (header) {
                                 throw new IllegalArgumentException("Invalid data of type List with header");
@@ -111,7 +111,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                             }
 
                         } else if (row instanceof Map casted) {
-                            XSSFRow xssfRow = sheet.createRow(rowAt++);
+                            SXSSFRow xssfRow = sheet.createRow(rowAt++);
 
                             if (!first) {
                                 this.first = true;
@@ -138,18 +138,20 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             runContext.metric(Counter.of("records", lineCount));
 
             workbook.write(outputStream);
-        }
 
-        return Output
-            .builder()
-            .uri(runContext.putTempFile(tempFile))
-            .build();
+
+            return Output
+                .builder()
+                .uri(runContext.putTempFile(tempFile))
+                .size(lineCount)
+                .build();
+        }
     }
 
     // Could be replaced with switch case in java21
     @Deprecated(forRemoval = true)
-    private void createCell(Workbook workbook, Sheet sheet, Object value, XSSFRow xssfRow, int rowNumber) {
-        XSSFCell cell = xssfRow.createCell(rowNumber);
+    private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber) {
+        SXSSFCell cell = xssfRow.createCell(rowNumber);
 
         if (value instanceof Number) {
             if (value instanceof Double doubleValue) {
@@ -215,5 +217,10 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             title = "Internal storage URI of the Excel file"
         )
         private URI uri;
+
+        @Schema(
+            title = "The number of fetched rows"
+        )
+        private long size;
     }
 }

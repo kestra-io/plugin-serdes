@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.excel;
 
+import com.github.pjfanning.xlsx.StreamingReader;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -10,10 +11,7 @@ import io.kestra.core.utils.ListUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.DateUtil;
-import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import javax.validation.constraints.NotBlank;
@@ -100,63 +98,65 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     public Output run(RunContext runContext) throws Exception {
         URI from = new URI(runContext.render(this.from));
 
-        XSSFWorkbook workbook = new XSSFWorkbook(runContext.uriToInputStream(from));
-        List<Sheet> sheets = new ArrayList<>();
-        workbook.sheetIterator().forEachRemaining(sheets::add);
+        try(Workbook workbook = StreamingReader.builder().rowCacheSize(1).open(runContext.uriToInputStream(from))) {
 
-        List<String> includedSheetsTitle = ListUtils.emptyOnNull(this.sheetsTitle)
-            .stream()
-            .map(throwFunction(runContext::render))
-            .toList();
+            List<Sheet> sheets = new ArrayList<>();
+            workbook.sheetIterator().forEachRemaining(sheets::add);
 
-        List<Sheet> selectedSheets = sheets.stream()
-            .filter(sheet -> includedSheetsTitle.isEmpty() || includedSheetsTitle.contains(sheet.getSheetName()))
-            .toList();
+            List<String> includedSheetsTitle = ListUtils.emptyOnNull(this.sheetsTitle)
+                .stream()
+                .map(throwFunction(runContext::render))
+                .toList();
 
-        runContext.metric(Counter.of("sheets", sheets.size()));
+            List<Sheet> selectedSheets = sheets.stream()
+                .filter(sheet -> includedSheetsTitle.isEmpty() || includedSheetsTitle.contains(sheet.getSheetName()))
+                .toList();
 
-        // read values
-        Map<String, URI> uris = new HashMap<>();
-        AtomicInteger rowsCount = new AtomicInteger();
+            runContext.metric(Counter.of("sheets", sheets.size()));
 
-        AtomicInteger skipped = new AtomicInteger();
-        for (Sheet sheet : selectedSheets) {
-            List<Object> values = new ArrayList<>();
+            // read values
+            Map<String, URI> uris = new HashMap<>();
+            AtomicInteger rowsCount = new AtomicInteger();
 
-            sheet.rowIterator().forEachRemaining(row -> {
-                List<Object> rowValues = new ArrayList<>();
-                if (this.skipRows > 0 && skipped.get() < this.skipRows) {
-                    skipped.incrementAndGet();
-                    return;
-                }
+            AtomicInteger skipped = new AtomicInteger();
+            for (Sheet sheet : selectedSheets) {
+                List<Object> values = new ArrayList<>();
 
-                for (int i = row.getFirstCellNum(); i < row.getLastCellNum(); i++) {
-                    Cell cell = row.getCell(i);
-                    if (cell != null) {
-                        if (this.valueRender.equals(ValueRender.FORMATTED_VALUE)) {
-                            extractValue(rowValues, cell);
-                        } else if (this.valueRender.equals(ValueRender.FORMULA)) {
-                            switch (cell.getCachedFormulaResultType()) {
-                                case NUMERIC -> rowValues.add(convertNumeric(cell));
-                                case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
+                sheet.rowIterator().forEachRemaining(row -> {
+                    List<Object> rowValues = new ArrayList<>();
+                    if (this.skipRows > 0 && skipped.get() < this.skipRows) {
+                        skipped.incrementAndGet();
+                        return;
+                    }
+
+                    for (int i = row.getFirstCellNum(); i < row.getLastCellNum(); i++) {
+                        Cell cell = row.getCell(i);
+                        if (cell != null) {
+                            if (this.valueRender.equals(ValueRender.FORMATTED_VALUE)) {
+                                extractValue(rowValues, cell);
+                            } else if (this.valueRender.equals(ValueRender.FORMULA)) {
+                                switch (cell.getCachedFormulaResultType()) {
+                                    case NUMERIC -> rowValues.add(convertNumeric(cell));
+                                    case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
+                                }
+                            } else {
+                                extractValue(rowValues, cell);
                             }
-                        } else {
-                            extractValue(rowValues, cell);
                         }
                     }
-                }
-                values.add(rowValues);
-            });
+                    values.add(rowValues);
+                });
 
-            rowsCount.addAndGet(values.size());
+                rowsCount.addAndGet(values.size());
 
-            uris.put(sheet.getSheetName(), convertToIon(runContext, values));
+                uris.put(sheet.getSheetName(), convertToIon(runContext, values));
+            }
+
+            return Output.builder()
+                .uris(uris)
+                .size(rowsCount.get())
+                .build();
         }
-
-        return Output.builder()
-            .uris(uris)
-            .size(rowsCount.get())
-            .build();
     }
 
     public void extractValue(List<Object> rowValues, Cell cell) {
@@ -231,7 +231,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         @Schema(
             title = "The number of fetched rows"
         )
-        private int size;
+        private long size;
     }
 
     private File store(RunContext runContext, Collection<Object> values) throws IOException {
