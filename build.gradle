@@ -58,18 +58,18 @@ dependencies {
     compileOnly group: 'ch.qos.logback', name: 'logback-classic'
 
     api 'de.siegmar:fastcsv:1.0.3'
-    api 'org.apache.avro:avro:1.11.1'
+    api 'org.apache.avro:avro:1.11.3'
     api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.13.1'
     api group: 'org.apache.poi', name: 'poi', version: '5.2.5'
     api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.2.5'
     api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '4.2.1'
 
-    api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.3.5') {
+    api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.3.6') {
         exclude group: 'org.slf4j'
     }
     api 'io.reactivex.rxjava2:rxjava:2.2.21'
     api 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
-    api group: 'org.json', name: 'json', version: '20230618'
+    api group: 'org.json', name: 'json', version: '20231013'
 }
 
 
