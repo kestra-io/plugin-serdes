@@ -75,6 +75,15 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
     @PluginProperty
     private boolean header = true;
 
+    @Schema(
+        title = "Whether styles should be applied to format values",
+        description = "Excel is limited to 64000 styles per document, and styles are applied on every date, " +
+            "removed this options when you have a lots of values."
+    )
+    @Builder.Default
+    @PluginProperty
+    private boolean styles = true;
+
     @Override
     public Output run(RunContext runContext) throws Exception {
         File tempFile = runContext.tempFile(".xlsx").toFile();
@@ -177,17 +186,23 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             cell.setCellValue(DateUtil.getExcelDate(date));
             cell.setCellType(CellType.NUMERIC);
         } else if (value instanceof LocalDate date) {
-            sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+            if (this.styles) {
+                sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+            }
 
             cell.setCellValue(DateUtil.getExcelDate(date));
             cell.setCellType(CellType.NUMERIC);
         } else if (value instanceof LocalDateTime date) {
-            sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+            if (this.styles) {
+                sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+            }
 
             cell.setCellValue(DateUtil.getExcelDate(date));
             cell.setCellType(CellType.NUMERIC);
         } else if (value instanceof Instant instant) {
-            sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+            if (this.styles) {
+                sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+            }
 
             if (getTimeZoneId() != null) {
                 LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(getTimeZoneId()));
