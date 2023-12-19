@@ -74,31 +74,29 @@ public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
             OutputStream output = new FileOutputStream(tempFile);
         ) {
-            if(input.ready()) {
-                XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
-                if (parserConfiguration != null) {
-                    xmlParserConfiguration = xmlParserConfiguration.withForceList(parserConfiguration.getForceList());
-                }
-                JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
-
-                Object result = result(jsonObject);
-
-                if (result instanceof JSONObject) {
-                    Map<String, Object> map = ((JSONObject) result).toMap();
-                    FileSerde.write(output, map);
-                    runContext.metric(Counter.of("records", map.size()));
-                } else if (result instanceof JSONArray) {
-                    List<Object> list = ((JSONArray) result).toList();
-                    list.forEach(throwConsumer(o -> {
-                        FileSerde.write(output, o);
-                    }));
-                    runContext.metric(Counter.of("records", list.size()));
-                } else {
-                    FileSerde.write(output, result);
-                }
-
-                output.flush();
+            XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
+            if (parserConfiguration != null) {
+                xmlParserConfiguration = xmlParserConfiguration.withForceList(parserConfiguration.getForceList());
             }
+            JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
+
+            Object result = result(jsonObject);
+
+            if (result instanceof JSONObject) {
+                Map<String, Object> map = ((JSONObject) result).toMap();
+                FileSerde.write(output, map);
+                runContext.metric(Counter.of("records", map.size()));
+            } else if (result instanceof JSONArray) {
+                List<Object> list = ((JSONArray) result).toList();
+                list.forEach(throwConsumer(o -> {
+                    FileSerde.write(output, o);
+                }));
+                runContext.metric(Counter.of("records", list.size()));
+            } else {
+                FileSerde.write(output, result);
+            }
+
+            output.flush();
         }
 
         return Output
