@@ -4,6 +4,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.serdes.avro.AbstractAvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import lombok.*;
@@ -16,9 +17,12 @@ import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
+import org.apache.poi.util.TempFile;
+import org.xerial.snappy.Snappy;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.Locale;
 import javax.validation.constraints.NotNull;
 
@@ -80,10 +84,14 @@ public class ParquetWriter extends AbstractAvroConverter implements RunnableTask
         ParquetTools.handleLogger();
     }
 
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public Output run(RunContext runContext) throws Exception {
-        // temp file
-        File tempFile = runContext.tempFile(".parquet").toFile();
+        // temp file, we create multiple useless tree to avoid incompatibility with EE javaSecurity
+        java.nio.file.Path tempDir = runContext.tempDir().resolve(IdUtils.create());
+        tempDir.toFile().mkdirs();
+        File tempFile = Files.createTempFile(tempDir, "", ".parquet").toFile();
+
         BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
 
         // avro options
