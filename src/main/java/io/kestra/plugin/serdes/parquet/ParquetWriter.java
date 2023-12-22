@@ -17,8 +17,6 @@ import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
-import org.apache.poi.util.TempFile;
-import org.xerial.snappy.Snappy;
 
 import java.io.*;
 import java.net.URI;
