@@ -12,13 +12,12 @@ import io.reactivex.FlowableOnSubscribe;
 import io.reactivex.Single;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
