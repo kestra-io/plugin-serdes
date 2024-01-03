@@ -15,7 +15,7 @@ import org.json.JSONObject;
 import org.json.XML;
 import org.json.XMLParserConfiguration;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;

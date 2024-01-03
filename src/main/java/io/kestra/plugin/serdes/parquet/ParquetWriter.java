@@ -22,7 +22,7 @@ import java.io.*;
 import java.net.URI;
 import java.nio.file.Files;
 import java.util.Locale;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_1_0;
 import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_2_0;

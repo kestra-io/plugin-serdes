@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.csv;
 
+import de.siegmar.fastcsv.writer.CsvAppender;
 import de.siegmar.fastcsv.writer.LineDelimiter;
 import de.siegmar.fastcsv.writer.QuoteStrategy;
 import io.kestra.plugin.serdes.AbstractTextWriter;
@@ -22,7 +23,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString

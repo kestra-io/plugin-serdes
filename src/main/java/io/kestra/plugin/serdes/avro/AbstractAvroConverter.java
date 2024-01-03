@@ -17,7 +17,7 @@ import org.apache.avro.generic.GenericData;
 import java.io.BufferedReader;
 import java.time.ZoneId;
 import java.util.*;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
