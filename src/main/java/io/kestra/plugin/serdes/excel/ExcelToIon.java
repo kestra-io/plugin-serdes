@@ -167,7 +167,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
             case FORMULA -> {
                 switch (cell.getCachedFormulaResultType()){
                     case NUMERIC -> rowValues.add(convertNumeric(cell));
-                    case STRING -> cell.getRichStringCellValue().getString();
+                    case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
                 }
             }
             case BLANK -> {
