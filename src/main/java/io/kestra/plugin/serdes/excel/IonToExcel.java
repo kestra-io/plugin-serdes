@@ -213,8 +213,14 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             }
             cell.setCellType(CellType.NUMERIC);
         } else {
-            cell.setCellValue(String.valueOf(value));
-            cell.setCellType(CellType.STRING);
+            String valueStr = String.valueOf(value);
+            if (valueStr.startsWith("Formula:")) {
+                cell.setCellFormula(valueStr.substring(8));
+                cell.setCellType(CellType.FORMULA);
+            } else {
+                cell.setCellValue(valueStr);
+                cell.setCellType(CellType.STRING);
+            }
         }
     }
 
