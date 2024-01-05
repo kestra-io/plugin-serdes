@@ -5,10 +5,6 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.Rethrow;
 import io.kestra.core.validations.DateFormat;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.reactivex.functions.Function;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.Schema;
@@ -17,7 +13,12 @@ import org.apache.avro.generic.GenericData;
 import java.io.BufferedReader;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.function.Function;
+
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 @SuperBuilder
 @ToString
@@ -128,14 +129,14 @@ public abstract class AbstractAvroConverter extends Task {
 
 
     protected <E extends Exception> Long convert(BufferedReader inputStream, Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer) {
-        Flowable<GenericData.Record> flowable = Flowable
-            .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
+        Flux<GenericData.Record> flowable = Flux
+            .create(FileSerde.reader(inputStream), FluxSink.OverflowStrategy.BUFFER)
             .map(this.convertToAvro(schema))
             .doOnNext(datum -> {
                 try {
                     consumer.accept(datum);
                 } catch (Throwable e) {
-                    throw new AvroConverter.IllegalRowConvertion(
+                    var avroException =  new AvroConverter.IllegalRowConvertion(
                         datum.getSchema()
                             .getFields()
                             .stream()
@@ -145,12 +146,13 @@ public abstract class AbstractAvroConverter extends Task {
                         e,
                         null
                     );
+                    throw new RuntimeException(avroException);
                 }
             });
 
         // metrics & finalize
-        Single<Long> count = flowable.count();
-        return count.blockingGet();
+        Mono<Long> count = flowable.count();
+        return count.block();
     }
 
     @SuppressWarnings("unchecked")
@@ -171,10 +173,11 @@ public abstract class AbstractAvroConverter extends Task {
 
                 throw new IllegalArgumentException("Unable to convert row of type: " + row.getClass());
             } catch (Throwable e) {
-                throw new AvroConverter.IllegalRow(
+                var avroException =  new AvroConverter.IllegalRow(
                     row,
                     e
                 );
+                throw new RuntimeException(avroException);
             }
         };
     }

@@ -5,10 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableOnSubscribe;
-import io.reactivex.Single;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -24,7 +20,14 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.TimeZone;
+import java.util.function.Consumer;
+
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
+
+import static io.kestra.core.utils.Rethrow.throwConsumer;
 
 @SuperBuilder
 @ToString
@@ -69,13 +72,13 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
             OutputStream output = new FileOutputStream(tempFile);
         ) {
-            Flowable<Object> flowable = Flowable
-                .create(this.nextRow(input), BackpressureStrategy.BUFFER)
-                .doOnNext(row -> FileSerde.write(output, row));
+            Flux<Object> flowable = Flux
+                .create(this.nextRow(input), FluxSink.OverflowStrategy.BUFFER)
+                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
 
             // metrics & finalize
-            Single<Long> count = flowable.count();
-            Long lineCount = count.blockingGet();
+            Mono<Long> count = flowable.count();
+            Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
             output.flush();
@@ -96,7 +99,7 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
         private final URI uri;
     }
 
-    private FlowableOnSubscribe<Object> nextRow(BufferedReader inputStream) {
+    private Consumer<FluxSink<Object>> nextRow(BufferedReader inputStream) throws IOException {
         ObjectMapper mapper = new ObjectMapper()
             .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
             .setSerializationInclusion(JsonInclude.Include.ALWAYS)
@@ -104,24 +107,24 @@ public class JsonReader extends Task implements RunnableTask<JsonReader.Output> 
             .registerModule(new JavaTimeModule())
             .registerModule(new Jdk8Module());
 
-        return s -> {
+        return throwConsumer(s -> {
             if (newLine) {
                 String line;
                 while ((line = inputStream.readLine()) != null) {
-                    s.onNext(mapper.readValue(line, Object.class));
+                    s.next(mapper.readValue(line, Object.class));
                 }
             } else {
                 Object objects = mapper.readValue(inputStream, Object.class);
 
                 if (objects instanceof Collection) {
                     ((Collection<?>) objects)
-                        .forEach(s::onNext);
+                        .forEach(s::next);
                 } else {
-                    s.onNext(objects);
+                    s.next(objects);
                 }
             }
 
-            s.onComplete();
-        };
+            s.complete();
+        });
     }
 }

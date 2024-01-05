@@ -1,13 +1,8 @@
 package io.kestra.plugin.serdes.csv;
 
-import de.siegmar.fastcsv.writer.CsvAppender;
 import de.siegmar.fastcsv.writer.LineDelimiter;
 import de.siegmar.fastcsv.writer.QuoteStrategy;
 import io.kestra.plugin.serdes.AbstractTextWriter;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.reactivex.functions.Consumer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -23,7 +18,12 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 @SuperBuilder
 @ToString
@@ -94,14 +94,14 @@ public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWri
             Writer fileWriter = new FileWriter(tempFile, Charset.forName(this.charset));
             de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter(fileWriter)
         ) {
-            Flowable<Object> flowable = Flowable
-                .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
+            Flux<Object> flowable = Flux
+                .create(FileSerde.reader(inputStream), FluxSink.OverflowStrategy.BUFFER)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
 
                     @SuppressWarnings("unchecked")
                     @Override
-                    public void accept(Object row) throws Exception {
+                    public void accept(Object row) {
                         if (row instanceof List) {
                             List<Object> casted = (List<Object>) row;
 
@@ -129,8 +129,8 @@ public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWri
                 });
 
             // metrics & finalize
-            Single<Long> count = flowable.count();
-            Long lineCount = count.blockingGet();
+            Mono<Long> count = flowable.count();
+            Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
         }
 
