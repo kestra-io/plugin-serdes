@@ -1,7 +1,5 @@
 package io.kestra.plugin.serdes.csv;
 
-import io.reactivex.Flowable;
-import io.reactivex.Single;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -17,7 +15,12 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import static io.kestra.core.utils.Rethrow.throwConsumer;
 
 @SuperBuilder
 @ToString
@@ -92,7 +95,7 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
             OutputStream output = new FileOutputStream(tempFile);
         ) {
             Map<Integer, String> headers = new TreeMap<>();
-            Flowable<Object> flowable = Flowable
+            Flux<Object> flowable = Flux
                 .fromIterable(csvReader)
                 .filter(csvRow -> {
                     if (header && csvRow.getOriginalLineNumber() == 1) {
@@ -118,11 +121,11 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
                     }
                     return r.getFields();
                 })
-                .doOnNext(row -> FileSerde.write(output, row));
+                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
 
             // metrics & finalize
-            Single<Long> count = flowable.count();
-            Long lineCount = count.blockingGet();
+            Mono<Long> count = flowable.count();
+            Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
             output.flush();

@@ -6,10 +6,6 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.AbstractTextWriter;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
-import io.reactivex.functions.Consumer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -20,6 +16,10 @@ import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -34,6 +34,7 @@ import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 @SuperBuilder
 @ToString
@@ -98,7 +99,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             FileOutputStream outputStream = new FileOutputStream(tempFile)
         ) {
             SXSSFSheet sheet = workbook.createSheet(sheetsTitle);
-            Flowable<Object> flowable = Flowable.create(FileSerde.reader(reader), BackpressureStrategy.BUFFER)
+            Flux<Object> flowable = Flux.create(FileSerde.reader(reader), FluxSink.OverflowStrategy.BUFFER)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
                     private int rowAt = 0;
@@ -142,8 +143,8 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                 });
 
             // metrics & finalize
-            Single<Long> count = flowable.count();
-            Long lineCount = count.blockingGet();
+            Mono<Long> count = flowable.count();
+            Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
             workbook.write(outputStream);

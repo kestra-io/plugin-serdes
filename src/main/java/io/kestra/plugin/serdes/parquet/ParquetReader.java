@@ -8,10 +8,6 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroDeserializer;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableOnSubscribe;
-import io.reactivex.Single;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.generic.GenericRecord;
@@ -23,10 +19,18 @@ import org.apache.parquet.hadoop.util.HadoopInputFile;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.util.Map;
+import java.util.function.Consumer;
+
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
+
+import static io.kestra.core.utils.Rethrow.throwConsumer;
 
 @SuperBuilder
 @ToString
@@ -72,13 +76,13 @@ public class ParquetReader extends Task implements RunnableTask<ParquetReader.Ou
             OutputStream output = new FileOutputStream(tempFile)
         ) {
 
-            Flowable<Map<String, Object>> flowable = Flowable
-                .create(this.nextRow(parquetReader), BackpressureStrategy.BUFFER)
+            Flux<Map<String, Object>> flowable = Flux
+                .create(this.nextRow(parquetReader), FluxSink.OverflowStrategy.BUFFER)
                 .map(AvroDeserializer::recordDeserializer)
-                .doOnNext(row -> FileSerde.write(output, row));
+                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
 
-            Single<Long> count = flowable.count();
-            Long lineCount = count.blockingGet();
+            Mono<Long> count = flowable.count();
+            Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
             output.flush();
@@ -90,8 +94,8 @@ public class ParquetReader extends Task implements RunnableTask<ParquetReader.Ou
             .build();
     }
 
-    private FlowableOnSubscribe<GenericRecord> nextRow(org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader) {
-        return s -> {
+    private Consumer<FluxSink<GenericRecord>> nextRow(org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader) throws IOException {
+        return throwConsumer(s -> {
             boolean next = true;
             while (next) {
                 GenericRecord record = parquetReader.read();
@@ -99,12 +103,12 @@ public class ParquetReader extends Task implements RunnableTask<ParquetReader.Ou
                 if (record == null) {
                     next = false;
                 } else {
-                    s.onNext(record);
+                    s.next(record);
                 }
             }
 
-            s.onComplete();
-        };
+            s.complete();
+        });
     }
 
     @Builder

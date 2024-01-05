@@ -11,14 +11,15 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Flowable;
-import io.reactivex.Single;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
+
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -89,15 +90,13 @@ public class JsonWriter extends Task implements RunnableTask<JsonWriter.Output> 
                 .registerModule(new Jdk8Module());
 
             if (this.newLine) {
-                Flowable<Object> flowable = Flowable
-                    .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
-                    .doOnNext(o -> {
-                        outfile.write(mapper.writeValueAsString(o) + "\n");
-                    });
+                Flux<Object> flowable = Flux
+                    .create(FileSerde.reader(inputStream), FluxSink.OverflowStrategy.BUFFER)
+                    .doOnNext(throwConsumer(o -> outfile.write(mapper.writeValueAsString(o) + "\n")));
 
                 // metrics & finalize
-                Single<Long> count = flowable.count();
-                Long lineCount = count.blockingGet();
+                Mono<Long> count = flowable.count();
+                Long lineCount = count.block();
                 runContext.metric(Counter.of("records", lineCount));
 
             } else {
