@@ -57,7 +57,7 @@ dependencies {
 
     compileOnly group: 'ch.qos.logback', name: 'logback-classic'
 
-    api 'de.siegmar:fastcsv:1.0.3'
+    api 'de.siegmar:fastcsv:2.2.2'
     api 'org.apache.avro:avro:1.11.3'
     api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.13.1'
     api group: 'org.apache.poi', name: 'poi', version: '5.2.5'

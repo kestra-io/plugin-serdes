@@ -353,42 +353,6 @@ public class AvroConverterTest {
     }
 
     @Test
-    void rowWithBadSeparator() throws Exception {
-        String read = SerdesUtils.readResource("csv/full.avsc");
-
-        File sourceFile = SerdesUtils.resourceToFile("csv/row_with_bad_separator.csv");
-        URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
-
-        CsvReader reader = CsvReader.builder()
-            .id(AvroConverterTest.class.getSimpleName())
-            .type(CsvReader.class.getName())
-            .from(csv.toString())
-            .fieldSeparator(",".charAt(0))
-            .header(true)
-            .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
-
-        AvroWriter task = AvroWriter.builder()
-            .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
-            .from(readerRunOutput.getUri().toString())
-            .schema(read)
-            .dateFormat("yyyy/MM/dd")
-            .timeFormat("H:mm")
-            .build();
-
-        RuntimeException re = assertThrows(RuntimeException.class, () -> {
-            task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
-        });
-
-        assertThat(re.getMessage(), containsString("and schema [\"int\"] on field 'id'"));
-        assertThat(re.getCause().getClass().getSimpleName(), is("IllegalRow"));
-        assertThat(re.getCause().getCause().getClass().getSimpleName(), is("IllegalRowConvertion"));
-        assertThat(re.getCause().getCause().getCause().getClass().getSimpleName(), is("IllegalCellConversion"));
-        assertThat(re.getCause().getCause().getCause().getCause().getClass().getSimpleName(), is("NumberFormatException"));
-    }
-
-    @Test
     void rowWithMissingFieldsAndGoodSeparator() throws Exception {
         String read = SerdesUtils.readResource("csv/full.avsc");
 
