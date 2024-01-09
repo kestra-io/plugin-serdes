@@ -1,10 +1,6 @@
 package io.kestra.plugin.serdes.csv;
 
-import de.siegmar.fastcsv.reader.CsvParser;
-import de.siegmar.fastcsv.reader.CsvRow;
-import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
-import io.reactivex.FlowableOnSubscribe;
 import io.reactivex.Single;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -16,12 +12,10 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.validation.constraints.NotNull;
 
@@ -50,13 +44,13 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
     @Schema(
         title = "The field separator character"
     )
-    private final Character fieldSeparator = ",".charAt(0);
+    private final Character fieldSeparator = ',';
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
-    private final Character textDelimiter = "\"".charAt(0);
+    private final Character textDelimiter = '"';
 
     @Builder.Default
     @Schema(
@@ -86,7 +80,6 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
     public Output run(RunContext runContext) throws Exception {
         // reader
         URI from = new URI(runContext.render(this.from));
-        de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader();
 
         // temp file
         File tempFile = runContext.tempFile(".ion").toFile();
@@ -95,12 +88,19 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
         AtomicInteger skipped = new AtomicInteger();
 
         try (
-            CsvParser csvParser = csvReader.parse(new InputStreamReader(runContext.uriToInputStream(from), charset));
+            de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
             OutputStream output = new FileOutputStream(tempFile);
         ) {
+            Map<Integer, String> headers = new TreeMap<>();
             Flowable<Object> flowable = Flowable
-                .create(this.nextRow(csvParser), BackpressureStrategy.BUFFER)
+                .fromIterable(csvReader)
                 .filter(csvRow -> {
+                    if (header && csvRow.getOriginalLineNumber() == 1) {
+                        for (int i = 0; i < csvRow.getFieldCount(); i++) {
+                            headers.put(i, csvRow.getField(i));
+                        }
+                        return false;
+                    }
                     if (this.skipRows > 0 && skipped.get() < this.skipRows) {
                         skipped.incrementAndGet();
                         return false;
@@ -110,10 +110,13 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
                 })
                 .map(r -> {
                     if (header) {
-                        return r.getFieldMap();
-                    } else {
-                        return r.getFields();
+                        Map<String, Object> fields = new LinkedHashMap<>();
+                        for (Map.Entry<Integer, String> header : headers.entrySet()) {
+                            fields.put(header.getValue(), r.getField(header.getKey()));
+                        }
+                        return fields;
                     }
+                    return r.getFields();
                 })
                 .doOnNext(row -> FileSerde.write(output, row));
 
@@ -140,40 +143,25 @@ public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
         private URI uri;
     }
 
-    private FlowableOnSubscribe<CsvRow> nextRow(CsvParser csvParser) {
-        return s -> {
-            CsvRow row;
-            while ((row = csvParser.nextRow()) != null) {
-                s.onNext(row);
-            }
-
-            s.onComplete();
-        };
-    }
-
-    private de.siegmar.fastcsv.reader.CsvReader csvReader() {
-        de.siegmar.fastcsv.reader.CsvReader csvReader = new de.siegmar.fastcsv.reader.CsvReader();
-
-        if (this.header != null) {
-            csvReader.setContainsHeader(this.header);
-        }
+    private de.siegmar.fastcsv.reader.CsvReader csvReader(InputStreamReader inputStreamReader) {
+        var builder = de.siegmar.fastcsv.reader.CsvReader.builder();
 
         if (this.textDelimiter != null) {
-            csvReader.setTextDelimiter(textDelimiter);
+            builder.quoteCharacter(textDelimiter);
         }
 
         if (this.fieldSeparator != null) {
-            csvReader.setFieldSeparator(fieldSeparator);
+            builder.fieldSeparator(fieldSeparator);
         }
 
         if (this.skipEmptyRows != null) {
-            csvReader.setSkipEmptyRows(skipEmptyRows);
+            builder.skipEmptyRows(skipEmptyRows);
         }
 
         if (this.errorOnDifferentFieldCount != null) {
-            csvReader.setErrorOnDifferentFieldCount(errorOnDifferentFieldCount);
+            builder.errorOnDifferentFieldCount(errorOnDifferentFieldCount);
         }
 
-        return csvReader;
+        return builder.build(inputStreamReader);
     }
 }

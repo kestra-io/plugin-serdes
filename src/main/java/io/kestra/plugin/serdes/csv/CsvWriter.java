@@ -1,7 +1,7 @@
 package io.kestra.plugin.serdes.csv;
 
-import de.siegmar.fastcsv.writer.CsvAppender;
-import io.kestra.core.validations.DateFormat;
+import de.siegmar.fastcsv.writer.LineDelimiter;
+import de.siegmar.fastcsv.writer.QuoteStrategy;
 import io.kestra.plugin.serdes.AbstractTextWriter;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
@@ -10,24 +10,16 @@ import io.reactivex.functions.Consumer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.commons.lang3.ArrayUtils;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.time.*;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.TemporalAccessor;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import javax.validation.constraints.NotNull;
@@ -58,19 +50,19 @@ public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWri
     @Schema(
         title = "The field separator character"
     )
-    private final Character fieldSeparator = ",".charAt(0);
+    private final Character fieldSeparator = ',';
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
-    private final Character textDelimiter = "\"".charAt(0);
+    private final Character textDelimiter = '"';
 
     @Builder.Default
     @Schema(
         title = "The character used to separate rows"
     )
-    private final Character[] lineDelimiter = ArrayUtils.toObject("\n".toCharArray());
+    private final String lineDelimiter = "\n";
 
     @Builder.Default
     @Schema(
@@ -90,9 +82,6 @@ public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWri
         // temp file
         File tempFile = runContext.tempFile(".csv").toFile();
 
-        // writer
-        de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter();
-
         // reader
         URI from = new URI(runContext.render(this.from));
 
@@ -101,7 +90,8 @@ public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWri
 
         try (
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
-            CsvAppender csvAppender = csvWriter.append(tempFile, Charset.forName(this.charset));
+            Writer fileWriter = new FileWriter(tempFile, Charset.forName(this.charset));
+            de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter(fileWriter)
         ) {
             Flowable<Object> flowable = Flowable
                 .create(FileSerde.reader(inputStream), BackpressureStrategy.BUFFER)
@@ -118,28 +108,22 @@ public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWri
                                 throw new IllegalArgumentException("Invalid data of type List with header");
                             }
 
-                            for (final Object value : casted) {
-                                csvAppender.appendField(convert(value));
-                            }
+                            var rows = casted.stream().map(field -> convert(field)).toList();
+                            csvWriter.writeRow(rows);
                         } else if (row instanceof Map) {
                             Map<String, Object> casted = (Map<String, Object>) row;
 
                             if (!first) {
                                 this.first = true;
                                 if (header) {
-                                    for (final String value : casted.keySet()) {
-                                        csvAppender.appendField(value);
-                                    }
-                                    csvAppender.endLine();
+                                    var rows = casted.keySet().stream().map(field -> convert(field)).toList();
+                                    csvWriter.writeRow(rows);
                                 }
                             }
 
-                            for (final Object value : casted.values()) {
-                                csvAppender.appendField(convert(value));
-                            }
+                            var rows = casted.values().stream().map(field -> convert(field)).toList();
+                            csvWriter.writeRow(rows);
                         }
-
-                        csvAppender.endLine();
                     }
                 });
 
@@ -147,8 +131,6 @@ public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWri
             Single<Long> count = flowable.count();
             Long lineCount = count.blockingGet();
             runContext.metric(Counter.of("records", lineCount));
-
-            csvAppender.flush();
         }
 
         return Output
@@ -166,14 +148,14 @@ public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWri
         private URI uri;
     }
 
-    private de.siegmar.fastcsv.writer.CsvWriter csvWriter() {
-        de.siegmar.fastcsv.writer.CsvWriter csvWriter = new de.siegmar.fastcsv.writer.CsvWriter();
+    private de.siegmar.fastcsv.writer.CsvWriter csvWriter(Writer writer) {
+        var builder = de.siegmar.fastcsv.writer.CsvWriter.builder();
 
-        csvWriter.setTextDelimiter(this.textDelimiter);
-        csvWriter.setFieldSeparator(this.fieldSeparator);
-        csvWriter.setLineDelimiter(ArrayUtils.toPrimitive(this.lineDelimiter));
-        csvWriter.setAlwaysDelimitText(this.alwaysDelimitText);
+        builder.quoteCharacter(this.textDelimiter);
+        builder.fieldSeparator(this.fieldSeparator);
+        builder.lineDelimiter(LineDelimiter.of(this.lineDelimiter));
+        builder.quoteStrategy(this.alwaysDelimitText ? QuoteStrategy.ALWAYS : QuoteStrategy.REQUIRED);
 
-        return csvWriter;
+        return builder.build(writer);
     }
 }

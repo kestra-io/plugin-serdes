@@ -51,7 +51,7 @@ class CsvReaderWriterTest {
             .from(readerRunOutput.getUri().toString())
             .fieldSeparator(";".charAt(0))
             .alwaysDelimitText(true)
-            .lineDelimiter(ArrayUtils.toObject((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n").toCharArray()))
+            .lineDelimiter((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n"))
             .header(header)
             .build();
         CsvWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
