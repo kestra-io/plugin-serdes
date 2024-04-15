@@ -1,5 +1,7 @@
 package io.kestra.plugin.serdes.avro;
 
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -23,6 +25,68 @@ import jakarta.validation.constraints.NotNull;
 @NoArgsConstructor
 @io.swagger.v3.oas.annotations.media.Schema(
     title = "Read a provided file containing ion serialized data and convert it to avro."
+)
+@Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Convert a CSV file to the Parquet format using Avro schema",
+            code = """     
+id: divvy_tripdata
+namespace: dev
+
+variables:
+  file_id: "{{ execution.startDate | dateAdd(-3, 'MONTHS') | date('yyyyMM') }}"
+
+tasks:
+  - id: get_zipfile
+    type: io.kestra.plugin.fs.http.Download
+    uri: "https://divvy-tripdata.s3.amazonaws.com/{{ render(vars.file_id) }}-divvy-tripdata.zip"
+
+  - id: unzip
+    type: io.kestra.plugin.compress.ArchiveDecompress
+    algorithm: ZIP
+    from: "{{ outputs.get_zipfile.uri }}"
+
+  - id: convert
+    type: io.kestra.plugin.serdes.csv.CsvReader
+    from: "{{outputs.unzip.files[render(vars.file_id) ~ '-divvy-tripdata.csv']}}"
+
+  - id: to_parquet
+    type: io.kestra.plugin.serdes.avro.AvroWriter # render(vars.file_id)
+    from: "{{ outputs.convert.uri }}"
+    datetimeFormat: "yyyy-MM-dd' 'HH:mm:ss"
+    schema: |
+      {
+        "type": "record",
+        "name": "Ride",
+        "namespace": "com.example.bikeshare",
+        "fields": [
+          {"name": "ride_id", "type": "string"},
+          {"name": "rideable_type", "type": "string"},
+          {"name": "started_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+          {"name": "ended_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+          {"name": "start_station_name", "type": "string"},
+          {"name": "start_station_id", "type": "string"},
+          {"name": "end_station_name", "type": "string"},
+          {"name": "end_station_id", "type": "string"},
+          {"name": "start_lat", "type": "double"},
+          {"name": "start_lng", "type": "double"},
+          {
+            "name": "end_lat",
+            "type": ["null", "double"],
+            "default": null
+          },
+          {
+            "name": "end_lng",
+            "type": ["null", "double"],
+            "default": null
+          },
+          {"name": "member_casual", "type": "string"}
+        ]
+      }"""
+        )
+    }
 )
 public class AvroWriter extends AbstractAvroConverter implements RunnableTask<AvroWriter.Output> {
     @NotNull
