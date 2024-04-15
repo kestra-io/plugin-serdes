@@ -53,7 +53,7 @@ tasks:
     from: "{{outputs.unzip.files[render(vars.file_id) ~ '-divvy-tripdata.csv']}}"
 
   - id: to_parquet
-    type: io.kestra.plugin.serdes.avro.AvroWriter # render(vars.file_id)
+    type: io.kestra.plugin.serdes.avro.AvroWriter
     from: "{{ outputs.convert.uri }}"
     datetimeFormat: "yyyy-MM-dd' 'HH:mm:ss"
     schema: |
