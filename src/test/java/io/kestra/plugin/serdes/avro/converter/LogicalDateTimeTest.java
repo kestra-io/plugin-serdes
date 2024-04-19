@@ -64,9 +64,11 @@ public class LogicalDateTimeTest {
     @ParameterizedTest
     @MethodSource("withFormat")
     void convertWithFormat(CharSequence v, String format, Instant expected) throws Exception {
-        AvroConverter avroConverter = AvroConverter.builder()
+        AvroConverter avroConverter = new AvroConverter(AvroConverterConfig.
+            builder()
             .datetimeFormat(format)
-            .build();
+            .build()
+        );
 
         AvroConverterTest.Utils.oneField(avroConverter, v, expected, LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)));
     }

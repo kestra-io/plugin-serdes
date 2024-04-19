@@ -183,45 +183,6 @@ public abstract class AbstractAvroConverter extends Task {
     }
 
     protected AvroConverter converter() {
-        AvroConverter.AvroConverterBuilder<?, ?> builder = AvroConverter.builder()
-            .timeZoneId(this.timeZoneId);
-
-        if (this.trueValues != null) {
-            builder.trueValues(this.trueValues);
-        }
-
-        if (this.falseValues != null) {
-            builder.falseValues(this.falseValues);
-        }
-
-        if (this.nullValues != null) {
-            builder.nullValues(this.nullValues);
-        }
-
-        if (this.dateFormat != null) {
-            builder.dateFormat(this.dateFormat);
-        }
-
-        if (this.timeFormat != null) {
-            builder.timeFormat(this.timeFormat);
-        }
-
-        if (this.datetimeFormat != null) {
-            builder.datetimeFormat(this.datetimeFormat);
-        }
-
-        if (this.decimalSeparator != null) {
-            builder.decimalSeparator(this.decimalSeparator);
-        }
-
-        if (this.strictSchema != null) {
-            builder.strictSchema(this.strictSchema);
-        }
-
-        if (this.inferAllFields != null) {
-            builder.inferAllFields(this.inferAllFields);
-        }
-
-        return builder.build();
+        return new AvroConverter(this);
     }
 }

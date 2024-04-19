@@ -1,7 +1,9 @@
 package io.kestra.plugin.serdes.avro;
 
 import com.google.common.collect.ImmutableMap;
+import io.kestra.plugin.serdes.avro.converter.AvroConverterConfig;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import lombok.experimental.SuperBuilder;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.SchemaParseException;
@@ -388,7 +390,7 @@ public class AvroConverterTest {
 
     public static class Utils {
         public static void oneField(Object v, Object expected, Schema type, Boolean inferAllFields) throws AvroConverter.IllegalRowConvertion, AvroConverter.IllegalStrictRowConversion {
-            oneField(AvroConverter.builder().inferAllFields(inferAllFields).build(), v, expected, type);
+            oneField(new AvroConverter(AvroConverterConfig.builder().inferAllFields(inferAllFields).build()), v, expected, type);
         }
 
         public static void oneField(AvroConverter avroConverter, Object v, Object expected, Schema type) throws AvroConverter.IllegalRowConvertion, AvroConverter.IllegalStrictRowConversion {
@@ -405,7 +407,7 @@ public class AvroConverterTest {
         }
 
         public static void oneFieldFailed(Object v, Schema type, Boolean inferAllFields) {
-            AvroConverter avroConverter = AvroConverter.builder().inferAllFields(inferAllFields).build();
+            AvroConverter avroConverter = new AvroConverter(AvroConverterConfig.builder().inferAllFields(inferAllFields).build());
             Schema schema = oneFieldSchema(type);
 
             assertThrows(AvroConverter.IllegalRowConvertion.class, () -> avroConverter.fromMap(schema, ImmutableMap.of("fieldName", v)));
@@ -442,5 +444,4 @@ public class AvroConverterTest {
             }
         }
     }
-
 }
