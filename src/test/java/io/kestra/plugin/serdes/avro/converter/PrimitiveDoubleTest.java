@@ -41,7 +41,7 @@ public class PrimitiveDoubleTest {
     @MethodSource("separator")
     void convertSeparator(Object v, double expected, Character separator) throws Exception {
         AvroConverterTest.Utils.oneField(
-            AvroConverter.builder().decimalSeparator(separator).build(),
+            new AvroConverter(AvroConverterConfig.builder().decimalSeparator(separator).build()),
             v,
             expected,
             Schema.create(Schema.Type.DOUBLE)

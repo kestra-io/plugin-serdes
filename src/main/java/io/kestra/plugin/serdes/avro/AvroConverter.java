@@ -2,11 +2,7 @@ package io.kestra.plugin.serdes.avro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
 import org.apache.avro.Conversions;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -26,12 +22,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@SuperBuilder
-@ToString
-@EqualsAndHashCode
-@Getter
-@NoArgsConstructor
-public class AvroConverter extends AbstractAvroConverter {
+public class AvroConverter {
     private static GenericData GENERIC_DATA;
 
     public static GenericData genericData() {
@@ -49,6 +40,12 @@ public class AvroConverter extends AbstractAvroConverter {
         }
 
         return AvroConverter.GENERIC_DATA;
+    }
+
+    private final AbstractAvroConverter abstractAvroConverter;
+
+    public AvroConverter(final AbstractAvroConverter abstractAvroConverter) {
+        this.abstractAvroConverter = abstractAvroConverter;
     }
 
     protected Object getValueFromNameOrAliases(Schema.Field field, Map<String, Object> data) {
@@ -76,7 +73,7 @@ public class AvroConverter extends AbstractAvroConverter {
             }
         }
 
-        if (this.strictSchema && schema.getFields().size() < data.size()) {
+        if (abstractAvroConverter.getStrictSchema() && schema.getFields().size() < data.size()) {
             throw new IllegalStrictRowConversion(schema, schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList()), data.values());
         }
 
@@ -91,7 +88,7 @@ public class AvroConverter extends AbstractAvroConverter {
             index++;
         }
 
-        if (this.strictSchema && schema.getFields().size() < data.size()) {
+        if (abstractAvroConverter.getStrictSchema() && schema.getFields().size() < data.size()) {
             throw new IllegalStrictRowConversion(schema, map.keySet(), data);
         }
 
@@ -101,12 +98,12 @@ public class AvroConverter extends AbstractAvroConverter {
     @SuppressWarnings("unchecked")
     protected Object convert(Schema schema, Object data) throws IllegalCellConversion {
         try {
-            if (this.inferAllFields) {
-                if (data instanceof String && this.contains(this.nullValues, (String) data)) {
+            if (abstractAvroConverter.getInferAllFields()) {
+                if (data instanceof String && this.contains(abstractAvroConverter.getNullValues(), (String) data)) {
                     return null;
-                } else if (data instanceof String && this.contains(this.trueValues, (String) data)) {
+                } else if (data instanceof String && this.contains(abstractAvroConverter.getNullValues(), (String) data)) {
                     return true;
-                } else if (data instanceof String && this.contains(this.falseValues, (String) data)) {
+                } else if (data instanceof String && this.contains(abstractAvroConverter.getNullValues(), (String) data)) {
                     return false;
                 }
             }
@@ -166,11 +163,11 @@ public class AvroConverter extends AbstractAvroConverter {
     }
 
     protected String convertDecimalSeparator(String value) {
-        if (this.decimalSeparator == '.') {
+        if (abstractAvroConverter.getDecimalSeparator() == '.') {
             return value;
         }
 
-        return StringUtils.replaceOnce(value, String.valueOf(this.decimalSeparator), ".");
+        return StringUtils.replaceOnce(value, String.valueOf(abstractAvroConverter.getDecimalSeparator()), ".");
     }
 
     @SuppressWarnings("UnpredictableBigDecimalConstructorCall")
@@ -210,7 +207,7 @@ public class AvroConverter extends AbstractAvroConverter {
 
     protected LocalDate logicalDate(Object data) {
         if (data instanceof String) {
-            return LocalDate.parse((String) data, DateTimeFormatter.ofPattern(this.dateFormat));
+            return LocalDate.parse((String) data, DateTimeFormatter.ofPattern(abstractAvroConverter.getDateFormat()));
         } else if (data instanceof Date) {
             Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(this.zoneId()));
             calendar.setTime((Date) data);
@@ -235,7 +232,7 @@ public class AvroConverter extends AbstractAvroConverter {
 
     protected LocalTime logicalTimeMillis(Object data) {
         if (data instanceof String) {
-            return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(this.timeFormat));
+            return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(abstractAvroConverter.getTimeFormat()));
         }
 
         return convertJavaTime(data);
@@ -243,7 +240,7 @@ public class AvroConverter extends AbstractAvroConverter {
 
     protected LocalTime logicalTimeMicros(Object data) {
         if (data instanceof String) {
-            return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(this.timeFormat));
+            return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(abstractAvroConverter.getTimeFormat()));
         }
 
         return convertJavaTime(data);
@@ -294,13 +291,13 @@ public class AvroConverter extends AbstractAvroConverter {
 
     protected Instant parseDateTime(String data){
         try {
-            return ZonedDateTime.parse(data, DateTimeFormatter.ofPattern(this.datetimeFormat))
+            return ZonedDateTime.parse(data, DateTimeFormatter.ofPattern(abstractAvroConverter.getDatetimeFormat()))
                 .toInstant();
         } catch (DateTimeParseException e) {
-            LocalDateTime localDateTime = LocalDateTime.parse(data, DateTimeFormatter.ofPattern(this.datetimeFormat));
+            LocalDateTime localDateTime = LocalDateTime.parse(data, DateTimeFormatter.ofPattern(abstractAvroConverter.getDatetimeFormat()));
 
-            if (this.timeZoneId != null) {
-                return localDateTime.atZone(ZoneId.of(this.timeZoneId)).toInstant();
+            if (abstractAvroConverter.getTimeZoneId() != null) {
+                return localDateTime.atZone(ZoneId.of(abstractAvroConverter.getTimeZoneId())).toInstant();
             } else {
                 return localDateTime.toInstant(ZoneOffset.UTC);
             }
@@ -390,7 +387,7 @@ public class AvroConverter extends AbstractAvroConverter {
     }
 
     protected Integer primitiveNull(Object data) {
-        if (data instanceof String && this.contains(this.nullValues, (String) data)) {
+        if (data instanceof String && this.contains(abstractAvroConverter.getNullValues(), (String) data)) {
             return null;
         } else if (data == null) {
             return null;
@@ -444,9 +441,9 @@ public class AvroConverter extends AbstractAvroConverter {
     }
 
     public Boolean primitiveBool(Object data) {
-        if (data instanceof String && this.contains(this.trueValues, (String) data)) {
+        if (data instanceof String && this.contains(abstractAvroConverter.getTrueValues(), (String) data)) {
             return true;
-        } else if (data instanceof String && this.contains(this.falseValues, (String) data)) {
+        } else if (data instanceof String && this.contains(abstractAvroConverter.getFalseValues(), (String) data)) {
             return false;
         } else if (data instanceof Integer && (int) data == 1) {
             return true;
@@ -470,7 +467,7 @@ public class AvroConverter extends AbstractAvroConverter {
     }
 
     protected ZoneId zoneId() {
-        return this.timeZoneId != null ? ZoneId.of(this.timeZoneId) : ZoneOffset.UTC;
+        return abstractAvroConverter.getTimeZoneId() != null ? ZoneId.of(abstractAvroConverter.getTimeZoneId()) : ZoneOffset.UTC;
     }
 
     protected static String trimExceptionMessage(Object data) throws JsonProcessingException {
