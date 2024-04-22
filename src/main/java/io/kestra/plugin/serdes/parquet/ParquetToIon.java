@@ -19,10 +19,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.URI;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -96,16 +93,15 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
             .withDataModel(AvroConverter.genericData());
 
         try (
-            final org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader = parquetReaderBuilder.build();
-            OutputStream output = new FileOutputStream(tempFile)
+            org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader = parquetReaderBuilder.build();
+            Writer output = new FileWriter(tempFile)
         ) {
 
             Flux<Map<String, Object>> flowable = Flux
                 .create(this.nextRow(parquetReader), FluxSink.OverflowStrategy.BUFFER)
-                .map(AvroDeserializer::recordDeserializer)
-                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
+                .map(AvroDeserializer::recordDeserializer);
 
-            Mono<Long> count = flowable.count();
+            Mono<Long> count = FileSerde.writeAll(output, flowable);
             Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
