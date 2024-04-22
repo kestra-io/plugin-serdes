@@ -96,35 +96,35 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "The compression to used"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     CompressionCodec compressionCodec = CompressionCodec.GZIP;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target row group size"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private Version version = Version.V2;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target row group size"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private Long rowGroupSize = (long) org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target page size"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private Integer pageSize = org.apache.parquet.hadoop.ParquetWriter.DEFAULT_PAGE_SIZE;
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Max dictionary page size"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private Integer dictionaryPageSize = org.apache.parquet.hadoop.ParquetWriter.DEFAULT_PAGE_SIZE;
 
     static {
@@ -171,7 +171,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         // convert
         try (
             org.apache.parquet.hadoop.ParquetWriter<GenericData.Record> writer = parquetWriterBuilder.build();
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)))
+            Reader inputStream = new InputStreamReader(runContext.storage().getFile(from))
         )
         {
             Long lineCount = this.convert(inputStream, schema, writer::write);

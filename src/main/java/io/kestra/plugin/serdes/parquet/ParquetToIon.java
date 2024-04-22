@@ -19,10 +19,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.URI;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -89,7 +86,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
 
         // Parquet file
         File parquetFile = runContext.workingDir().createTempFile(".parquet").toFile();
-        try (OutputStream outputStream = new FileOutputStream(parquetFile)) {
+        try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(parquetFile), FileSerde.BUFFER_SIZE)) {
             IOUtils.copyLarge(runContext.storage().getFile(from), outputStream);
         }
         Path parquetHadoopPath = new Path(parquetFile.getPath());
@@ -100,16 +97,15 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
             .withDataModel(AvroConverter.genericData());
 
         try (
-            final org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader = parquetReaderBuilder.build();
-            OutputStream output = new FileOutputStream(tempFile)
+            org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader = parquetReaderBuilder.build();
+            Writer output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
         ) {
 
             Flux<Map<String, Object>> flowable = Flux
                 .create(this.nextRow(parquetReader), FluxSink.OverflowStrategy.BUFFER)
-                .map(AvroDeserializer::recordDeserializer)
-                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
+                .map(AvroDeserializer::recordDeserializer);
 
-            Mono<Long> count = flowable.count();
+            Mono<Long> count = FileSerde.writeAll(output, flowable);
             Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
