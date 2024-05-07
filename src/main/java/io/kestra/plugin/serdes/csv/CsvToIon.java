@@ -23,8 +23,6 @@ import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import static io.kestra.core.utils.Rethrow.throwConsumer;
-
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
@@ -66,42 +64,49 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Schema(
         title = "Specifies if the first line should be the header"
     )
+    @PluginProperty
     private final Boolean header = true;
 
     @Builder.Default
     @Schema(
         title = "The field separator character"
     )
+    @PluginProperty
     private final Character fieldSeparator = ',';
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
+    @PluginProperty
     private final Character textDelimiter = '"';
 
     @Builder.Default
     @Schema(
         title = "Specifies if empty rows should be skipped"
     )
+    @PluginProperty
     private final Boolean skipEmptyRows = false;
 
     @Builder.Default
     @Schema(
         title = "Specifies if an exception should be thrown, if CSV data contains different field count"
     )
+    @PluginProperty
     private final Boolean errorOnDifferentFieldCount = false;
 
     @Builder.Default
     @Schema(
         title = "Number of lines to skip at the start of the file"
     )
+    @PluginProperty
     private final Integer skipRows = 0;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty
     private final String charset = StandardCharsets.UTF_8.name();
 
     @Override
@@ -116,8 +121,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         AtomicInteger skipped = new AtomicInteger();
 
         try (
-            de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader = this.csvReader(new InputStreamReader(runContext.storage().getFile(from), charset));
-            OutputStream output = new FileOutputStream(tempFile);
+            Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset), FileSerde.BUFFER_SIZE);
+            de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader = this.csvReader(reader);
+            Writer output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             Map<Integer, String> headers = new TreeMap<>();
             Flux<Object> flowable = Flux
@@ -145,11 +151,11 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         return fields;
                     }
                     return r.getFields();
-                })
-                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
+                });
+
+            Mono<Long> count = FileSerde.writeAll(output, flowable);
 
             // metrics & finalize
-            Mono<Long> count = flowable.count();
             Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
@@ -171,7 +177,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         private URI uri;
     }
 
-    private de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader(InputStreamReader inputStreamReader) {
+    private de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader(Reader reader) {
         var builder = de.siegmar.fastcsv.reader.CsvReader.builder();
 
         if (this.textDelimiter != null) {
@@ -190,6 +196,6 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             builder.ignoreDifferentFieldCount(!errorOnDifferentFieldCount);
         }
 
-        return builder.ofCsvRecord(inputStreamReader);
+        return builder.ofCsvRecord(reader);
     }
 }
