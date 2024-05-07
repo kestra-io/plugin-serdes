@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.csv;
 
+import io.kestra.core.models.annotations.Plugin;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -30,7 +31,10 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Schema(
     title = "Read a csv file and write it to an ion serialized data file."
 )
-public class CsvReader extends Task implements RunnableTask<CsvReader.Output> {
+@Plugin(
+    aliases = "io.kestra.plugin.serdes.csv.CsvReader"
+)
+public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @NotNull
     @Schema(
         title = "Source file URI")

@@ -3,7 +3,6 @@ package io.kestra.plugin.serdes.csv;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import org.apache.commons.lang3.ArrayUtils;
 import org.junit.jupiter.api.Test;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.runners.RunContext;
@@ -22,7 +21,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 @MicronautTest
-class CsvReaderWriterTest {
+class CsvToIonWriterTest {
     @Inject
     RunContextFactory runContextFactory;
 
@@ -36,25 +35,25 @@ class CsvReaderWriterTest {
         File sourceFile = SerdesUtils.resourceToFile(file);
         URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        CsvReader reader = CsvReader.builder()
-            .id(CsvReaderWriterTest.class.getSimpleName())
-            .type(CsvReader.class.getName())
+        CsvToIon reader = CsvToIon.builder()
+            .id(CsvToIonWriterTest.class.getSimpleName())
+            .type(CsvToIon.class.getName())
             .from(source.toString())
             .fieldSeparator(";".charAt(0))
             .header(header)
             .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        CsvWriter writer = CsvWriter.builder()
-            .id(CsvReaderWriterTest.class.getSimpleName())
-            .type(CsvWriter.class.getName())
+        IonToCsv writer = IonToCsv.builder()
+            .id(CsvToIonWriterTest.class.getSimpleName())
+            .type(IonToCsv.class.getName())
             .from(readerRunOutput.getUri().toString())
             .fieldSeparator(";".charAt(0))
             .alwaysDelimitText(true)
             .lineDelimiter((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n"))
             .header(header)
             .build();
-        CsvWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+        IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
         assertThat(
             CharStreams.toString(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri()))),
@@ -77,9 +76,9 @@ class CsvReaderWriterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/insurance_sample.csv");
         URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        CsvReader reader = CsvReader.builder()
-            .id(CsvReaderWriterTest.class.getSimpleName())
-            .type(CsvReader.class.getName())
+        CsvToIon reader = CsvToIon.builder()
+            .id(CsvToIonWriterTest.class.getSimpleName())
+            .type(CsvToIon.class.getName())
             .from(source.toString())
             .fieldSeparator(";".charAt(0))
             .skipRows(4)

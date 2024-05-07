@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.kestra.core.models.annotations.Plugin;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -37,7 +38,10 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Schema(
     title = "Read a json file and write it to an ion serialized data file."
 )
-public class JsonReader extends Task implements RunnableTask<JsonReader.Output> {
+@Plugin(
+    aliases = "io.kestra.plugin.serdes.json.JsonReader"
+)
+public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
     @NotNull
     @Schema(
         title = "Source file URI"

@@ -9,7 +9,7 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.plugin.serdes.avro.AvroWriter;
+import io.kestra.plugin.serdes.avro.IonToAvro;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 
 @MicronautTest
-class CsvWriterTest {
+class IonToCsvTest {
     @Inject
     RunContextFactory runContextFactory;
 
@@ -66,15 +66,15 @@ class CsvWriterTest {
 
             URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
-            CsvWriter writer = CsvWriter.builder()
-                .id(CsvWriterTest.class.getSimpleName())
-                .type(CsvWriter.class.getName())
+            IonToCsv writer = IonToCsv.builder()
+                .id(IonToCsvTest.class.getSimpleName())
+                .type(IonToCsv.class.getName())
                 .from(uri.toString())
                 .fieldSeparator(";".charAt(0))
                 .alwaysDelimitText(true)
                 .header(true)
                 .build();
-            CsvWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+            IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri())));
 
@@ -111,15 +111,15 @@ class CsvWriterTest {
 
             URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
-            CsvWriter writer = CsvWriter.builder()
-                .id(CsvWriterTest.class.getSimpleName())
-                .type(CsvWriter.class.getName())
+            IonToCsv writer = IonToCsv.builder()
+                .id(IonToCsvTest.class.getSimpleName())
+                .type(IonToCsv.class.getName())
                 .from(uri.toString())
                 .fieldSeparator(";".charAt(0))
                 .alwaysDelimitText(true)
                 .header(false)
                 .build();
-            CsvWriter.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+            IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri())));
 
@@ -152,16 +152,16 @@ class CsvWriterTest {
 
             URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
-            CsvWriter writer = CsvWriter.builder()
-                .id(AvroWriter.class.getSimpleName())
-                .type(CsvWriter.class.getName())
+            IonToCsv writer = IonToCsv.builder()
+                .id(IonToAvro.class.getSimpleName())
+                .type(IonToCsv.class.getName())
                 .from(uri.toString())
                 .alwaysDelimitText(true)
                 .header(false)
                 .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
                 .build();
 
-            CsvWriter.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+            IonToCsv.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             assertThat(
                 IOUtils.toString(this.storageInterface.get(null, run.getUri()), Charsets.UTF_8),

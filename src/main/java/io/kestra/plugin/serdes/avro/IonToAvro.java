@@ -86,9 +86,10 @@ tasks:
         ]
       }"""
         )
-    }
+    },
+    aliases = "io.kestra.plugin.serdes.avro.AvroWriter"
 )
-public class AvroWriter extends AbstractAvroConverter implements RunnableTask<AvroWriter.Output> {
+public class IonToAvro extends AbstractAvroConverter implements RunnableTask<IonToAvro.Output> {
     @NotNull
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Source file URI"
