@@ -6,6 +6,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.Schema;
@@ -101,7 +102,6 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     public Output run(RunContext runContext) throws Exception {
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
-        BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
 
         // avro writer
         Schema.Parser parser = new Schema.Parser();
@@ -113,7 +113,8 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         URI from = new URI(runContext.render(this.from));
 
         try (
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
+            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE);
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
