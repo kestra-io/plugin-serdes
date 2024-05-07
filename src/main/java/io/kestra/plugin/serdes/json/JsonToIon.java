@@ -21,6 +21,7 @@ import io.kestra.core.serializers.FileSerde;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.TimeZone;
@@ -124,18 +125,16 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         try (
-            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset), BUFFER_SIZE);
-            OutputStream output = new FileOutputStream(tempFile);
+            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset), FileSerde.BUFFER_SIZE);
+            Writer writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)), FileSerde.BUFFER_SIZE)
         ) {
             Flux<Object> flowable = Flux
                 .create(this.nextRow(input), FluxSink.OverflowStrategy.BUFFER);
-            Mono<Long> count = FileSerde.writeAll(output, flowable);
+            Mono<Long> count = FileSerde.writeAll(writer, flowable);
 
             // metrics & finalize
             Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
-
-            output.flush();
         }
 
         return Output
