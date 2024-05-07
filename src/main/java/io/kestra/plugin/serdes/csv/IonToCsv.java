@@ -24,7 +24,6 @@ import java.util.function.Consumer;
 
 import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 @SuperBuilder
@@ -84,36 +83,42 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Schema(
         title = "Specifies if the first line should be the header"
     )
+    @PluginProperty
     private final Boolean header = true;
 
     @Builder.Default
     @Schema(
         title = "The field separator character"
     )
+    @PluginProperty
     private final Character fieldSeparator = ',';
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
+    @PluginProperty
     private final Character textDelimiter = '"';
 
     @Builder.Default
     @Schema(
         title = "The character used to separate rows"
     )
+    @PluginProperty
     private final String lineDelimiter = "\n";
 
     @Builder.Default
     @Schema(
         title = "Whether fields should always be delimited using the textDelimiter option."
     )
+    @PluginProperty
     private final Boolean alwaysDelimitText = false;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty
     private final String charset = StandardCharsets.UTF_8.name();
 
 
@@ -129,12 +134,13 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         this.init(runContext);
 
         try (
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
-            Writer fileWriter = new FileWriter(tempFile, Charset.forName(this.charset));
+            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            Writer fileWriter = new BufferedWriter(new  FileWriter(tempFile, Charset.forName(this.charset)), FileSerde.BUFFER_SIZE);
             de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter(fileWriter)
         ) {
-            Flux<Object> flowable = Flux
-                .create(FileSerde.reader(inputStream), FluxSink.OverflowStrategy.BUFFER)
+
+            
+            Flux<Object> flowable = FileSerde.readAll(inputStream)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
 
