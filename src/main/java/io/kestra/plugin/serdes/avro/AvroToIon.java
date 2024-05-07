@@ -74,7 +74,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
         try(
             InputStream in = runContext.storage().getFile(from);
-            OutputStream output = new FileOutputStream(tempFile)
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             DataFileStream<GenericRecord> dataFileStream = new DataFileStream<>(in, datumReader);
 
