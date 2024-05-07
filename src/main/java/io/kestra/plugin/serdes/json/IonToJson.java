@@ -91,7 +91,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         description = "Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     private final boolean newLine = true;
 
     @Builder.Default
@@ -109,7 +109,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
 
         try (
             BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
+            InputStream inputStream = runContext.storage().getFile(from);
         ) {
             ObjectMapper mapper = new ObjectMapper()
                 .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
@@ -119,8 +119,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                 .registerModule(new Jdk8Module());
 
             if (this.newLine) {
-                Flux<Object> flowable = Flux
-                    .create(FileSerde.reader(inputStream), FluxSink.OverflowStrategy.BUFFER)
+                Flux<Object> flowable = FileSerde.readAll(inputStream)
                     .doOnNext(throwConsumer(o -> outfile.write(mapper.writeValueAsString(o) + "\n")));
 
                 // metrics & finalize
@@ -129,15 +128,11 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                 runContext.metric(Counter.of("records", lineCount));
 
             } else {
-                AtomicLong lineCount = new AtomicLong();
-
-                List<Object> list = new ArrayList<>();
-                FileSerde.reader(inputStream, throwConsumer(e -> {
-                    list.add(e);
-                    lineCount.incrementAndGet();
-                }));
+                List<Object> list =  FileSerde.readAll(inputStream)
+                    .collectList()
+                    .block();
                 outfile.write(mapper.writeValueAsString(list));
-                runContext.metric(Counter.of("records", lineCount.get()));
+                runContext.metric(Counter.of("records", list.size()));
             }
 
             outfile.flush();

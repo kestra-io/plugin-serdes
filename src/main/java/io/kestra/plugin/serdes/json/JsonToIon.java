@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.json;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -82,6 +83,14 @@ tasks:
     aliases = "io.kestra.plugin.serdes.json.JsonReader"
 )
 public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
+    private static final int BUFFER_SIZE = 32 * 1024;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+        .setSerializationInclusion(JsonInclude.Include.ALWAYS)
+        .setTimeZone(TimeZone.getDefault())
+        .registerModule(new JavaTimeModule())
+        .registerModule(new Jdk8Module());
+
     @NotNull
     @Schema(
         title = "Source file URI"
@@ -94,6 +103,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
+    @PluginProperty
     private final String charset = StandardCharsets.UTF_8.name();
 
     @Builder.Default
@@ -102,6 +112,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         description ="Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
+    @PluginProperty
     private final Boolean newLine = true;
 
     @Override
@@ -113,15 +124,14 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         try (
-            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset));
+            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset), BUFFER_SIZE);
             OutputStream output = new FileOutputStream(tempFile);
         ) {
             Flux<Object> flowable = Flux
-                .create(this.nextRow(input), FluxSink.OverflowStrategy.BUFFER)
-                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
+                .create(this.nextRow(input), FluxSink.OverflowStrategy.BUFFER);
+            Mono<Long> count = FileSerde.writeAll(output, flowable);
 
             // metrics & finalize
-            Mono<Long> count = flowable.count();
             Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
@@ -144,21 +154,16 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
     }
 
     private Consumer<FluxSink<Object>> nextRow(BufferedReader inputStream) throws IOException {
-        ObjectMapper mapper = new ObjectMapper()
-            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-            .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-            .setTimeZone(TimeZone.getDefault())
-            .registerModule(new JavaTimeModule())
-            .registerModule(new Jdk8Module());
+        ObjectReader objectReader = OBJECT_MAPPER.readerFor(Object.class);
 
         return throwConsumer(s -> {
             if (newLine) {
                 String line;
                 while ((line = inputStream.readLine()) != null) {
-                    s.next(mapper.readValue(line, Object.class));
+                    s.next(objectReader.readValue(line));
                 }
             } else {
-                Object objects = mapper.readValue(inputStream, Object.class);
+                Object objects = objectReader.readValue(inputStream);
 
                 if (objects instanceof Collection) {
                     ((Collection<?>) objects)
