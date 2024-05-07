@@ -95,8 +95,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         try (
-            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset));
-            OutputStream output = new FileOutputStream(tempFile);
+            Reader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset), FileSerde.BUFFER_SIZE);
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
             if (parserConfiguration != null) {
