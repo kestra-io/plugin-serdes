@@ -3,7 +3,6 @@ package io.kestra.plugin.serdes.avro;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.plugin.serdes.avro.converter.AvroConverterConfig;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import lombok.experimental.SuperBuilder;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.SchemaParseException;
@@ -18,8 +17,8 @@ import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.plugin.serdes.csv.CsvReader;
-import io.kestra.plugin.serdes.json.JsonReader;
+import io.kestra.plugin.serdes.csv.CsvToIon;
+import io.kestra.plugin.serdes.json.JsonToIon;
 
 import jakarta.inject.Inject;
 import java.io.*;
@@ -50,30 +49,30 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/full.csv");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        CsvReader reader = CsvReader.builder()
+        CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(CsvReader.class.getName())
+            .type(CsvToIon.class.getName())
             .from(csv.toString())
             .fieldSeparator(",".charAt(0))
             .header(true)
             .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
             .build();
 
-        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        IonToAvro.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
-            is(AvroWriterTest.avroSize(
-                new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
+            IonToAvroTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
+            is(IonToAvroTest.avroSize(
+                new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                     .getResource("csv/full.avro"))
                     .toURI())))
             )
@@ -87,28 +86,28 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/full.jsonl");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        JsonReader reader = JsonReader.builder()
+        JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(JsonReader.class.getName())
+            .type(JsonToIon.class.getName())
             .from(csv.toString())
             .build();
-        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
             .build();
 
-        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        IonToAvro.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
-            is(AvroWriterTest.avroSize(
-                new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
+            IonToAvroTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
+            is(IonToAvroTest.avroSize(
+                new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                     .getResource("csv/full.avro"))
                     .toURI())))
             )
@@ -122,18 +121,18 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema.csv");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        CsvReader reader = CsvReader.builder()
+        CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(CsvReader.class.getName())
+            .type(CsvToIon.class.getName())
             .from(csv.toString())
             .fieldSeparator(",".charAt(0))
             .header(true)
             .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
@@ -156,18 +155,18 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema_array.csv");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        CsvReader reader = CsvReader.builder()
+        CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(CsvReader.class.getName())
+            .type(CsvToIon.class.getName())
             .from(csv.toString())
             .fieldSeparator(",".charAt(0))
             .header(false)
             .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
@@ -190,18 +189,18 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema.csv");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        CsvReader reader = CsvReader.builder()
+        CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(CsvReader.class.getName())
+            .type(CsvToIon.class.getName())
             .from(csv.toString())
             .fieldSeparator(",".charAt(0))
             .header(true)
             .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
@@ -219,16 +218,16 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema.jsonl");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        JsonReader reader = JsonReader.builder()
+        JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(JsonReader.class.getName())
+            .type(JsonToIon.class.getName())
             .from(csv.toString())
             .build();
-        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
@@ -251,16 +250,16 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/strict_schema_nested.jsonl");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        JsonReader reader = JsonReader.builder()
+        JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(JsonReader.class.getName())
+            .type(JsonToIon.class.getName())
             .from(csv.toString())
             .build();
-        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
@@ -285,17 +284,17 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/portfolio.json");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        JsonReader reader = JsonReader.builder()
+        JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(JsonReader.class.getName())
+            .type(JsonToIon.class.getName())
             .from(csv.toString())
             .newLine(Boolean.FALSE)
             .build();
-        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
@@ -316,29 +315,29 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/portfolio.json");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        JsonReader reader = JsonReader.builder()
+        JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(JsonReader.class.getName())
+            .type(JsonToIon.class.getName())
             .from(csv.toString())
             .newLine(Boolean.FALSE)
             .build();
-        JsonReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
             .build();
 
-        AvroWriter.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        IonToAvro.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
-            is(AvroWriterTest.avroSize(
-                new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
+            IonToAvroTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
+            is(IonToAvroTest.avroSize(
+                new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                     .getResource("csv/portfolio_aliases.avro"))
                     .toURI())))
             )
@@ -361,18 +360,18 @@ public class AvroConverterTest {
         File sourceFile = SerdesUtils.resourceToFile("csv/row_with_missing_fields_and_good_separator.csv");
         URI csv = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        CsvReader reader = CsvReader.builder()
+        CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(CsvReader.class.getName())
+            .type(CsvToIon.class.getName())
             .from(csv.toString())
             .fieldSeparator(",".charAt(0))
             .header(false)
             .build();
-        CsvReader.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        AvroWriter task = AvroWriter.builder()
+        IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+            .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
             .schema(read)
             .dateFormat("yyyy/MM/dd")

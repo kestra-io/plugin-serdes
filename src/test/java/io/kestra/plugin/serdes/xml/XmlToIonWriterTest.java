@@ -10,9 +10,9 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.plugin.serdes.avro.AvroWriter;
-import io.kestra.plugin.serdes.csv.CsvWriter;
-import io.kestra.plugin.serdes.json.JsonWriter;
+import io.kestra.plugin.serdes.avro.IonToAvro;
+import io.kestra.plugin.serdes.csv.IonToCsv;
+import io.kestra.plugin.serdes.json.IonToJson;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.apache.commons.io.IOUtils;
@@ -32,7 +32,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 @MicronautTest
-class XmlReaderWriterTest {
+class XmlToIonWriterTest {
     private static ObjectMapper mapper = new XmlMapper();
 
     @Inject
@@ -44,12 +44,12 @@ class XmlReaderWriterTest {
     @Inject
     SerdesUtils serdesUtils;
 
-    private XmlReader.Output reader(File sourceFile, String query) throws Exception {
+    private XmlToIon.Output reader(File sourceFile, String query) throws Exception {
         URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        XmlReader reader = XmlReader.builder()
-            .id(XmlReader.class.getSimpleName())
-            .type(XmlReader.class.getName())
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
             .query(query)
             .from(source.toString())
             .build();
@@ -57,10 +57,10 @@ class XmlReaderWriterTest {
         return reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
     }
 
-    private XmlWriter.Output writer(URI from) throws Exception {
-        XmlWriter writer = XmlWriter.builder()
-            .id(JsonWriter.class.getSimpleName())
-            .type(JsonWriter.class.getName())
+    private IonToXml.Output writer(URI from) throws Exception {
+        IonToXml writer = IonToXml.builder()
+            .id(IonToJson.class.getSimpleName())
+            .type(IonToJson.class.getName())
             .from(from.toString())
             .build();
 
@@ -72,8 +72,8 @@ class XmlReaderWriterTest {
         File sourceFile = SerdesUtils.resourceToFile("xml/book.xml");
         File resultFile = SerdesUtils.resourceToFile("xml/book_result.xml");
 
-        XmlReader.Output readerRunOutput = this.reader(sourceFile, "/catalog/book");
-        XmlWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri());
+        XmlToIon.Output readerRunOutput = this.reader(sourceFile, "/catalog/book");
+        IonToXml.Output writerRunOutput = this.writer(readerRunOutput.getUri());
 
         assertThat(
             IOUtils.toString(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri()))),
@@ -86,8 +86,8 @@ class XmlReaderWriterTest {
         File sourceFile = SerdesUtils.resourceToFile("xml/docbook.xml");
         File resultFile = SerdesUtils.resourceToFile("xml/docbook_result.xml");
 
-        XmlReader.Output readerRunOutput = this.reader(sourceFile, null);
-        XmlWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri());
+        XmlToIon.Output readerRunOutput = this.reader(sourceFile, null);
+        IonToXml.Output writerRunOutput = this.writer(readerRunOutput.getUri());
 
         assertThat(
             IOUtils.toString(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri()))),
@@ -119,14 +119,14 @@ class XmlReaderWriterTest {
 
             URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
-            XmlWriter writer = XmlWriter.builder()
-                .id(AvroWriter.class.getSimpleName())
-                .type(CsvWriter.class.getName())
+            IonToXml writer = IonToXml.builder()
+                .id(IonToAvro.class.getSimpleName())
+                .type(IonToCsv.class.getName())
                 .from(uri.toString())
                 .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
                 .build();
 
-            XmlWriter.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+            IonToXml.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             assertThat(
                 IOUtils.toString(this.storageInterface.get(null, run.getUri()), Charsets.UTF_8),
@@ -153,7 +153,7 @@ class XmlReaderWriterTest {
     // Assert that there is no exception throw when reading an empty file
     void readEmpty() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty.xml");
-        XmlReader.Output reader = this.reader(sourceFile, "/random/stuff");
+        XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
         String tagContent = new BufferedReader(new
             InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is(""));
@@ -163,7 +163,7 @@ class XmlReaderWriterTest {
     // Assert that there is no exception throw when reading an empty file
     void readEmptyTagBadQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
-        XmlReader.Output reader = this.reader(sourceFile, "/random/stuff");
+        XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
         String tagContent = new BufferedReader(new
             InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is(""));
@@ -173,7 +173,7 @@ class XmlReaderWriterTest {
     // Assert that there is no exception throw when reading an empty file
     void readEmptyTagGoodQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
-        XmlReader.Output reader = this.reader(sourceFile, "/catalog");
+        XmlToIon.Output reader = this.reader(sourceFile, "/catalog");
         String tagContent = new BufferedReader(new
             InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is("\"\""));

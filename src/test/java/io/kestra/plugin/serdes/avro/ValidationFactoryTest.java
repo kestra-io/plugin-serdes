@@ -25,20 +25,20 @@ class ValidationFactoryTest {
         );
 
         var validator = modelValidator.isValid(
-            AvroWriter.builder()
+            IonToAvro.builder()
                 .id("unit")
                 .from("unit")
-                .type(AvroWriter.class.getName())
+                .type(IonToAvro.class.getName())
                 .schema(schema)
                 .build()
         );
         assertThat(validator.isPresent(), is(false));
 
         validator = modelValidator.isValid(
-            AvroWriter.builder()
+            IonToAvro.builder()
                 .id("unit")
                 .from("unit")
-                .type(AvroWriter.class.getName())
+                .type(IonToAvro.class.getName())
                 .schema("{\"invalid\": \"avro schema\"}")
                 .build()
         );
@@ -46,20 +46,20 @@ class ValidationFactoryTest {
 
 
         validator = modelValidator.isValid(
-            AvroWriter.builder()
+            IonToAvro.builder()
                 .id("unit")
                 .from("unit")
-                .type(AvroWriter.class.getName())
+                .type(IonToAvro.class.getName())
                 .schema("{\"invalid json schema\"}")
                 .build()
         );
         assertThat(validator.isPresent(), is(true));
 
         validator = modelValidator.isValid(
-            AvroWriter.builder()
+            IonToAvro.builder()
                 .id("unit")
                 .from("unit")
-                .type(AvroWriter.class.getName())
+                .type(IonToAvro.class.getName())
                 .schema("{{ test }}")
                 .build()
         );

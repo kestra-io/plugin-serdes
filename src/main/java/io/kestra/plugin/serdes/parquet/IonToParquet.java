@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.parquet;
 
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -35,7 +36,10 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
 @io.swagger.v3.oas.annotations.media.Schema(
     title = "Read a provided file containing ion serialized data and convert it to parquet."
 )
-public class ParquetWriter extends AbstractAvroConverter implements RunnableTask<ParquetWriter.Output> {
+@Plugin(
+    aliases = "io.kestra.plugin.serdes.parquet.ParquetWriter"
+)
+public class IonToParquet extends AbstractAvroConverter implements RunnableTask<IonToParquet.Output> {
     @NotNull
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Source file URI"

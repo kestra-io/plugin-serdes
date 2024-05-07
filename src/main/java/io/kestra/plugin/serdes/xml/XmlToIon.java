@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.xml;
 
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -34,7 +35,10 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     title = "Read a XML file and write it to an ion serialized data file."
 )
 @Slf4j
-public class XmlReader extends Task implements RunnableTask<XmlReader.Output> {
+@Plugin(
+    aliases = "io.kestra.plugin.serdes.xml.XmlReader"
+)
+public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     @NotNull
     @Schema(
         title = "Source file URI"

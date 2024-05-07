@@ -23,7 +23,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
 @MicronautTest
-class ParquetReaderWriterTest {
+class ParquetToIonWriterTest {
     @Inject
     StorageInterface storageInterface;
 
@@ -55,26 +55,26 @@ class ParquetReaderWriterTest {
 
             URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
-            ParquetWriter writer = ParquetWriter.builder()
-                .id(ParquetWriter.class.getSimpleName())
-                .type(ParquetWriter.class.getName())
+            IonToParquet writer = IonToParquet.builder()
+                .id(IonToParquet.class.getSimpleName())
+                .type(IonToParquet.class.getName())
                 .from(uri.toString())
                 .schema(IOUtils.toString(
-                    Objects.requireNonNull(ParquetReaderWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
+                    Objects.requireNonNull(ParquetToIonWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
                     StandardCharsets.UTF_8
                 ))
                 .timeZoneId("UTC")
                 .build();
 
-            ParquetWriter.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+            IonToParquet.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-            ParquetReader reader = ParquetReader.builder()
-                .id(ParquetReader.class.getSimpleName())
-                .type(ParquetReader.class.getName())
+            ParquetToIon reader = ParquetToIon.builder()
+                .id(ParquetToIon.class.getSimpleName())
+                .type(ParquetToIon.class.getName())
                 .from(writerOutput.getUri().toString())
                 .build();
 
-            ParquetReader.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+            ParquetToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
             List<Map<String, Object>> result = new ArrayList<>();
             FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, readerOutput.getUri()))), r -> result.add((Map<String, Object>) r));

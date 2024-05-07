@@ -9,7 +9,7 @@ import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.serdes.csv.CsvWriter;
+import io.kestra.plugin.serdes.csv.IonToCsv;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
@@ -33,7 +33,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 @MicronautTest
-class AvroWriterTest {
+class IonToAvroTest {
     @Inject
     StorageInterface storageInterface;
 
@@ -54,30 +54,30 @@ class AvroWriterTest {
         URI source = storageInterface.put(
             null,
             new URI("/" + FriendlyId.createFriendlyId()),
-            new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
+            new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                 .getResource(file))
                 .toURI()))
         );
 
-        AvroWriter task = AvroWriter.builder()
-            .id(AvroWriterTest.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+        IonToAvro task = IonToAvro.builder()
+            .id(IonToAvroTest.class.getSimpleName())
+            .type(IonToAvro.class.getName())
             .from(source.toString())
             .inferAllFields(false)
             .schema(
                 Files.asCharSource(
-                    new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader().getResource("csv/insurance_sample.avsc")).toURI()),
+                    new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("csv/insurance_sample.avsc")).toURI()),
                     Charsets.UTF_8
                 ).read()
             )
             .build();
 
-        AvroWriter.Output run = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+        IonToAvro.Output run = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            AvroWriterTest.avroSize(this.storageInterface.get(null, run.getUri())),
-            is(AvroWriterTest.avroSize(
-                new FileInputStream(new File(Objects.requireNonNull(AvroWriterTest.class.getClassLoader()
+            IonToAvroTest.avroSize(this.storageInterface.get(null, run.getUri())),
+            is(IonToAvroTest.avroSize(
+                new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                     .getResource("csv/insurance_sample.avro"))
                     .toURI())))
             )
@@ -117,12 +117,12 @@ class AvroWriterTest {
 
             URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
-            AvroWriter writer = AvroWriter.builder()
-                .id(AvroWriter.class.getSimpleName())
-                .type(CsvWriter.class.getName())
+            IonToAvro writer = IonToAvro.builder()
+                .id(IonToAvro.class.getSimpleName())
+                .type(IonToCsv.class.getName())
                 .from(uri.toString())
                 .schema(IOUtils.toString(
-                    Objects.requireNonNull(AvroWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
+                    Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("avro/all.avsc")),
                     StandardCharsets.UTF_8
                 ))
                 .build();

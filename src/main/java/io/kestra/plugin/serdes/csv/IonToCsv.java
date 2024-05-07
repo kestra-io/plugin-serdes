@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.csv;
 
 import de.siegmar.fastcsv.writer.LineDelimiter;
 import de.siegmar.fastcsv.writer.QuoteStrategy;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.plugin.serdes.AbstractTextWriter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -33,7 +34,10 @@ import reactor.core.publisher.Mono;
 @Schema(
     title = "Read an ion serialized data file and write it to a csv file."
 )
-public class CsvWriter extends AbstractTextWriter implements RunnableTask<CsvWriter.Output> {
+@Plugin(
+    aliases = "io.kestra.plugin.serdes.csv.CsvWriter"
+)
+public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCsv.Output> {
     @NotNull
     @Schema(
         title = "Source file URI"

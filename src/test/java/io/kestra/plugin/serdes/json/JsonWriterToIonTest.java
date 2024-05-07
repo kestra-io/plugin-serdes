@@ -9,8 +9,8 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.plugin.serdes.avro.AvroWriter;
-import io.kestra.plugin.serdes.csv.CsvWriter;
+import io.kestra.plugin.serdes.avro.IonToAvro;
+import io.kestra.plugin.serdes.csv.IonToCsv;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.apache.commons.io.FilenameUtils;
@@ -31,7 +31,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 @MicronautTest
-class JsonReaderWriterTest {
+class JsonWriterToIonTest {
     private static ObjectMapper mapper = new ObjectMapper();
 
     @Inject
@@ -43,12 +43,12 @@ class JsonReaderWriterTest {
     @Inject
     SerdesUtils serdesUtils;
 
-    private JsonReader.Output reader(File sourceFile, boolean jsonNl) throws Exception {
+    private JsonToIon.Output reader(File sourceFile, boolean jsonNl) throws Exception {
         URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        JsonReader reader = JsonReader.builder()
-            .id(JsonReader.class.getSimpleName())
-            .type(AvroWriter.class.getName())
+        JsonToIon reader = JsonToIon.builder()
+            .id(JsonToIon.class.getSimpleName())
+            .type(IonToAvro.class.getName())
             .from(source.toString())
             .newLine(jsonNl)
             .build();
@@ -56,10 +56,10 @@ class JsonReaderWriterTest {
         return reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
     }
 
-    private JsonWriter.Output writer(URI from, boolean jsonNl) throws Exception {
-        JsonWriter writer = JsonWriter.builder()
-            .id(JsonWriter.class.getSimpleName())
-            .type(JsonWriter.class.getName())
+    private IonToJson.Output writer(URI from, boolean jsonNl) throws Exception {
+        IonToJson writer = IonToJson.builder()
+            .id(IonToJson.class.getSimpleName())
+            .type(IonToJson.class.getName())
             .from(from.toString())
             .newLine(jsonNl)
             .build();
@@ -71,8 +71,8 @@ class JsonReaderWriterTest {
     void newLine() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("csv/full.jsonl");
 
-        JsonReader.Output readerRunOutput = this.reader(sourceFile, true);
-        JsonWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri(), true);
+        JsonToIon.Output readerRunOutput = this.reader(sourceFile, true);
+        IonToJson.Output writerRunOutput = this.writer(readerRunOutput.getUri(), true);
 
         assertThat(
             mapper.readTree(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri()))),
@@ -88,8 +88,8 @@ class JsonReaderWriterTest {
     void notNewLine() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("csv/full.jsonl");
 
-        JsonReader.Output readerRunOutput = this.reader(sourceFile, true);
-        JsonWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
+        JsonToIon.Output readerRunOutput = this.reader(sourceFile, true);
+        IonToJson.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
 
         assertThat(
             FilenameUtils.getExtension(writerRunOutput.getUri().getPath()),
@@ -101,8 +101,8 @@ class JsonReaderWriterTest {
     void array() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("csv/full.json");
 
-        JsonReader.Output readerRunOutput = this.reader(sourceFile, false);
-        JsonWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
+        JsonToIon.Output readerRunOutput = this.reader(sourceFile, false);
+        IonToJson.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
 
         assertThat(
             mapper.readTree(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri()))),
@@ -114,8 +114,8 @@ class JsonReaderWriterTest {
     void object() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("csv/object.json");
 
-        JsonReader.Output readerRunOutput = this.reader(sourceFile, false);
-        JsonWriter.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
+        JsonToIon.Output readerRunOutput = this.reader(sourceFile, false);
+        IonToJson.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
 
 
         List<Map> objects = Arrays.asList(mapper.readValue(
@@ -151,13 +151,13 @@ class JsonReaderWriterTest {
 
             URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
-            JsonWriter writer = JsonWriter.builder()
-                .id(AvroWriter.class.getSimpleName())
-                .type(CsvWriter.class.getName())
+            IonToJson writer = IonToJson.builder()
+                .id(IonToAvro.class.getSimpleName())
+                .type(IonToCsv.class.getName())
                 .from(uri.toString())
                 .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
                 .build();
-            JsonWriter.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+            IonToJson.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             assertThat(
                 IOUtils.toString(this.storageInterface.get(null, run.getUri()), Charsets.UTF_8),
