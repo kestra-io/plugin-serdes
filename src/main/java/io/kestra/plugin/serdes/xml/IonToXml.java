@@ -115,8 +115,8 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
         URI from = new URI(runContext.render(this.from));
 
         try (
-            BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
+            Writer outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)), FileSerde.BUFFER_SIZE);
+            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), Charset.forName(charset)), FileSerde.BUFFER_SIZE)
         ) {
             XmlMapper mapper = new XmlMapper();
 
@@ -133,15 +133,11 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
                 .withRootName(runContext.render(this.rootName))
                 .withFeatures(ToXmlGenerator.Feature.WRITE_XML_DECLARATION);
 
-            AtomicLong lineCount = new AtomicLong();
-
-            List<Object> list = new ArrayList<>();
-            FileSerde.reader(inputStream, throwConsumer(e -> {
-                list.add(e);
-                lineCount.incrementAndGet();
-            }));
-            outfile.write(objectWriter.writeValueAsString(list));
-            runContext.metric(Counter.of("records", lineCount.get()));
+            List<Object> list = FileSerde.readAll(inputStream).collectList().block();
+            if (list != null) {
+                outfile.write(objectWriter.writeValueAsString(list));
+                runContext.metric(Counter.of("records", list.size()));
+            }
 
             outfile.flush();
         }
