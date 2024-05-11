@@ -7,6 +7,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.AbstractTextWriter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.poi.ss.usermodel.*;
@@ -14,16 +15,11 @@ import org.apache.poi.xssf.streaming.SXSSFCell;
 import org.apache.poi.xssf.streaming.SXSSFRow;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-
-import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
@@ -35,6 +31,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+
+import static io.kestra.core.utils.Rethrow.throwFunction;
 
 @SuperBuilder
 @ToString
@@ -48,10 +46,11 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
     @NotNull
     @Schema(
-        title = "Source file URI"
+        title = "Source file URI",
+        anyOf = {String.class, Map.class}
     )
     @PluginProperty(dynamic = true)
-    private String from;
+    private Object from;
 
     @Schema(
         title = "The name of a supported character set",
@@ -87,18 +86,50 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        File tempFile = runContext.tempFile(".xlsx").toFile();
+        Long lineCount;
 
-        URI from = new URI(runContext.render(this.from));
+        if (this.from instanceof String from) {
+            this.init(runContext);
+            try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
+                File tempFile = runContext.tempFile(".xlsx").toFile();
 
-        this.init(runContext);
+                lineCount = writeQuery(runContext, sheetsTitle, from, tempFile, workbook);
+
+                return Output.builder()
+                    .uri(runContext.storage().putFile(tempFile))
+                    .size(lineCount)
+                    .build();
+            }
+        } else if (from instanceof Map<?,?> from) {
+            try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
+                File tempFile = runContext.tempFile(".xlsx").toFile();
+
+                lineCount = ((Map<String, String>) from).entrySet()
+	                .stream()
+	                .map(throwFunction(entry -> writeQuery(runContext, entry.getKey(), entry.getValue(), tempFile, workbook)))
+                    .mapToLong(Long::longValue)
+                    .sum();
+
+                return Output.builder()
+                    .uri(runContext.storage().putFile(tempFile))
+                    .size(lineCount)
+                    .build();
+
+            }
+        }
+
+        throw new IllegalStateException("Invalid variable: 'from'");
+    }
+
+    private Long writeQuery(RunContext runContext, String title, String from, File tempFile, SXSSFWorkbook workbook) throws Exception {
+        URI fromUri = new URI(from);
+        Long lineCount;
 
         try (
-            BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
-            SXSSFWorkbook workbook = new SXSSFWorkbook(1);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(fromUri)));
             FileOutputStream outputStream = new FileOutputStream(tempFile)
         ) {
-            SXSSFSheet sheet = workbook.createSheet(sheetsTitle);
+            SXSSFSheet sheet = workbook.createSheet(title);
             Flux<Object> flowable = Flux.create(FileSerde.reader(reader), FluxSink.OverflowStrategy.BUFFER)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
@@ -144,18 +175,13 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
             // metrics & finalize
             Mono<Long> count = flowable.count();
-            Long lineCount = count.block();
+            lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
             workbook.write(outputStream);
-
-
-            return Output
-                .builder()
-                .uri(runContext.storage().putFile(tempFile))
-                .size(lineCount)
-                .build();
         }
+
+        return lineCount;
     }
 
     // Could be replaced with switch case in java21
