@@ -17,11 +17,9 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.net.URI;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -51,7 +49,7 @@ public class IonToExcelTest {
             .build();
         IonToExcel.Output excelOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(null, excelOutput.getUri()));
+        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(null, (URI) excelOutput.getUri()));
         XSSFWorkbook expected = new XSSFWorkbook(new FileInputStream(SerdesUtils.resourceToFile(expectedExcelResourcePath)));
         assertThat(actual, WorkbookMatcher.sameWorkbook(expected));
     }
@@ -171,5 +169,40 @@ public class IonToExcelTest {
         ExcelToIon.Output outputWriter = reader.run(runContext);
 
         assertThat(outputWriter.getSize(), is(ROWS_COUNT + 1));
+    }
+
+    @Test
+    void multiSheets() throws Exception {
+        URI inputUri = this.serdesUtils.resourceToStorageObject(
+            SerdesUtils.resourceToFile("excel/insurance_sample.ion")
+        );
+
+        IonToExcel writer = IonToExcel.builder()
+            .id(IonToExcelTest.class.getSimpleName())
+            .type(IonToExcel.class.getName())
+            .sheetsTitle("Worksheet")
+            .from(
+                Map.of(
+                    "Worksheet_1", inputUri.toString(),
+                    "Worksheet_2", inputUri.toString(),
+                    "Worksheet_3", inputUri.toString()
+                ))
+            .build();
+
+        IonToExcel.Output excelOutput = writer.run(
+            TestsUtils.mockRunContext(
+                runContextFactory,
+                writer,
+                ImmutableMap.of()
+            )
+        );
+
+        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(null, excelOutput.getUri()));
+        XSSFWorkbook expected = new XSSFWorkbook(
+            new FileInputStream(
+                SerdesUtils.resourceToFile("excel/insurance_sample_multiple_sheets.xlsx")
+            )
+        );
+        assertThat(actual, WorkbookMatcher.sameWorkbook(expected));
     }
 }
