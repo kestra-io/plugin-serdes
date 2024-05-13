@@ -94,7 +94,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         this.init(runContext);
 
         try (
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
             Writer fileWriter = new FileWriter(tempFile, Charset.forName(this.charset));
             de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter(fileWriter)
         ) {
@@ -140,7 +140,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 

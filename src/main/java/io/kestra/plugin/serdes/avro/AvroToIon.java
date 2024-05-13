@@ -53,7 +53,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         File tempFile = runContext.tempFile(".ion").toFile();
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
         try(
-            InputStream in = runContext.uriToInputStream(from);
+            InputStream in = runContext.storage().getFile(from);
             OutputStream output = new FileOutputStream(tempFile)
         ) {
             DataFileStream<GenericRecord> dataFileStream = new DataFileStream<>(in, datumReader);
@@ -72,7 +72,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 

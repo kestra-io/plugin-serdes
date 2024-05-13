@@ -84,7 +84,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
 
         try (
             BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
         ) {
             ObjectMapper mapper = new ObjectMapper()
                 .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
@@ -120,7 +120,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 

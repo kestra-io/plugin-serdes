@@ -80,7 +80,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
 
         try (
             BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
         ) {
             XmlMapper mapper = new XmlMapper();
 
@@ -112,7 +112,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
 
         return IonToXml.Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 

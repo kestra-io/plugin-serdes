@@ -73,7 +73,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         File tempFile = runContext.tempFile(".ion").toFile();
 
         try (
-            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
+            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset));
             OutputStream output = new FileOutputStream(tempFile);
         ) {
             Flux<Object> flowable = Flux
@@ -90,7 +90,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 

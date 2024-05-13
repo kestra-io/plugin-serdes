@@ -66,7 +66,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
         // Parquet file
         File parquetFile = runContext.tempFile(".parquet").toFile();
         try (OutputStream outputStream = new FileOutputStream(parquetFile)) {
-            IOUtils.copyLarge(runContext.uriToInputStream(from), outputStream);
+            IOUtils.copyLarge(runContext.storage().getFile(from), outputStream);
         }
         Path parquetHadoopPath = new Path(parquetFile.getPath());
         HadoopInputFile parquetOutputFile = HadoopInputFile.fromPath(parquetHadoopPath, new Configuration());
@@ -94,7 +94,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 
