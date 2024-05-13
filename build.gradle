@@ -73,7 +73,7 @@ dependencies {
 
     api 'de.siegmar:fastcsv:2.2.2'
     api 'org.apache.avro:avro:1.11.3'
-    api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.13.1'
+    api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.14.0'
     api group: 'org.apache.poi', name: 'poi', version: '5.2.5'
     api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.2.5'
     api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '4.3.1'
