@@ -113,7 +113,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         URI from = new URI(runContext.render(this.from));
 
         try (
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
@@ -129,7 +129,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 

@@ -122,7 +122,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         // convert
         try (
             org.apache.parquet.hadoop.ParquetWriter<GenericData.Record> writer = parquetWriterBuilder.build();
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)))
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)))
         )
         {
             Long lineCount = this.convert(inputStream, schema, writer::write);
@@ -135,7 +135,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 

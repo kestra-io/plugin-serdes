@@ -94,7 +94,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         this.init(runContext);
 
         try (
-            BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.uriToInputStream(from)));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
             SXSSFWorkbook workbook = new SXSSFWorkbook(1);
             FileOutputStream outputStream = new FileOutputStream(tempFile)
         ) {
@@ -152,7 +152,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
             return Output
                 .builder()
-                .uri(runContext.putTempFile(tempFile))
+                .uri(runContext.storage().putFile(tempFile))
                 .size(lineCount)
                 .build();
         }

@@ -98,7 +98,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     public Output run(RunContext runContext) throws Exception {
         URI from = new URI(runContext.render(this.from));
 
-        try(Workbook workbook = StreamingReader.builder().rowCacheSize(1).open(runContext.uriToInputStream(from))) {
+        try(Workbook workbook = StreamingReader.builder().rowCacheSize(1).open(runContext.storage().getFile(from))) {
 
             List<Sheet> sheets = new ArrayList<>();
             workbook.sheetIterator().forEachRemaining(sheets::add);
@@ -197,10 +197,10 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                 convertedSheet.add(row);
             }
 
-            return runContext.putTempFile(this.store(runContext, convertedSheet));
+            return runContext.storage().putFile(this.store(runContext, convertedSheet));
         }
 
-        return runContext.putTempFile(this.store(runContext, values));
+        return runContext.storage().putFile(this.store(runContext, values));
     }
 
     private Object convertNumeric(Cell cell) {

@@ -95,7 +95,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         AtomicInteger skipped = new AtomicInteger();
 
         try (
-            de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader(new InputStreamReader(runContext.uriToInputStream(from), charset));
+            de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader(new InputStreamReader(runContext.storage().getFile(from), charset));
             OutputStream output = new FileOutputStream(tempFile);
         ) {
             Map<Integer, String> headers = new TreeMap<>();
@@ -137,7 +137,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         return Output
             .builder()
-            .uri(runContext.putTempFile(tempFile))
+            .uri(runContext.storage().putFile(tempFile))
             .build();
     }
 
