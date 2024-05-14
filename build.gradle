@@ -34,6 +34,25 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add("-parameters")
 }
 
+// fix most of Jackson deps as we have issue with versions coming from the Micronaut BOM
+configurations.configureEach {
+    resolutionStrategy {
+        force("com.fasterxml.jackson:jackson-bom:" + jacksonVersion)
+        force("com.fasterxml.jackson.core:jackson-bom:" + jacksonVersion)
+        force("com.fasterxml.jackson.core:jackson-core:" + jacksonVersion)
+        force("com.fasterxml.jackson.core:jackson-databind:" + jacksonVersion)
+        force("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:" + jacksonVersion)
+        force("com.fasterxml.jackson.module:jackson-module-parameter-names:" + jacksonVersion)
+        force("com.fasterxml.jackson.datatype:jackson-datatype-guava:" + jacksonVersion)
+        force("com.fasterxml.jackson.core:jackson-annotations:" + jacksonVersion)
+        force("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:" + jacksonVersion)
+        force("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:" + jacksonVersion)
+        force("com.fasterxml.jackson.dataformat:jackson-dataformat-ion:" + jacksonVersion)
+        force("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:" + jacksonVersion)
+        force("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:" + jacksonVersion)
+    }
+}
+
 dependencies {
     // lombok
     annotationProcessor "org.projectlombok:lombok:$lombokVersion"
@@ -60,7 +79,7 @@ dependencies {
     api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.4.0') {
         exclude group: 'org.slf4j'
     }
-    api 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.16.2'
+    api "com.fasterxml.jackson.dataformat:jackson-dataformat-xml"
     api group: 'org.json', name: 'json', version: '20240303'
 }
 
