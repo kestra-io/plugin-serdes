@@ -19,10 +19,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+
+import java.io.*;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -260,7 +258,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
     private File store(RunContext runContext, Collection<Object> values) throws IOException {
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
-        try (OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)) {
             values.forEach(throwConsumer(row -> FileSerde.write(output, row)));
         }
         return tempFile;
