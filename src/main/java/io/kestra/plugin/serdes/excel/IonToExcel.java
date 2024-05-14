@@ -18,13 +18,13 @@ import org.apache.poi.xssf.streaming.SXSSFRow;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -153,11 +153,11 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         Long lineCount;
 
         try (
-            BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(fromUri)));
-            FileOutputStream outputStream = new FileOutputStream(tempFile)
+            Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(fromUri), Charset.forName(this.charset)), FileSerde.BUFFER_SIZE);
+            OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             SXSSFSheet sheet = workbook.createSheet(title);
-            Flux<Object> flowable = Flux.create(FileSerde.reader(reader), FluxSink.OverflowStrategy.BUFFER)
+            Flux<Object> flowable = FileSerde.readAll(reader)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
                     private int rowAt = 0;
