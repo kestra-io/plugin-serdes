@@ -155,7 +155,7 @@ class XmlToIonWriterTest {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
         String tagContent = new BufferedReader(new
-            InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+            InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is(""));
     }
 
@@ -165,7 +165,7 @@ class XmlToIonWriterTest {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
         String tagContent = new BufferedReader(new
-            InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+            InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is(""));
     }
 
@@ -175,7 +175,7 @@ class XmlToIonWriterTest {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/catalog");
         String tagContent = new BufferedReader(new
-            InputStreamReader(runContextFactory.of().uriToInputStream(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+            InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is("\"\""));
     }
 }
