@@ -88,23 +88,23 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
     public Output run(RunContext runContext) throws Exception {
         Long lineCount;
 
-        if (this.from instanceof String from) {
+        if (this.from instanceof String fromStr) {
             this.init(runContext);
             try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
                 File tempFile = runContext.tempFile(".xlsx").toFile();
 
-                lineCount = writeQuery(runContext, sheetsTitle, from, tempFile, workbook);
+                lineCount = writeQuery(runContext, sheetsTitle, runContext.render(fromStr), tempFile, workbook);
 
                 return Output.builder()
                     .uri(runContext.storage().putFile(tempFile))
                     .size(lineCount)
                     .build();
             }
-        } else if (from instanceof Map<?,?> from) {
+        } else if (from instanceof Map<?,?> fromMap) {
             try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
                 File tempFile = runContext.tempFile(".xlsx").toFile();
 
-                lineCount = ((Map<String, String>) from).entrySet()
+                lineCount = runContext.renderMap((Map<String, String>) fromMap).entrySet()
 	                .stream()
 	                .map(throwFunction(entry -> writeQuery(runContext, entry.getKey(), entry.getValue(), tempFile, workbook)))
                     .mapToLong(Long::longValue)
@@ -184,69 +184,73 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         return lineCount;
     }
 
-    // Could be replaced with switch case in java21
-    @Deprecated(forRemoval = true)
     private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber) {
         SXSSFCell cell = xssfRow.createCell(rowNumber);
 
-        if (value instanceof Number) {
-            if (value instanceof Double doubleValue) {
-                cell.setCellValueImpl(doubleValue);
-            } else if (value instanceof Integer intValue) {
-                cell.setCellValueImpl(intValue);
-            } else if (value instanceof Float floatValue) {
-                cell.setCellValueImpl(floatValue);
-            } else if (value instanceof Long longValue) {
-                cell.setCellValueImpl(longValue);
-            } else if (value instanceof BigDecimal bigDecimalValue) {
-                cell.setCellValueImpl(bigDecimalValue.doubleValue());
-            } else if (value instanceof BigInteger bigIntegerValue) {
-                cell.setCellValue(bigIntegerValue.toString());
-                cell.setCellType(CellType.STRING);
-                return;
-            }
+        switch (value) {
+            case Number number -> {
+                if (value instanceof Double doubleValue) {
+                    cell.setCellValueImpl(doubleValue);
+                } else if (value instanceof Integer intValue) {
+                    cell.setCellValueImpl(intValue);
+                } else if (value instanceof Float floatValue) {
+                    cell.setCellValueImpl(floatValue);
+                } else if (value instanceof Long longValue) {
+                    cell.setCellValueImpl(longValue);
+                } else if (value instanceof BigDecimal bigDecimalValue) {
+                    cell.setCellValueImpl(bigDecimalValue.doubleValue());
+                } else if (value instanceof BigInteger bigIntegerValue) {
+                    cell.setCellValue(bigIntegerValue.toString());
+                    cell.setCellType(CellType.STRING);
+                    return;
+                }
 
-            cell.setCellType(CellType.NUMERIC);
-        } else if (value instanceof Boolean) {
-            cell.setCellType(CellType.BOOLEAN);
-        } else if (value instanceof Date date) {
-            cell.setCellValue(DateUtil.getExcelDate(date));
-            cell.setCellType(CellType.NUMERIC);
-        } else if (value instanceof LocalDate date) {
-            if (this.styles) {
-                sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+                cell.setCellType(CellType.NUMERIC);
             }
-
-            cell.setCellValue(DateUtil.getExcelDate(date));
-            cell.setCellType(CellType.NUMERIC);
-        } else if (value instanceof LocalDateTime date) {
-            if (this.styles) {
-                sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
-            }
-
-            cell.setCellValue(DateUtil.getExcelDate(date));
-            cell.setCellType(CellType.NUMERIC);
-        } else if (value instanceof Instant instant) {
-            if (this.styles) {
-                sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
-            }
-
-            if (getTimeZoneId() != null) {
-                LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(getTimeZoneId()));
+            case Boolean b -> cell.setCellType(CellType.BOOLEAN);
+            case Date date -> {
                 cell.setCellValue(DateUtil.getExcelDate(date));
-            } else {
-                Date date = Date.from(instant);
-                cell.setCellValue(DateUtil.getExcelDate(date));
+                cell.setCellType(CellType.NUMERIC);
             }
-            cell.setCellType(CellType.NUMERIC);
-        } else {
-            String valueStr = String.valueOf(value);
-            if (valueStr.startsWith("Formula:")) {
-                cell.setCellFormula(valueStr.substring(8));
-                cell.setCellType(CellType.FORMULA);
-            } else {
-                cell.setCellValue(valueStr);
-                cell.setCellType(CellType.STRING);
+            case LocalDate date -> {
+                if (this.styles) {
+                    sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+                }
+
+                cell.setCellValue(DateUtil.getExcelDate(date));
+                cell.setCellType(CellType.NUMERIC);
+            }
+            case LocalDateTime date -> {
+                if (this.styles) {
+                    sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+                }
+
+                cell.setCellValue(DateUtil.getExcelDate(date));
+                cell.setCellType(CellType.NUMERIC);
+            }
+            case Instant instant -> {
+                if (this.styles) {
+                    sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
+                }
+
+                if (getTimeZoneId() != null) {
+                    LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(getTimeZoneId()));
+                    cell.setCellValue(DateUtil.getExcelDate(date));
+                } else {
+                    Date date = Date.from(instant);
+                    cell.setCellValue(DateUtil.getExcelDate(date));
+                }
+                cell.setCellType(CellType.NUMERIC);
+            }
+            case null, default -> {
+                String valueStr = String.valueOf(value);
+                if (valueStr.startsWith("Formula:")) {
+                    cell.setCellFormula(valueStr.substring(8));
+                    cell.setCellType(CellType.FORMULA);
+                } else {
+                    cell.setCellValue(valueStr);
+                    cell.setCellType(CellType.STRING);
+                }
             }
         }
     }
