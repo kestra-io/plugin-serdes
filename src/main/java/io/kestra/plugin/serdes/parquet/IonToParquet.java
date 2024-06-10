@@ -41,7 +41,7 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
     examples = {
         @Example(
             full = true,
-            title = "Read a csv file, transform it and write the transformed data in parquet format.",
+            title = "Read a CSV file, transform it and store the transformed data as a parquet file.",
             code = """     
 id: ion_to_parquet
 namespace: dev

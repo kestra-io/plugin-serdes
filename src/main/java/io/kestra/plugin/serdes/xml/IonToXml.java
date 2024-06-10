@@ -45,7 +45,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         examples = {
         @Example(
             full = true,
-            title = "Read a csv file, transform it and write the transformed data to xml format.",
+            title = "Read a CSV file, transform it and store the transformed data as an XML file.",
             code = """     
 id: ion_to_xml
 namespace: dev

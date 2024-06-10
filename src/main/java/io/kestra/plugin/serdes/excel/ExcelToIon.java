@@ -42,7 +42,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
     examples = {
         @Example(
             full = true,
-            title = "Convert an excel file to ion format.",
+            title = "Convert an Excel file to the Ion format.",
             code = """     
 id: excel_to_ion
 namespace: dev

@@ -36,7 +36,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     examples = {
         @Example(
             full = true,
-            title = "Convert a csv file to ion format.",
+            title = "Convert a CSV file to the Amazon Ion format.",
             code = """     
 id: csv_to_ion
 namespace: dev

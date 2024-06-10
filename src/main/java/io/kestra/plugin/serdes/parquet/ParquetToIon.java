@@ -46,7 +46,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     examples = {
         @Example(
             full = true,
-            title = "Convert a parquet file to ion format.",
+            title = "Convert a parquet file to the Amazon Ion format.",
             code = """     
 id: parquet_to_ion
 namespace: dev

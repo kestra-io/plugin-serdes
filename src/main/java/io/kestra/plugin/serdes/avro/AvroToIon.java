@@ -39,7 +39,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     examples = {
         @Example(
             full = true,
-            title = "Convert an avro file to ion format.",
+            title = "Convert an Avro file to the Amazon Ion format.",
             code = """     
 id: avro_to_ion
 namespace: dev

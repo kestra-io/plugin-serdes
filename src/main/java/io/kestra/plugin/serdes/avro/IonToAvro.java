@@ -30,7 +30,7 @@ import jakarta.validation.constraints.NotNull;
     examples = {
         @Example(
             full = true,
-            title = "Convert a csv file to the avro format.",
+            title = "Convert a CSV file to the Avro format.",
             code = """     
 id: divvy_tripdata
 namespace: dev

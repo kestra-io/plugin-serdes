@@ -47,7 +47,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     examples = {
     @Example(
         full = true,
-        title = "Download a csv file, convert it into ion data, and write it in json format.",
+        title = "Download a CSV file and convert it to a JSON format.",
         code = """     
 id: ion_to_json
 namespace: dev

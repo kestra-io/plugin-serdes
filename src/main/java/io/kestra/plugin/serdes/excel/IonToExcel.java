@@ -48,7 +48,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
     examples = {
         @Example(
             full = true,
-            title = "Download a csv file, convert it into ion data, and write it in excel format.",
+            title = "Download a CSV file and convert it to the Excel file format.",
             code = """     
 id: ion_to_excel
 namespace: dev

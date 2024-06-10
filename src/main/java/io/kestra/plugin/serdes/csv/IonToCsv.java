@@ -39,7 +39,7 @@ import reactor.core.publisher.Mono;
     examples = {
         @Example(
             full = true,
-            title = "Download a csv file, transform it and write the transformed data in csv format.",
+            title = "Download a CSV file, transform it in SQL and store the transformed data as a CSV file.",
             code = """     
 id: ion_to_csv
 namespace: dev

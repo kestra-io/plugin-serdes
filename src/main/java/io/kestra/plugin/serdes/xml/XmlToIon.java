@@ -40,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     examples = {
         @Example(
             full = true,
-            title = "Convert a xml file to ion format.",
+            title = "Convert an XML file to the Amazon Ion format.",
             code = """     
 id: xml_to_ion
 namespace: dev
