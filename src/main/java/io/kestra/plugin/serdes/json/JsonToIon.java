@@ -44,7 +44,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     examples = {
         @Example(
             full = true,
-            title = "Convert a json file to ion format.",
+            title = "Convert a JSON file to the Amazon Ion format.",
             code = """     
 id: json_to_ion
 namespace: dev
