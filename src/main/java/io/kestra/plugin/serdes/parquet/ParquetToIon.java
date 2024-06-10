@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.parquet;
 
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -42,6 +43,25 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     title = "Read a provided parquet file and convert it to ion serialized data file."
 )
 @Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Convert a parquet file to the Amazon Ion format.",
+            code = """     
+id: parquet_to_ion
+namespace: dev
+
+tasks:
+  - id: http_download
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/parquet/products.parquet
+
+  - id: to_ion
+    type: io.kestra.plugin.serdes.parquet.ParquetToIon
+    from: "{{ outputs.http_download.uri }}"
+"""
+        )
+    },
     aliases = "io.kestra.plugin.serdes.parquet.ParquetReader"
 )
 public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Output> {

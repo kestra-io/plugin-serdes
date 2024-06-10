@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.avro;
 
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -35,6 +36,25 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     title = "Read a provided avro file and convert it to ion serialized data file."
 )
 @Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Convert an Avro file to the Amazon Ion format.",
+            code = """     
+id: avro_to_ion
+namespace: dev
+
+tasks:
+  - id: http_download
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/avro/products.avro
+
+  - id: to_ion
+    type: io.kestra.plugin.serdes.avro.AvroToIon
+    from: "{{ outputs.http_download.uri }}"
+"""
+        )
+    },
     aliases = "io.kestra.plugin.serdes.avro.AvroReader"
 )
 public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {

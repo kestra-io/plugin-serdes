@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.csv;
 
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -32,6 +33,25 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     title = "Read a csv file and write it to an ion serialized data file."
 )
 @Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Convert a CSV file to the Amazon Ion format.",
+            code = """     
+id: csv_to_ion
+namespace: dev
+
+tasks:
+  - id: http_download
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
+
+  - id: to_ion
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.http_download.uri }}"
+"""
+        )
+    },
     aliases = "io.kestra.plugin.serdes.csv.CsvReader"
 )
 public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
