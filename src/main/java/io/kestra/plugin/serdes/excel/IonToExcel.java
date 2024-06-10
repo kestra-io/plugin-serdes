@@ -1,5 +1,7 @@
 package io.kestra.plugin.serdes.excel;
 
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -41,6 +43,31 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 @Schema(
     title = "Read an ION-serialized file and transform it to an Excel file"
+)
+@Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Download a csv file, convert it into ion data, and write it in excel format.",
+            code = """     
+id: ion_to_excel
+namespace: dev
+
+tasks:
+  - id: http_download
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
+
+  - id: convert
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.http_download.uri }}"
+
+  - id: to_excel
+    type: io.kestra.plugin.serdes.excel.IonToExcel
+    from: "{{ outputs.convert.uri }}"
+"""
+        )
+    }
 )
 public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonToExcel.Output> {
 

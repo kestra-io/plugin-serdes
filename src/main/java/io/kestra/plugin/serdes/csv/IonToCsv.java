@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.csv;
 
 import de.siegmar.fastcsv.writer.LineDelimiter;
 import de.siegmar.fastcsv.writer.QuoteStrategy;
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.plugin.serdes.AbstractTextWriter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -35,6 +36,40 @@ import reactor.core.publisher.Mono;
     title = "Read an ion serialized data file and write it to a csv file."
 )
 @Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Download a csv file, transform it and write the transformed data in csv format.",
+            code = """     
+id: ion_to_csv
+namespace: dev
+
+tasks:
+  - id: download_csv
+    type: io.kestra.plugin.core.http.Download
+    description: salaries of data professionals from 2020 to 2023 (source ai-jobs.net)
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
+
+  - id: avg_salary_by_job_title
+    type: io.kestra.plugin.jdbc.duckdb.Query
+    inputFiles:
+      data.csv: "{{ outputs.download_csv.uri }}"
+    sql: |
+      SELECT 
+        job_title,
+        ROUND(AVG(salary),2) AS avg_salary
+      FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
+      GROUP BY job_title
+      HAVING COUNT(job_title) > 10
+      ORDER BY avg_salary DESC;
+    store: true
+
+  - id: result
+    type: io.kestra.plugin.serdes.csv.IonToCsv
+    from: "{{ outputs.avg_salary_by_job_title.uri }}"
+"""
+        )
+    },
     aliases = "io.kestra.plugin.serdes.csv.CsvWriter"
 )
 public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCsv.Output> {

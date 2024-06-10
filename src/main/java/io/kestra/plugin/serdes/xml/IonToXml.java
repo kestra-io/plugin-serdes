@@ -7,6 +7,8 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.ser.ToXmlGenerator;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -40,6 +42,40 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     title = "Read an ion serialized data file and write it to a XML file."
 )
 @Plugin(
+        examples = {
+        @Example(
+            full = true,
+            title = "Read a csv file, transform it and write the transformed data to xml format.",
+            code = """     
+id: ion_to_xml
+namespace: dev
+
+tasks:
+  - id: download_csv
+    type: io.kestra.plugin.core.http.Download
+    description: salaries of data professionals from 2020 to 2023 (source ai-jobs.net)
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
+
+  - id: avg_salary_by_job_title
+    type: io.kestra.plugin.jdbc.duckdb.Query
+    inputFiles:
+      data.csv: "{{ outputs.download_csv.uri }}"
+    sql: |
+      SELECT 
+        job_title,
+        ROUND(AVG(salary),2) AS avg_salary
+      FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
+      GROUP BY job_title
+      HAVING COUNT(job_title) > 10
+      ORDER BY avg_salary DESC;
+    store: true
+
+  - id: result
+    type: io.kestra.plugin.serdes.xml.IonToXml
+    from: "{{ outputs.avg_salary_by_job_title.uri }}"
+"""
+        )
+    },
     aliases = "io.kestra.plugin.serdes.xml.XmlWriter"
 )
 public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {

@@ -30,7 +30,7 @@ import jakarta.validation.constraints.NotNull;
     examples = {
         @Example(
             full = true,
-            title = "Convert a CSV file to the Parquet format using Avro schema",
+            title = "Convert a csv file to the avro format.",
             code = """     
 id: divvy_tripdata
 namespace: dev
@@ -40,7 +40,7 @@ variables:
 
 tasks:
   - id: get_zipfile
-    type: io.kestra.plugin.fs.http.Download
+    type: io.kestra.plugin.core.http.Download
     uri: "https://divvy-tripdata.s3.amazonaws.com/{{ render(vars.file_id) }}-divvy-tripdata.zip"
 
   - id: unzip
@@ -50,10 +50,10 @@ tasks:
 
   - id: convert
     type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{outputs.unzip.files[render(vars.file_id) ~ '-divvy-tripdata.csv']}}"
+    from: "{{ outputs.unzip.files[render(vars.file_id) ~ '-divvy-tripdata.csv'] }}"
 
-  - id: to_parquet
-    type: io.kestra.plugin.serdes.avro.AvroWriter
+  - id: to_avro
+    type: io.kestra.plugin.serdes.avro.IonToAvro
     from: "{{ outputs.convert.uri }}"
     datetimeFormat: "yyyy-MM-dd' 'HH:mm:ss"
     schema: |

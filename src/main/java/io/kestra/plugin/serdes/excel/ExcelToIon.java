@@ -1,6 +1,9 @@
 package io.kestra.plugin.serdes.excel;
 
 import com.github.pjfanning.xlsx.StreamingReader;
+
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -34,6 +37,27 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 @Schema(
     title = "Read data from Excel into a row-wise ION-serialized format"
+)
+@Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Convert an excel file to ion format.",
+            code = """     
+id: excel_to_ion
+namespace: dev
+
+tasks:
+  - id: http_download
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/excel/Products.xlsx
+
+  - id: to_ion
+    type: io.kestra.plugin.serdes.excel.ExcelToIon
+    from: "{{ outputs.http_download.uri }}"
+"""
+        )
+    }
 )
 public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> {
     @NotBlank

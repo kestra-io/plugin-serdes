@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.xml;
 
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -36,6 +37,25 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 )
 @Slf4j
 @Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Convert a xml file to ion format.",
+            code = """     
+id: xml_to_ion
+namespace: dev
+
+tasks:
+  - id: http_download
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/xml/products.xml
+
+  - id: to_ion
+    type: io.kestra.plugin.serdes.xml.XmlToIon
+    from: "{{ outputs.http_download.uri }}"
+"""
+        )
+    },
     aliases = "io.kestra.plugin.serdes.xml.XmlReader"
 )
 public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {

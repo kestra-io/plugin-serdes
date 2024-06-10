@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -39,6 +41,25 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     title = "Read a json file and write it to an ion serialized data file."
 )
 @Plugin(
+    examples = {
+        @Example(
+            full = true,
+            title = "Convert a json file to ion format.",
+            code = """     
+id: json_to_ion
+namespace: dev
+
+tasks:
+  - id: http_download
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/json/products.json
+
+  - id: to_ion
+    type: io.kestra.plugin.serdes.json.JsonToIon
+    from: "{{ outputs.http_download.uri }}"
+"""
+        )
+    },
     aliases = "io.kestra.plugin.serdes.json.JsonReader"
 )
 public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {

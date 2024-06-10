@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -42,6 +44,29 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     title = "Read an ion serialized data file and write it to a new line delimited json file."
 )
 @Plugin(
+    examples = {
+    @Example(
+        full = true,
+        title = "Download a csv file, convert it into ion data, and write it in json format.",
+        code = """     
+id: ion_to_json
+namespace: dev
+
+tasks:
+  - id: http_download
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
+
+  - id: convert
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.http_download.uri }}"
+
+  - id: to_json
+    type: io.kestra.plugin.serdes.json.IonToJson
+    from: "{{ outputs.convert.uri }}"
+"""
+        )
+    },
     aliases = "io.kestra.plugin.serdes.json.JsonWriter"
 )
 public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
