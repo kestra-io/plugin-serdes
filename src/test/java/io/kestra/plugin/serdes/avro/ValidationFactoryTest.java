@@ -1,7 +1,7 @@
 package io.kestra.plugin.serdes.avro;
 
 import io.kestra.core.models.validations.ModelValidator;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.kestra.core.junit.annotations.KestraTest;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +12,7 @@ import jakarta.inject.Inject;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
-@MicronautTest
+@KestraTest
 class ValidationFactoryTest {
     @Inject
     private ModelValidator modelValidator;

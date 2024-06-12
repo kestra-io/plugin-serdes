@@ -2,7 +2,7 @@ package io.kestra.plugin.serdes.avro;
 
 import com.google.common.collect.ImmutableMap;
 import io.kestra.plugin.serdes.avro.converter.AvroConverterConfig;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.kestra.core.junit.annotations.KestraTest;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.SchemaParseException;
@@ -31,7 +31,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@MicronautTest
+@KestraTest
 public class AvroConverterTest {
     @Inject
     RunContextFactory runContextFactory;
