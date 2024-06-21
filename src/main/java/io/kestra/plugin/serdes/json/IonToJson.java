@@ -104,7 +104,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
     @Override
     public Output run(RunContext runContext) throws Exception {
         String suffix = this.newLine ? ".jsonl" : ".json";
-        File tempFile = runContext.tempFile(suffix).toFile();
+        File tempFile = runContext.workingDir().createTempFile(suffix).toFile();
         URI from = new URI(runContext.render(this.from));
 
         try (

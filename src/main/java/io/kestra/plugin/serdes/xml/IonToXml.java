@@ -111,7 +111,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
 
     @Override
     public IonToXml.Output run(RunContext runContext) throws Exception {
-        File tempFile = runContext.tempFile(".xml").toFile();
+        File tempFile = runContext.workingDir().createTempFile(".xml").toFile();
         URI from = new URI(runContext.render(this.from));
 
         try (

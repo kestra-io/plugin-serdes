@@ -135,7 +135,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
     @Override
     public Output run(RunContext runContext) throws Exception {
         // temp file, we create multiple useless tree to avoid incompatibility with EE javaSecurity
-        java.nio.file.Path tempDir = runContext.tempDir().resolve(IdUtils.create());
+        java.nio.file.Path tempDir = runContext.workingDir().path().resolve(IdUtils.create());
         tempDir.toFile().mkdirs();
         File tempFile = Files.createTempFile(tempDir, "", ".parquet").toFile();
 

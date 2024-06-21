@@ -109,7 +109,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         URI from = new URI(runContext.render(this.from));
 
         // temp file
-        File tempFile = runContext.tempFile(".ion").toFile();
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         // configuration
         AtomicInteger skipped = new AtomicInteger();

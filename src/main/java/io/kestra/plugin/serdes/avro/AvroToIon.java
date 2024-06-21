@@ -70,7 +70,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         URI from = new URI(runContext.render(this.from));
 
         // New ion file
-        File tempFile = runContext.tempFile(".ion").toFile();
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
         try(
             InputStream in = runContext.storage().getFile(from);

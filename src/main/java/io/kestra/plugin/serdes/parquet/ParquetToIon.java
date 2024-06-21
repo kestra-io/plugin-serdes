@@ -81,10 +81,10 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
         URI from = new URI(runContext.render(this.from));
 
         // New ion file
-        File tempFile = runContext.tempFile(".ion").toFile();
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         // Parquet file
-        File parquetFile = runContext.tempFile(".parquet").toFile();
+        File parquetFile = runContext.workingDir().createTempFile(".parquet").toFile();
         try (OutputStream outputStream = new FileOutputStream(parquetFile)) {
             IOUtils.copyLarge(runContext.storage().getFile(from), outputStream);
         }

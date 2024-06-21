@@ -92,7 +92,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         URI from = new URI(runContext.render(this.from));
 
         // temp file
-        File tempFile = runContext.tempFile(".ion").toFile();
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         try (
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset));

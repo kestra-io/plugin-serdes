@@ -118,7 +118,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         if (this.from instanceof String fromStr) {
             this.init(runContext);
             try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
-                File tempFile = runContext.tempFile(".xlsx").toFile();
+                File tempFile = runContext.workingDir().createTempFile(".xlsx").toFile();
 
                 lineCount = writeQuery(runContext, sheetsTitle, runContext.render(fromStr), tempFile, workbook);
 
@@ -129,7 +129,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             }
         } else if (from instanceof Map<?,?> fromMap) {
             try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
-                File tempFile = runContext.tempFile(".xlsx").toFile();
+                File tempFile = runContext.workingDir().createTempFile(".xlsx").toFile();
 
                 lineCount = runContext.renderMap((Map<String, String>) fromMap).entrySet()
 	                .stream()

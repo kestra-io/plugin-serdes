@@ -259,7 +259,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     }
 
     private File store(RunContext runContext, Collection<Object> values) throws IOException {
-        File tempFile = runContext.tempFile(".ion").toFile();
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
         try (OutputStream output = new FileOutputStream(tempFile)) {
             values.forEach(throwConsumer(row -> FileSerde.write(output, row)));
         }

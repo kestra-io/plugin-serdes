@@ -100,7 +100,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @Override
     public Output run(RunContext runContext) throws Exception {
         // temp file
-        File tempFile = runContext.tempFile(".avro").toFile();
+        File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
         BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
 
         // avro writer

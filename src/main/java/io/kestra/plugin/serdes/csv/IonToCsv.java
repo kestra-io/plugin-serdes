@@ -120,7 +120,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Override
     public Output run(RunContext runContext) throws Exception {
         // temp file
-        File tempFile = runContext.tempFile(".csv").toFile();
+        File tempFile = runContext.workingDir().createTempFile(".csv").toFile();
 
         // reader
         URI from = new URI(runContext.render(this.from));
