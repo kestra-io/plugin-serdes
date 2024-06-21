@@ -35,33 +35,17 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add("-parameters")
 }
 
-// fix most of Jackson deps as we have issue with versions coming from the Micronaut BOM
-configurations.configureEach {
-    resolutionStrategy {
-        force("com.fasterxml.jackson:jackson-bom:" + jacksonVersion)
-        force("com.fasterxml.jackson.core:jackson-bom:" + jacksonVersion)
-        force("com.fasterxml.jackson.core:jackson-core:" + jacksonVersion)
-        force("com.fasterxml.jackson.core:jackson-databind:" + jacksonVersion)
-        force("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:" + jacksonVersion)
-        force("com.fasterxml.jackson.module:jackson-module-parameter-names:" + jacksonVersion)
-        force("com.fasterxml.jackson.datatype:jackson-datatype-guava:" + jacksonVersion)
-        force("com.fasterxml.jackson.core:jackson-annotations:" + jacksonVersion)
-        force("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:" + jacksonVersion)
-        force("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:" + jacksonVersion)
-        force("com.fasterxml.jackson.dataformat:jackson-dataformat-ion:" + jacksonVersion)
-        force("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:" + jacksonVersion)
-        force("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:" + jacksonVersion)
-        force("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:" + jacksonVersion)
-    }
-}
-
 dependencies {
+    // Platform
+    annotationProcessor enforcedPlatform("io.kestra:platform:$kestraVersion")
+    implementation enforcedPlatform("io.kestra:platform:$kestraVersion")
+    api enforcedPlatform("io.kestra:platform:$kestraVersion")
+
     // lombok
-    annotationProcessor "org.projectlombok:lombok:$lombokVersion"
-    compileOnly "org.projectlombok:lombok:$lombokVersion"
+    annotationProcessor "org.projectlombok:lombok"
+    compileOnly "org.projectlombok:lombok"
 
     // Micronaut
-    compileOnly platform("io.micronaut.platform:micronaut-platform:$micronautVersion")
     compileOnly "io.micronaut.reactor:micronaut-reactor"
 
     // Kestra
@@ -69,8 +53,8 @@ dependencies {
     annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
 
     // Logs
-    compileOnly 'org.slf4j:slf4j-api:2.0.13'
-    compileOnly 'ch.qos.logback:logback-classic:1.5.6'
+    compileOnly 'org.slf4j:slf4j-api'
+    compileOnly 'ch.qos.logback:logback-classic'
 
     api 'de.siegmar:fastcsv:2.2.2'
     api 'org.apache.avro:avro:1.11.3'
@@ -103,16 +87,17 @@ testlogger {
 }
 
 dependencies {
+    // Platform
+    testAnnotationProcessor enforcedPlatform("io.kestra:platform:$kestraVersion")
+    testImplementation enforcedPlatform("io.kestra:platform:$kestraVersion")
+
     // lombok
-    testAnnotationProcessor "org.projectlombok:lombok:" + lombokVersion
-    testCompileOnly 'org.projectlombok:lombok:' + lombokVersion
+    testAnnotationProcessor "org.projectlombok:lombok"
+    testCompileOnly 'org.projectlombok:lombok'
 
     // micronaut
-    testAnnotationProcessor platform("io.micronaut.platform:micronaut-platform:$micronautVersion")
     testAnnotationProcessor "io.micronaut:micronaut-inject-java"
     testAnnotationProcessor "io.micronaut.validation:micronaut-validation-processor"
-
-    testImplementation platform("io.micronaut.platform:micronaut-platform:$micronautVersion")
     testImplementation "io.micronaut:micronaut-inject"
     testImplementation "io.micronaut.test:micronaut-test-junit5"
     testImplementation "io.micronaut.validation:micronaut-validation"
@@ -125,13 +110,13 @@ dependencies {
     testImplementation group: "io.kestra", name: "storage-local", version: kestraVersion
 
     testImplementation "org.junit.jupiter:junit-jupiter-engine"
-    testImplementation "org.hamcrest:hamcrest:2.2"
-    testImplementation "org.hamcrest:hamcrest-library:2.2"
+    testImplementation "org.hamcrest:hamcrest"
+    testImplementation "org.hamcrest:hamcrest-library"
     testImplementation "bad.robot:simple-excel:1.2"
 
     testImplementation "org.junit.jupiter:junit-jupiter-params"
 
-    testImplementation group: 'com.devskiller.friendly-id', name: 'friendly-id', version: '1.1.0'
+    testImplementation group: 'com.devskiller.friendly-id', name: 'friendly-id'
 }
 
 
@@ -139,7 +124,7 @@ dependencies {
  * Allure Reports
  **********************************************************************************************************************/
 dependencies {
-    testImplementation platform("io.qameta.allure:allure-bom:2.27.0")
+    testImplementation enforcedPlatform("io.kestra:platform:$kestraVersion")
     testImplementation "io.qameta.allure:allure-junit5"
 }
 
@@ -181,6 +166,11 @@ nexusPublishing {
             snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
         }
     }
+}
+
+tasks.withType(GenerateModuleMetadata).configureEach {
+    // Suppression this validation error as we want to enforce the Kestra platform
+    suppressedValidationErrors.add('enforced-platform')
 }
 
 jar {
