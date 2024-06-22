@@ -45,7 +45,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
             title = "Convert an Excel file to the Ion format.",
             code = """     
 id: excel_to_ion
-namespace: dev
+namespace: company.team
 
 tasks:
   - id: http_download

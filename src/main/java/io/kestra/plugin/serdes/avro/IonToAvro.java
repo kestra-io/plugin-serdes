@@ -33,7 +33,7 @@ import jakarta.validation.constraints.NotNull;
             title = "Convert a CSV file to the Avro format.",
             code = """     
 id: divvy_tripdata
-namespace: dev
+namespace: company.team
 
 variables:
   file_id: "{{ execution.startDate | dateAdd(-3, 'MONTHS') | date('yyyyMM') }}"

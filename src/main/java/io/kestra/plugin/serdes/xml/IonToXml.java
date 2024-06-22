@@ -48,7 +48,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
             title = "Read a CSV file, transform it and store the transformed data as an XML file.",
             code = """     
 id: ion_to_xml
-namespace: dev
+namespace: company.team
 
 tasks:
   - id: download_csv

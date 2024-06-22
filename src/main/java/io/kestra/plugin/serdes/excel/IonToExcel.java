@@ -51,7 +51,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
             title = "Download a CSV file and convert it to the Excel file format.",
             code = """     
 id: ion_to_excel
-namespace: dev
+namespace: company.team
 
 tasks:
   - id: http_download
