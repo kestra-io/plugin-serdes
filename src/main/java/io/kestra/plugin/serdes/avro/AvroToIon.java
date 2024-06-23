@@ -42,7 +42,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
             title = "Convert an Avro file to the Amazon Ion format.",
             code = """     
 id: avro_to_ion
-namespace: dev
+namespace: company.team
 
 tasks:
   - id: http_download

@@ -50,7 +50,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         title = "Download a CSV file and convert it to a JSON format.",
         code = """     
 id: ion_to_json
-namespace: dev
+namespace: company.team
 
 tasks:
   - id: http_download

@@ -42,7 +42,7 @@ import reactor.core.publisher.Mono;
             title = "Download a CSV file, transform it in SQL and store the transformed data as a CSV file.",
             code = """     
 id: ion_to_csv
-namespace: dev
+namespace: company.team
 
 tasks:
   - id: download_csv

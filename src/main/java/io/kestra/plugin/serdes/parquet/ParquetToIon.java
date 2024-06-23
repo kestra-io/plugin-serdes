@@ -49,7 +49,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
             title = "Convert a parquet file to the Amazon Ion format.",
             code = """     
 id: parquet_to_ion
-namespace: dev
+namespace: company.team
 
 tasks:
   - id: http_download
