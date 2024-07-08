@@ -38,7 +38,26 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read a json file and write it to an ion serialized data file."
+    title = "Read a json file and write it to an ion serialized data file.",
+    description = """
+    Please note that we support JSONL format only, i.e. one JSON per line.
+
+    A sample JSON file content would be:
+    ```
+    {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
+    {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
+    {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
+    ```
+
+    We do NOT support an array of JSON objects, i.e. the JSON file with the following content is not supported:
+    ```
+    [
+        {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
+        {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
+        {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
+    ]
+    ```
+    """
 )
 @Plugin(
     examples = {
