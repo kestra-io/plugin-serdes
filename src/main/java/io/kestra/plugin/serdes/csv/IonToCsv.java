@@ -1,7 +1,7 @@
 package io.kestra.plugin.serdes.csv;
 
 import de.siegmar.fastcsv.writer.LineDelimiter;
-import de.siegmar.fastcsv.writer.QuoteStrategy;
+import de.siegmar.fastcsv.writer.QuoteStrategies;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.plugin.serdes.AbstractTextWriter;
@@ -148,21 +148,21 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
                                 throw new IllegalArgumentException("Invalid data of type List with header");
                             }
 
-                            var rows = casted.stream().map(field -> convert(field)).toList();
-                            csvWriter.writeRow(rows);
+                            var record = casted.stream().map(field -> convert(field)).toList();
+                            csvWriter.writeRecord(record);
                         } else if (row instanceof Map) {
                             Map<String, Object> casted = (Map<String, Object>) row;
 
                             if (!first) {
                                 this.first = true;
                                 if (header) {
-                                    var rows = casted.keySet().stream().map(field -> convert(field)).toList();
-                                    csvWriter.writeRow(rows);
+                                    var record = casted.keySet().stream().map(field -> convert(field)).toList();
+                                    csvWriter.writeRecord(record);
                                 }
                             }
 
-                            var rows = casted.values().stream().map(field -> convert(field)).toList();
-                            csvWriter.writeRow(rows);
+                            var record = casted.values().stream().map(field -> convert(field)).toList();
+                            csvWriter.writeRecord(record);
                         }
                     }
                 });
@@ -194,7 +194,9 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         builder.quoteCharacter(this.textDelimiter);
         builder.fieldSeparator(this.fieldSeparator);
         builder.lineDelimiter(LineDelimiter.of(this.lineDelimiter));
-        builder.quoteStrategy(this.alwaysDelimitText ? QuoteStrategy.ALWAYS : QuoteStrategy.REQUIRED);
+        if (this.alwaysDelimitText) {
+            builder.quoteStrategy(QuoteStrategies.ALWAYS);
+        }
 
         return builder.build(writer);
     }

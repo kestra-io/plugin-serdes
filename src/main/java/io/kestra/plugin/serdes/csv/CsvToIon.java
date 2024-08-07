@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.csv;
 
+import de.siegmar.fastcsv.reader.CsvRecord;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -115,16 +116,16 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         AtomicInteger skipped = new AtomicInteger();
 
         try (
-            de.siegmar.fastcsv.reader.CsvReader csvReader = this.csvReader(new InputStreamReader(runContext.storage().getFile(from), charset));
+            de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader = this.csvReader(new InputStreamReader(runContext.storage().getFile(from), charset));
             OutputStream output = new FileOutputStream(tempFile);
         ) {
             Map<Integer, String> headers = new TreeMap<>();
             Flux<Object> flowable = Flux
                 .fromIterable(csvReader)
-                .filter(csvRow -> {
-                    if (header && csvRow.getOriginalLineNumber() == 1) {
-                        for (int i = 0; i < csvRow.getFieldCount(); i++) {
-                            headers.put(i, csvRow.getField(i));
+                .filter(csvRecord -> {
+                    if (header && csvRecord.getStartingLineNumber() == 1) {
+                        for (int i = 0; i < csvRecord.getFieldCount(); i++) {
+                            headers.put(i, csvRecord.getField(i));
                         }
                         return false;
                     }
@@ -170,7 +171,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         private URI uri;
     }
 
-    private de.siegmar.fastcsv.reader.CsvReader csvReader(InputStreamReader inputStreamReader) {
+    private de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader(InputStreamReader inputStreamReader) {
         var builder = de.siegmar.fastcsv.reader.CsvReader.builder();
 
         if (this.textDelimiter != null) {
@@ -182,13 +183,13 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         }
 
         if (this.skipEmptyRows != null) {
-            builder.skipEmptyRows(skipEmptyRows);
+            builder.skipEmptyLines(skipEmptyRows);
         }
 
         if (this.errorOnDifferentFieldCount != null) {
-            builder.errorOnDifferentFieldCount(errorOnDifferentFieldCount);
+            builder.ignoreDifferentFieldCount(!errorOnDifferentFieldCount);
         }
 
-        return builder.build(inputStreamReader);
+        return builder.ofCsvRecord(inputStreamReader);
     }
 }
