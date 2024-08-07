@@ -123,7 +123,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         try (
             de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader = this.csvReader(new InputStreamReader(runContext.storage().getFile(from), charset));
-            OutputStream output = new FileOutputStream(tempFile);
+            Writer output = new FileWriter(tempFile);
         ) {
             Map<Integer, String> headers = new TreeMap<>();
             Flux<Object> flowable = Flux
