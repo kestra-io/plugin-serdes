@@ -74,6 +74,10 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
 
     static {
         ParquetTools.handleLogger();
+
+        // We initialize snappy in a static initializer block, so it is done when the plugin is loaded by the plugin registry,
+        // and not at when it is executed by the Worker to prevent issues with Java Security that prevent writing on /tmp.
+        ParquetTools.initSnappy();
     }
 
     public Output run(RunContext runContext) throws Exception {
