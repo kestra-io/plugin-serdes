@@ -25,6 +25,7 @@ import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -153,11 +154,11 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         Long lineCount;
 
         try (
-            BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(fromUri)));
+            Reader reader = new InputStreamReader(runContext.storage().getFile(fromUri), Charset.forName(this.charset));
             FileOutputStream outputStream = new FileOutputStream(tempFile)
         ) {
             SXSSFSheet sheet = workbook.createSheet(title);
-            Flux<Object> flowable = Flux.create(FileSerde.reader(reader), FluxSink.OverflowStrategy.BUFFER)
+            Flux<Object> flowable = FileSerde.readAll(reader)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
                     private int rowAt = 0;

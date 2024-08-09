@@ -23,23 +23,21 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class AvroConverter {
-    private static GenericData GENERIC_DATA;
+    private static final GenericData GENERIC_DATA = new GenericData();
+    static {
+        GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+        GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
+        GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.DateConversion());
+        GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimeMicrosConversion());
+        GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimeMillisConversion());
+        GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMicrosConversion());
+        GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
+        GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.LocalTimestampMicrosConversion());
+        GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.LocalTimestampMillisConversion());
+    }
 
     public static GenericData genericData() {
-        if (AvroConverter.GENERIC_DATA == null) {
-            AvroConverter.GENERIC_DATA = new GenericData();
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.DateConversion());
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimeMicrosConversion());
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimeMillisConversion());
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMicrosConversion());
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.LocalTimestampMicrosConversion());
-            AvroConverter.GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.LocalTimestampMillisConversion());
-        }
-
-        return AvroConverter.GENERIC_DATA;
+        return GENERIC_DATA;
     }
 
     private final AbstractAvroConverter abstractAvroConverter;

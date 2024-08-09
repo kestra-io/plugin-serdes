@@ -15,6 +15,7 @@ import io.kestra.core.serializers.FileSerde;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,8 +23,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import static io.kestra.core.utils.Rethrow.throwConsumer;
 
 @SuperBuilder
 @ToString
@@ -66,42 +65,49 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Schema(
         title = "Specifies if the first line should be the header"
     )
+    @PluginProperty
     private final Boolean header = true;
 
     @Builder.Default
     @Schema(
         title = "The field separator character"
     )
+    @PluginProperty
     private final Character fieldSeparator = ',';
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
+    @PluginProperty
     private final Character textDelimiter = '"';
 
     @Builder.Default
     @Schema(
         title = "Specifies if empty rows should be skipped"
     )
+    @PluginProperty
     private final Boolean skipEmptyRows = false;
 
     @Builder.Default
     @Schema(
         title = "Specifies if an exception should be thrown, if CSV data contains different field count"
     )
+    @PluginProperty
     private final Boolean errorOnDifferentFieldCount = false;
 
     @Builder.Default
     @Schema(
         title = "Number of lines to skip at the start of the file"
     )
+    @PluginProperty
     private final Integer skipRows = 0;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty
     private final String charset = StandardCharsets.UTF_8.name();
 
     @Override
@@ -117,7 +123,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         try (
             de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader = this.csvReader(new InputStreamReader(runContext.storage().getFile(from), charset));
-            OutputStream output = new FileOutputStream(tempFile);
+            Writer output = new FileWriter(tempFile);
         ) {
             Map<Integer, String> headers = new TreeMap<>();
             Flux<Object> flowable = Flux
@@ -145,11 +151,11 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         return fields;
                     }
                     return r.getFields();
-                })
-                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
+                });
+
+            Mono<Long> count = FileSerde.writeAll(output, flowable);
 
             // metrics & finalize
-            Mono<Long> count = flowable.count();
             Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 

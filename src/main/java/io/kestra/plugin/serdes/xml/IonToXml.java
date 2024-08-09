@@ -116,7 +116,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
 
         try (
             BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
+            Reader inputStream = new InputStreamReader(runContext.storage().getFile(from), Charset.forName(charset))
         ) {
             XmlMapper mapper = new XmlMapper();
 
@@ -133,15 +133,11 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
                 .withRootName(runContext.render(this.rootName))
                 .withFeatures(ToXmlGenerator.Feature.WRITE_XML_DECLARATION);
 
-            AtomicLong lineCount = new AtomicLong();
-
-            List<Object> list = new ArrayList<>();
-            FileSerde.reader(inputStream, throwConsumer(e -> {
-                list.add(e);
-                lineCount.incrementAndGet();
-            }));
-            outfile.write(objectWriter.writeValueAsString(list));
-            runContext.metric(Counter.of("records", lineCount.get()));
+            List<Object> list = FileSerde.readAll(inputStream).collectList().block();
+            if (list != null) {
+                outfile.write(objectWriter.writeValueAsString(list));
+                runContext.metric(Counter.of("records", list.size()));
+            }
 
             outfile.flush();
         }

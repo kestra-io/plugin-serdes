@@ -2,6 +2,8 @@ package io.kestra.plugin.serdes.json;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -70,6 +72,7 @@ tasks:
     aliases = "io.kestra.plugin.serdes.json.JsonWriter"
 )
 public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
+    private static final int BUFFER_SIZE = 32 * 1024;
     @NotNull
     @Schema(
         title = "Source file URI"
@@ -108,8 +111,8 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         URI from = new URI(runContext.render(this.from));
 
         try (
-            BufferedWriter outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)));
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
+            OutputStream outfile = new FileOutputStream(tempFile);
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), BUFFER_SIZE);
         ) {
             ObjectMapper mapper = new ObjectMapper()
                 .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
@@ -117,11 +120,15 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                 .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId))))
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module());
+            SequenceWriter objectWriter = mapper.writerFor(Object.class).writeValues(outfile);
 
             if (this.newLine) {
                 Flux<Object> flowable = Flux
                     .create(FileSerde.reader(inputStream), FluxSink.OverflowStrategy.BUFFER)
-                    .doOnNext(throwConsumer(o -> outfile.write(mapper.writeValueAsString(o) + "\n")));
+                    .doOnNext(throwConsumer(o -> {
+                        objectWriter.write(o);
+                        outfile.write("\n".getBytes());
+                    }));
 
                 // metrics & finalize
                 Mono<Long> count = flowable.count();
@@ -136,7 +143,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                     list.add(e);
                     lineCount.incrementAndGet();
                 }));
-                outfile.write(mapper.writeValueAsString(list));
+                objectWriter.write(list);
                 runContext.metric(Counter.of("records", lineCount.get()));
             }
 

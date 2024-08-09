@@ -11,6 +11,9 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 
 import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.function.Function;
@@ -107,7 +110,7 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Whether to consider a field present in the data but not declared in the schema as an error",
         description = "Default value is false"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     protected Boolean strictSchema = Boolean.FALSE;
 
     @Builder.Default
@@ -116,7 +119,7 @@ public abstract class AbstractAvroConverter extends Task {
         description = "If true, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`." +
             "If false, we will infer bool & null only on field declared on schema as `null` and `bool`."
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     protected Boolean inferAllFields = false;
 
     @Builder.Default
@@ -124,14 +127,15 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Timezone to use when no timezone can be parsed on the source.",
         description = "If null, the timezone will be `UTC` Default value is system timezone"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     protected final String timeZoneId = ZoneId.systemDefault().toString();
 
 
-    protected <E extends Exception> Long convert(BufferedReader inputStream, Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer) {
-        Flux<GenericData.Record> flowable = Flux
-            .create(FileSerde.reader(inputStream), FluxSink.OverflowStrategy.BUFFER)
-            .map(this.convertToAvro(schema))
+    protected <E extends Exception> Long convert(Reader inputStream, Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer) throws IOException {
+        AvroConverter converter = new AvroConverter(this);
+
+        Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
+            .map(this.convertToAvro(schema, converter))
             .doOnNext(datum -> {
                 try {
                     consumer.accept(datum);
@@ -156,9 +160,7 @@ public abstract class AbstractAvroConverter extends Task {
     }
 
     @SuppressWarnings("unchecked")
-    protected Function<Object, GenericData.Record> convertToAvro(Schema schema) {
-        AvroConverter converter = this.converter();
-
+    protected Function<Object, GenericData.Record> convertToAvro(Schema schema, AvroConverter converter) {
         return row -> {
             try {
                 if (row instanceof List) {
@@ -180,9 +182,5 @@ public abstract class AbstractAvroConverter extends Task {
                 throw new RuntimeException(avroException);
             }
         };
-    }
-
-    protected AvroConverter converter() {
-        return new AvroConverter(this);
     }
 }

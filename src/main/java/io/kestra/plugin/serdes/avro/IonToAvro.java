@@ -90,6 +90,8 @@ tasks:
     aliases = "io.kestra.plugin.serdes.avro.AvroWriter"
 )
 public class IonToAvro extends AbstractAvroConverter implements RunnableTask<IonToAvro.Output> {
+    private static final int BUFFER_SIZE = 32 * 1024;
+
     @NotNull
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Source file URI"
@@ -101,7 +103,6 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     public Output run(RunContext runContext) throws Exception {
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
-        BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
 
         // avro writer
         Schema.Parser parser = new Schema.Parser();
@@ -113,7 +114,8 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         URI from = new URI(runContext.render(this.from));
 
         try (
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)));
+            Reader inputStream = new InputStreamReader(runContext.storage().getFile(from));
+            BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), BUFFER_SIZE);
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
