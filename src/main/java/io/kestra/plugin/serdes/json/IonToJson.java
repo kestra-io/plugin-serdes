@@ -2,7 +2,6 @@ package io.kestra.plugin.serdes.json;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
@@ -22,12 +21,10 @@ import lombok.experimental.SuperBuilder;
 
 import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -122,8 +119,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             SequenceWriter objectWriter = mapper.writerFor(Object.class).writeValues(outfile);
 
             if (this.newLine) {
-                Flux<Object> flowable = Flux
-                    .create(FileSerde.reader(inputStream), FluxSink.OverflowStrategy.BUFFER)
+                Flux<Object> flowable = FileSerde.readAll(inputStream)
                     .doOnNext(throwConsumer(o -> {
                         objectWriter.write(o);
                         outfile.write("\n".getBytes());
