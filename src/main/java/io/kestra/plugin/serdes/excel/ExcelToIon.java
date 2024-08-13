@@ -15,17 +15,16 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
+import reactor.core.publisher.Flux;
 
 import java.io.*;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
 @SuperBuilder
@@ -258,8 +257,9 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
     private File store(RunContext runContext, Collection<Object> values) throws IOException {
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
-        try (OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)) {
-            values.forEach(throwConsumer(row -> FileSerde.write(output, row)));
+        try (var output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)) {
+            var flux = Flux.fromIterable(values);
+            FileSerde.writeAll(output, flux).block();
         }
         return tempFile;
     }
