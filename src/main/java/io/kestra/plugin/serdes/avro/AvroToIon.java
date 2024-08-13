@@ -74,16 +74,16 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
         try(
             InputStream in = runContext.storage().getFile(from);
-            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
+            var output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             DataFileStream<GenericRecord> dataFileStream = new DataFileStream<>(in, datumReader);
 
             Flux<Map<String, Object>> flowable = Flux
                 .create(this.nextRow(dataFileStream), FluxSink.OverflowStrategy.BUFFER)
-                .map(AvroDeserializer::recordDeserializer)
-                .doOnNext(throwConsumer(row -> FileSerde.write(output, row)));
+                .map(AvroDeserializer::recordDeserializer);
 
-            Mono<Long> count = flowable.count();
+            Mono<Long> count = FileSerde.writeAll(output, flowable);
+
             Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
