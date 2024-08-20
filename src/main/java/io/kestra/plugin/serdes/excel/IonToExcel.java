@@ -66,8 +66,39 @@ tasks:
     type: io.kestra.plugin.serdes.excel.IonToExcel
     from: "{{ outputs.convert.uri }}"
 """
-        )
-    }
+        ),
+	@Example(
+	    full = true,
+	    title = "Download CSV files and convert them into an Excel file with dedicated sheets.",
+	    code = """
+id: excel
+namespace: company.team
+
+tasks:
+  - id: dataset1
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
+
+  - id: dataset2
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/fruit.csv
+
+  - id: convert1
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.dataset1.uri }}"
+
+  - id: convert2
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.dataset2.uri }}"
+
+  - id: write
+    type: io.kestra.plugin.serdes.excel.IonToExcel
+    from: 
+      Sheet_1: "{{ outputs.convert1.uri }}"
+      Sheet_2: "{{ outputs.convert2.uri }}"
+"""
+	)
+}
 )
 public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonToExcel.Output> {
 
