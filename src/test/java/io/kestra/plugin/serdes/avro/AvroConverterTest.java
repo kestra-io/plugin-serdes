@@ -70,7 +70,7 @@ public class AvroConverterTest {
         IonToAvro.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            IonToAvroTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
+            IonToAvroTest.avroSize(this.storageInterface.get(null, null, avroRunOutput.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                     .getResource("csv/full.avro"))
@@ -105,7 +105,7 @@ public class AvroConverterTest {
         IonToAvro.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            IonToAvroTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
+            IonToAvroTest.avroSize(this.storageInterface.get(null, null, avroRunOutput.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                     .getResource("csv/full.avro"))
@@ -335,7 +335,7 @@ public class AvroConverterTest {
         IonToAvro.Output avroRunOutput = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            IonToAvroTest.avroSize(this.storageInterface.get(null, avroRunOutput.getUri())),
+            IonToAvroTest.avroSize(this.storageInterface.get(null, null, avroRunOutput.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                     .getResource("csv/portfolio_aliases.avro"))
@@ -344,7 +344,7 @@ public class AvroConverterTest {
         );
 
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
-        DataFileStream<GenericRecord> dataFileReader = new DataFileStream<>(this.storageInterface.get(null, avroRunOutput.getUri()), datumReader);
+        DataFileStream<GenericRecord> dataFileReader = new DataFileStream<>(this.storageInterface.get(null, null, avroRunOutput.getUri()), datumReader);
         dataFileReader.forEach(genericRecord -> {
             GenericRecord scenario = ((GenericRecord) ((GenericRecord) genericRecord.get("it")).get("selectedScenario"));
             assertThat(scenario.get("nbJH_DTP_Sales"), notNullValue());

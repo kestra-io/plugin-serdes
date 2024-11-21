@@ -64,7 +64,7 @@ class IonToCsvTest {
                 )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
-            URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+            URI uri = storageInterface.put(null, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToCsvTest.class.getSimpleName())
@@ -76,7 +76,7 @@ class IonToCsvTest {
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri())));
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri())));
 
             assertThat(out, containsString("\"string\";\"int\""));
             assertThat(out, containsString("\"3.2\";\"" + ZonedDateTime.now().getYear()));
@@ -109,7 +109,7 @@ class IonToCsvTest {
                 )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
-            URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+            URI uri = storageInterface.put(null, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToCsvTest.class.getSimpleName())
@@ -121,7 +121,7 @@ class IonToCsvTest {
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, writerRunOutput.getUri())));
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri())));
 
             assertThat(out, containsString("\"3.2\";\"" + ZonedDateTime.now().getYear()));
             assertThat(out, containsString("\"3.4\";\"" + ZonedDateTime.now().getYear()));
@@ -150,7 +150,7 @@ class IonToCsvTest {
                 )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
-            URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+            URI uri = storageInterface.put(null, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToAvro.class.getSimpleName())
@@ -164,7 +164,7 @@ class IonToCsvTest {
             IonToCsv.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             assertThat(
-                IOUtils.toString(this.storageInterface.get(null, run.getUri()), Charsets.UTF_8),
+                IOUtils.toString(this.storageInterface.get(null, null, run.getUri()), Charsets.UTF_8),
                 is("\"string\"," +
                     "\"2\"," +
                     "\"3.200000047683716\"," +
