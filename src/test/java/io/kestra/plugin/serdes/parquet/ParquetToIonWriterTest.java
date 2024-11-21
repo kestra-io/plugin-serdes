@@ -53,7 +53,7 @@ class ParquetToIonWriterTest {
                 )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
-            URI uri = storageInterface.put(null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+            URI uri = storageInterface.put(null, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
 
             IonToParquet writer = IonToParquet.builder()
                 .id(IonToParquet.class.getSimpleName())
@@ -77,7 +77,7 @@ class ParquetToIonWriterTest {
             ParquetToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
             List<Map<String, Object>> result = new ArrayList<>();
-            FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, readerOutput.getUri()))), r -> result.add((Map<String, Object>) r));
+            FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(null, null, readerOutput.getUri()))), r -> result.add((Map<String, Object>) r));
 
             assertThat(result.size(), is(1));
             assertThat(result.get(0).get("String"), is("string"));
