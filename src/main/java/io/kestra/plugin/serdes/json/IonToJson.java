@@ -11,6 +11,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
@@ -47,7 +48,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     @Example(
         full = true,
         title = "Download a CSV file and convert it to a JSON format.",
-        code = """     
+        code = """
 id: ion_to_json
 namespace: company.team
 
@@ -73,16 +74,14 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    @PluginProperty(dynamic = true)
-    private final String charset = StandardCharsets.UTF_8.name();
+    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
 
     @Builder.Default
     @Schema(
@@ -90,35 +89,34 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         description = "Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
-    @PluginProperty
-    private final boolean newLine = true;
+    private final Property<Boolean> newLine = Property.of(true);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
-    @PluginProperty(dynamic = true)
-    private final String timeZoneId = ZoneId.systemDefault().toString();
+    private final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        String suffix = this.newLine ? ".jsonl" : ".json";
+        String suffix = runContext.render(this.newLine).as(Boolean.class).orElseThrow() ? ".jsonl" : ".json";
         File tempFile = runContext.workingDir().createTempFile(suffix).toFile();
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
+        var renderedCharset = runContext.render(this.charset).as(String.class).orElseThrow();
         try (
             OutputStream outfile = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE);
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), renderedCharset), FileSerde.BUFFER_SIZE);
         ) {
             ObjectMapper mapper = new ObjectMapper()
                 .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
                 .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-                .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId))))
+                .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow())))
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module());
             SequenceWriter objectWriter = mapper.writerFor(Object.class).writeValues(outfile);
 
-            if (this.newLine) {
+            if (runContext.render(this.newLine).as(Boolean.class).orElseThrow()) {
                 Flux<Object> flowable = FileSerde.readAll(inputStream)
                     .doOnNext(throwConsumer(o -> {
                         objectWriter.write(o);

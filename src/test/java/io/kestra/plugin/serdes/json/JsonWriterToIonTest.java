@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.json;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
@@ -49,8 +50,8 @@ class JsonWriterToIonTest {
         JsonToIon reader = JsonToIon.builder()
             .id(JsonToIon.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(source.toString())
-            .newLine(jsonNl)
+            .from(Property.of(source.toString()))
+            .newLine(Property.of(jsonNl))
             .build();
 
         return reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
@@ -60,8 +61,8 @@ class JsonWriterToIonTest {
         IonToJson writer = IonToJson.builder()
             .id(IonToJson.class.getSimpleName())
             .type(IonToJson.class.getName())
-            .from(from.toString())
-            .newLine(jsonNl)
+            .from(Property.of(from.toString()))
+            .newLine(Property.of(jsonNl))
             .build();
 
         return writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
@@ -154,8 +155,8 @@ class JsonWriterToIonTest {
             IonToJson writer = IonToJson.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
-                .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
+                .from(Property.of(uri.toString()))
+                .timeZoneId(Property.of(ZoneId.of("Europe/Lisbon").toString()))
                 .build();
             IonToJson.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 

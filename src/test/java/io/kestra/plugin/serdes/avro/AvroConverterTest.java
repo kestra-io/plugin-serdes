@@ -90,7 +90,7 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(csv.toString())
+            .from(Property.of(csv.toString()))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -222,7 +222,7 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(csv.toString())
+            .from(Property.of(csv.toString()))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -254,7 +254,7 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(csv.toString())
+            .from(Property.of(csv.toString()))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -288,8 +288,8 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(csv.toString())
-            .newLine(Boolean.FALSE)
+            .from(Property.of(csv.toString()))
+            .newLine(Property.of(Boolean.FALSE))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -319,8 +319,8 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(csv.toString())
-            .newLine(Boolean.FALSE)
+            .from(Property.of(csv.toString()))
+            .newLine(Property.of(Boolean.FALSE))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
