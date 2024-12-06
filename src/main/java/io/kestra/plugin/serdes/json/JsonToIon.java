@@ -6,18 +6,22 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.net.URI;
@@ -26,11 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.TimeZone;
 import java.util.function.Consumer;
-
-import jakarta.validation.constraints.NotNull;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -42,43 +41,43 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Schema(
     title = "Read a JSON file and write it to an ION serialized data file.",
     description = """
-    Please note that we support JSONL format only, i.e. one JSON dictionary/map per line.
+        Please note that we support JSONL format only, i.e. one JSON dictionary/map per line.
 
-    Here is how a sample JSON file content might look like:
-    ```
-    {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
-    {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
-    {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
-    ```
-
-    We do NOT support an array of JSON objects. A JSON file in the following array format is not supported:
-    ```
-    [
+        Here is how a sample JSON file content might look like:
+        ```
         {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
         {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
         {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
-    ]
-    ```
-    """
+        ```
+
+        We do NOT support an array of JSON objects. A JSON file in the following array format is not supported:
+        ```
+        [
+            {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
+            {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
+            {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
+        ]
+        ```
+        """
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
             title = "Convert a JSON file to the Amazon Ion format.",
-            code = """     
-id: json_to_ion
-namespace: company.team
+            code = """
+                id: json_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/json/products.json
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/json/products.json
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.json.JsonToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.json.JsonToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.json.JsonReader"
@@ -96,40 +95,40 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    @PluginProperty
-    private final String charset = StandardCharsets.UTF_8.name();
+    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
 
     @Builder.Default
     @Schema(
         title = "Is the file is a json new line (JSON-NL)",
-        description ="Is the file is a json with new line separator\n" +
+        description = "Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
-    @PluginProperty
-    private final Boolean newLine = true;
+    private final Property<Boolean> newLine = Property.of(true);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
+        var renderedCharset = runContext.render(this.charset).as(String.class).orElseThrow();
+        var renderedNewLine = runContext.render(this.newLine).as(Boolean.class).orElseThrow();
+
         try (
-            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset), FileSerde.BUFFER_SIZE);
-            Writer writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)), FileSerde.BUFFER_SIZE)
+            BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), renderedCharset), FileSerde.BUFFER_SIZE);
+            Writer writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(renderedCharset)), FileSerde.BUFFER_SIZE)
         ) {
             Flux<Object> flowable = Flux
-                .create(this.nextRow(input), FluxSink.OverflowStrategy.BUFFER);
+                .create(this.nextRow(input, renderedNewLine), FluxSink.OverflowStrategy.BUFFER);
             Mono<Long> count = FileSerde.writeAll(writer, flowable);
 
             // metrics & finalize
@@ -152,7 +151,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         private final URI uri;
     }
 
-    private Consumer<FluxSink<Object>> nextRow(BufferedReader inputStream) throws IOException {
+    private Consumer<FluxSink<Object>> nextRow(BufferedReader inputStream, boolean newLine) throws IOException {
         ObjectReader objectReader = OBJECT_MAPPER.readerFor(Object.class);
 
         return throwConsumer(s -> {

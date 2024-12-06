@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.validations.DateFormat;
@@ -48,8 +49,7 @@ public abstract class AbstractTextWriter extends Task {
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
-    @PluginProperty(dynamic = true)
-    private final String timeZoneId = ZoneId.systemDefault().toString();
+    private final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
 
     @Getter(AccessLevel.NONE)
     private transient DateTimeFormatter dateFormatter;
@@ -67,7 +67,7 @@ public abstract class AbstractTextWriter extends Task {
         dateFormatter = DateTimeFormatter.ofPattern(runContext.render(this.dateFormat));
         timeFormatter = DateTimeFormatter.ofPattern(runContext.render(this.timeFormat));
         dateTimeFormatter = DateTimeFormatter.ofPattern(runContext.render(this.dateTimeFormat));
-        zoneId = ZoneId.of(runContext.render(this.timeZoneId));
+        zoneId = ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow());
     }
 
     protected String convert(Object value) {

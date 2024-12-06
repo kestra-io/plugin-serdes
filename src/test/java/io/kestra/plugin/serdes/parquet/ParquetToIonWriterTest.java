@@ -1,12 +1,13 @@
 package io.kestra.plugin.serdes.parquet;
 
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
@@ -58,12 +59,12 @@ class ParquetToIonWriterTest {
             IonToParquet writer = IonToParquet.builder()
                 .id(IonToParquet.class.getSimpleName())
                 .type(IonToParquet.class.getName())
-                .from(uri.toString())
+                .from(Property.of(uri.toString()))
                 .schema(IOUtils.toString(
                     Objects.requireNonNull(ParquetToIonWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
                     StandardCharsets.UTF_8
                 ))
-                .timeZoneId("UTC")
+                .timeZoneId(Property.of("UTC"))
                 .build();
 
             IonToParquet.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
@@ -71,7 +72,7 @@ class ParquetToIonWriterTest {
             ParquetToIon reader = ParquetToIon.builder()
                 .id(ParquetToIon.class.getSimpleName())
                 .type(ParquetToIon.class.getName())
-                .from(writerOutput.getUri().toString())
+                .from(Property.of(writerOutput.getUri().toString()))
                 .build();
 
             ParquetToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));

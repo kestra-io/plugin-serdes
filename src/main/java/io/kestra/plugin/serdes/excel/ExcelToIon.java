@@ -1,26 +1,29 @@
 package io.kestra.plugin.serdes.excel;
 
 import com.github.pjfanning.xlsx.StreamingReader;
-
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.ListUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.poi.ss.usermodel.*;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.PositiveOrZero;
 import reactor.core.publisher.Flux;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,19 +43,19 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
         @Example(
             full = true,
             title = "Convert an Excel file to the Ion format.",
-            code = """     
-id: excel_to_ion
-namespace: company.team
+            code = """
+                id: excel_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/excel/Products.xlsx
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/excel/Products.xlsx
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.excel.ExcelToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.excel.ExcelToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     }
 )
@@ -61,51 +64,44 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     @Schema(
         title = "The sheets title to be included"
     )
-    @PluginProperty
-    private List<String> sheetsTitle;
+    private Property<List<String>> sheetsTitle;
 
     @Schema(
         title = "The name of a supported character set"
     )
-    @PluginProperty
     @Builder.Default
-    private String charset = "UTF-8";
+    private Property<String> charset = Property.of("UTF-8");
 
     @Schema(
         title = "Determines how values should be rendered in the output",
         description = "Possible values: FORMATTED_VALUE, UNFORMATTED_VALUE, FORMULA"
     )
-    @PluginProperty
     @Builder.Default
-    private ValueRender valueRender = ValueRender.UNFORMATTED_VALUE;
+    private Property<ValueRender> valueRender = Property.of(ValueRender.UNFORMATTED_VALUE);
 
     @Schema(
         title = "How dates, times, and durations should be represented in the output",
         description = "Possible values: SERIAL_NUMBER, FORMATTED_STRING"
     )
     @Builder.Default
-    @PluginProperty
-    private DateTimeRender dateTimeRender = DateTimeRender.UNFORMATTED_VALUE;
+    private Property<DateTimeRender> dateTimeRender = Property.of(DateTimeRender.UNFORMATTED_VALUE);
 
     @Schema(
         title = "Whether the first row should be treated as the header"
     )
-    @PluginProperty
     @Builder.Default
-    private boolean header = true;
+    private Property<Boolean> header = Property.of(true);
 
     @Schema(
         title = "Specifies if empty rows should be skipped"
     )
-    @PluginProperty
     @Builder.Default
-    private boolean skipEmptyRows = false;
+    private Property<Boolean> skipEmptyRows = Property.of(false);
 
     @Schema(
         title = "Number of lines to skip at the start of the file. Useful if a table has a title and explanation in the first few rows"
@@ -117,14 +113,14 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-        try(Workbook workbook = StreamingReader.builder().rowCacheSize(1).open(runContext.storage().getFile(from))) {
+        try (Workbook workbook = StreamingReader.builder().rowCacheSize(1).open(runContext.storage().getFile(from))) {
 
             List<Sheet> sheets = new ArrayList<>();
             workbook.sheetIterator().forEachRemaining(sheets::add);
 
-            List<String> includedSheetsTitle = ListUtils.emptyOnNull(this.sheetsTitle)
+            List<String> includedSheetsTitle = ListUtils.emptyOnNull(runContext.render(this.sheetsTitle).asList(String.class))
                 .stream()
                 .map(throwFunction(runContext::render))
                 .toList();
@@ -140,6 +136,9 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
             AtomicInteger rowsCount = new AtomicInteger();
 
             AtomicInteger skipped = new AtomicInteger();
+            var renderedValueRender = runContext.render(this.valueRender).as(ValueRender.class).orElseThrow();
+            var renderedSkipEmptyRowsValue = runContext.render(this.skipEmptyRows).as(Boolean.class).orElseThrow();
+            var renderedDateTimeRender = runContext.render(this.dateTimeRender).as(DateTimeRender.class).orElseThrow();
             for (Sheet sheet : selectedSheets) {
                 List<Object> values = new ArrayList<>();
 
@@ -153,15 +152,15 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                     for (int i = row.getFirstCellNum(); i < row.getLastCellNum(); i++) {
                         Cell cell = row.getCell(i);
                         if (cell != null) {
-                            if (this.valueRender.equals(ValueRender.FORMATTED_VALUE)) {
-                                extractValue(rowValues, cell);
-                            } else if (this.valueRender.equals(ValueRender.FORMULA)) {
+                            if (renderedValueRender.equals(ValueRender.FORMATTED_VALUE)) {
+                                extractValue(rowValues, cell, renderedSkipEmptyRowsValue, renderedDateTimeRender);
+                            } else if (renderedValueRender.equals(ValueRender.FORMULA)) {
                                 switch (cell.getCachedFormulaResultType()) {
-                                    case NUMERIC -> rowValues.add(convertNumeric(cell));
+                                    case NUMERIC -> rowValues.add(convertNumeric(cell, renderedDateTimeRender));
                                     case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
                                 }
                             } else {
-                                extractValue(rowValues, cell);
+                                extractValue(rowValues, cell, renderedSkipEmptyRowsValue, renderedDateTimeRender);
                             }
                         }
                     }
@@ -180,19 +179,19 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         }
     }
 
-    public void extractValue(List<Object> rowValues, Cell cell) {
+    public void extractValue(List<Object> rowValues, Cell cell, boolean skipEmptyRowsValue, DateTimeRender dateTimeRender) {
         switch (cell.getCellType()) {
             case STRING -> rowValues.add(cell.getStringCellValue());
             case BOOLEAN -> rowValues.add(cell.getBooleanCellValue());
-            case NUMERIC -> rowValues.add(convertNumeric(cell));
+            case NUMERIC -> rowValues.add(convertNumeric(cell, dateTimeRender));
             case FORMULA -> {
-                switch (cell.getCachedFormulaResultType()){
-                    case NUMERIC -> rowValues.add(convertNumeric(cell));
+                switch (cell.getCachedFormulaResultType()) {
+                    case NUMERIC -> rowValues.add(convertNumeric(cell, dateTimeRender));
                     case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
                 }
             }
             case BLANK -> {
-                if (!this.skipEmptyRows) {
+                if (!skipEmptyRowsValue) {
                     rowValues.add(cell.getStringCellValue());
                 }
             }
@@ -201,8 +200,8 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         }
     }
 
-    private URI convertToIon(RunContext runContext, List<Object> values) throws IOException {
-        if (header) {
+    private URI convertToIon(RunContext runContext, List<Object> values) throws IOException, IllegalVariableEvaluationException {
+        if (runContext.render(header).as(Boolean.class).orElseThrow()) {
             List<Object> headers = (List<Object>) values.remove(0);
             List<Object> convertedSheet = new LinkedList<>();
 
@@ -224,9 +223,9 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         return runContext.storage().putFile(this.store(runContext, values));
     }
 
-    private Object convertNumeric(Cell cell) {
-        if(DateUtil.isCellDateFormatted(cell)) {
-            return switch (this.dateTimeRender) {
+    private Object convertNumeric(Cell cell, DateTimeRender dateTimeRender) {
+        if (DateUtil.isCellDateFormatted(cell)) {
+            return switch (dateTimeRender) {
                 case SERIAL_NUMBER -> cell.getNumericCellValue();
                 case FORMATTED_STRING -> {
                     DataFormatter dataFormatter = new DataFormatter();

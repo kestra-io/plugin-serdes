@@ -3,15 +3,17 @@ package io.kestra.plugin.serdes.avro;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.core.junit.annotations.KestraTest;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
-import jakarta.inject.Inject;
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
 import java.net.URI;
 import java.util.Objects;
 
@@ -48,7 +50,7 @@ public class AvroToIonWriterTest {
         AvroToIon reader = AvroToIon.builder()
             .id(AvroToIonWriterTest.class.getSimpleName())
             .type(AvroToIon.class.getName())
-            .from(source.toString())
+            .from(Property.of(source.toString()))
             .build();
 
         AvroToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
@@ -56,11 +58,11 @@ public class AvroToIonWriterTest {
         IonToAvro writer = IonToAvro.builder()
             .id(IonToAvroTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(readerRunOutput.getUri().toString())
-            .inferAllFields(false)
+            .from(Property.of(readerRunOutput.getUri().toString()))
+            .inferAllFields(Property.of(false))
             .schema(
                 Files.asCharSource(
-                    new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource(file.replace(".avro",".avsc"))).toURI()),
+                    new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource(file.replace(".avro", ".avsc"))).toURI()),
                     Charsets.UTF_8
                 ).read()
             )

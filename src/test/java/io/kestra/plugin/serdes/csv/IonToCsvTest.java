@@ -3,6 +3,8 @@ package io.kestra.plugin.serdes.csv;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
@@ -10,18 +12,19 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 import io.kestra.plugin.serdes.avro.IonToAvro;
-import io.kestra.core.junit.annotations.KestraTest;
+import jakarta.inject.Inject;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.net.URI;
-import java.time.*;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -42,7 +45,7 @@ class IonToCsvTest {
     @Test
     void map() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             Arrays
                 .asList(
                     ImmutableMap.builder()
@@ -69,10 +72,10 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToCsvTest.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
-                .fieldSeparator(";".charAt(0))
-                .alwaysDelimitText(true)
-                .header(true)
+                .from(Property.of(uri.toString()))
+                .fieldSeparator(Property.of(";".charAt(0)))
+                .alwaysDelimitText(Property.of(true))
+                .header(Property.of(true))
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -87,16 +90,16 @@ class IonToCsvTest {
     @Test
     void list() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             Arrays
                 .asList(
                     Arrays.asList(
-                         "string",
-                         2,
-                         3.2F,
-                         3.2D,
-                         Instant.now(),
-                         ZonedDateTime.now()
+                        "string",
+                        2,
+                        3.2F,
+                        3.2D,
+                        Instant.now(),
+                        ZonedDateTime.now()
                     ),
                     Arrays.asList(
                         "string",
@@ -114,10 +117,10 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToCsvTest.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
-                .fieldSeparator(";".charAt(0))
-                .alwaysDelimitText(true)
-                .header(false)
+                .from(Property.of(uri.toString()))
+                .fieldSeparator(Property.of(";".charAt(0)))
+                .alwaysDelimitText(Property.of(true))
+                .header(Property.of(false))
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -131,7 +134,7 @@ class IonToCsvTest {
     @Test
     void ion() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
                     ImmutableMap.builder()
                         .put("String", "string")
@@ -155,10 +158,10 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
-                .alwaysDelimitText(true)
-                .header(false)
-                .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
+                .from(Property.of(uri.toString()))
+                .alwaysDelimitText(Property.of(true))
+                .header(Property.of(false))
+                .timeZoneId(Property.of(ZoneId.of("Europe/Lisbon").toString()))
                 .build();
 
             IonToCsv.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));

@@ -1,14 +1,16 @@
 package io.kestra.plugin.serdes.xml;
 
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -17,13 +19,12 @@ import org.json.JSONObject;
 import org.json.XML;
 import org.json.XMLParserConfiguration;
 
-import jakarta.validation.constraints.NotNull;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -41,19 +42,19 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         @Example(
             full = true,
             title = "Convert an XML file to the Amazon Ion format.",
-            code = """     
-id: xml_to_ion
-namespace: company.team
+            code = """
+                id: xml_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/xml/products.xml
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/xml/products.xml
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.xml.XmlToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.xml.XmlToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.xml.XmlReader"
@@ -63,48 +64,51 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    @PluginProperty
-    private final String charset = StandardCharsets.UTF_8.name();
+    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
 
     @Schema(
         title = "XPath use to query in the XML file."
     )
-    @PluginProperty
-    private String query;
+    private Property<String> query;
 
     @Schema(
         title = "XML parser configuration."
     )
-    @PluginProperty
     private ParserConfiguration parserConfiguration;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         try (
-            Reader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset), FileSerde.BUFFER_SIZE);
+            Reader input = new BufferedReader(
+                new InputStreamReader(
+                    runContext.storage().getFile(from),
+                    runContext.render(charset).as(String.class).orElseThrow()
+                ),
+                FileSerde.BUFFER_SIZE
+            );
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
             if (parserConfiguration != null) {
-                xmlParserConfiguration = xmlParserConfiguration.withForceList(parserConfiguration.getForceList());
+                var renderedParserConfig = runContext.render(parserConfiguration.getForceList()).asList(String.class);
+                xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(renderedParserConfig));
             }
             JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
 
-            Object result = result(jsonObject);
+            Object result = result(jsonObject, runContext);
 
             if (result instanceof JSONObject) {
                 Map<String, Object> map = ((JSONObject) result).toMap();
@@ -129,10 +133,11 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             .build();
     }
 
-    private Object result(JSONObject jsonObject) {
-        if (this.query != null) {
+    private Object result(JSONObject jsonObject, RunContext runContext) throws IllegalVariableEvaluationException {
+        var renderedQuery = runContext.render(this.query).as(String.class);
+        if (renderedQuery.isPresent()) {
             try {
-                return jsonObject.query(this.query);
+                return jsonObject.query(renderedQuery.get());
             } catch (Exception e) {
                 log.debug("JsonObject query failed, Object maybe null or empty.");
                 return null;
@@ -158,7 +163,6 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         @Schema(
             title = "List of XML tags that must be parsed as lists."
         )
-        @PluginProperty
-        private Set<String> forceList;
+        private Property<List<String>> forceList;
     }
 }

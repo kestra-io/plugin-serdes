@@ -1,13 +1,13 @@
 package io.kestra.plugin.serdes.avro.converter;
 
+import io.kestra.plugin.serdes.avro.AvroConverter;
+import io.kestra.plugin.serdes.avro.AvroConverterTest;
 import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import io.kestra.plugin.serdes.avro.AvroConverter;
-import io.kestra.plugin.serdes.avro.AvroConverterTest;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -64,11 +64,9 @@ public class LogicalDateTimeTest {
     @ParameterizedTest
     @MethodSource("withFormat")
     void convertWithFormat(CharSequence v, String format, Instant expected) throws Exception {
-        AvroConverter avroConverter = new AvroConverter(AvroConverterConfig.
-            builder()
+        AvroConverter avroConverter = AvroConverter.builder()
             .datetimeFormat(format)
-            .build()
-        );
+            .build();
 
         AvroConverterTest.Utils.oneField(avroConverter, v, expected, LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)));
     }

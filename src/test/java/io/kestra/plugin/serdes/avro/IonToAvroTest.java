@@ -4,13 +4,15 @@ import com.devskiller.friendly_id.FriendlyId;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.csv.IonToCsv;
-import io.kestra.core.junit.annotations.KestraTest;
+import jakarta.inject.Inject;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
@@ -26,7 +28,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
-import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -56,15 +57,15 @@ class IonToAvroTest {
             null,
             new URI("/" + FriendlyId.createFriendlyId()),
             new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                .getResource(file))
+                    .getResource(file))
                 .toURI()))
         );
 
         IonToAvro task = IonToAvro.builder()
             .id(IonToAvroTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(source.toString())
-            .inferAllFields(false)
+            .from(Property.of(source.toString()))
+            .inferAllFields(Property.of(false))
             .schema(
                 Files.asCharSource(
                     new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("csv/insurance_sample.avsc")).toURI()),
@@ -79,7 +80,7 @@ class IonToAvroTest {
             IonToAvroTest.avroSize(this.storageInterface.get(null, null, run.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                    .getResource("csv/insurance_sample.avro"))
+                        .getResource("csv/insurance_sample.avro"))
                     .toURI())))
             )
         );
@@ -97,7 +98,7 @@ class IonToAvroTest {
     @Test
     void ion() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
                     ImmutableMap.builder()
                         .put("String", "string")
@@ -121,7 +122,7 @@ class IonToAvroTest {
             IonToAvro writer = IonToAvro.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
+                .from(Property.of(uri.toString()))
                 .schema(IOUtils.toString(
                     Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("avro/all.avsc")),
                     StandardCharsets.UTF_8

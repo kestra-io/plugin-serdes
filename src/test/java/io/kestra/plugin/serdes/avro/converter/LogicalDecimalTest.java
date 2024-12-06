@@ -1,9 +1,9 @@
 package io.kestra.plugin.serdes.avro.converter;
 
-import org.apache.avro.LogicalTypes;
-import org.apache.avro.Schema;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverterTest;
+import org.apache.avro.LogicalTypes;
+import org.apache.avro.Schema;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -45,7 +45,7 @@ public class LogicalDecimalTest {
     @MethodSource("separator")
     void convertSeparator(Object v, BigDecimal expected, Integer precision, Integer scale, Character separator) throws Exception {
         AvroConverterTest.Utils.oneField(
-            new AvroConverter(AvroConverterConfig.builder().decimalSeparator(separator).build()),
+            AvroConverter.builder().decimalSeparator(separator).build(),
             v,
             expected,
             LogicalTypes.decimal(precision, scale).addToSchema(Schema.create(Schema.Type.BYTES))

@@ -2,14 +2,15 @@ package io.kestra.plugin.serdes.parquet;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroDeserializer;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.generic.GenericRecord;
@@ -18,16 +19,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.net.URI;
 import java.util.Map;
 import java.util.function.Consumer;
-
-import jakarta.validation.constraints.NotNull;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -44,19 +43,19 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         @Example(
             full = true,
             title = "Convert a parquet file to the Amazon Ion format.",
-            code = """     
-id: parquet_to_ion
-namespace: company.team
+            code = """
+                id: parquet_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/parquet/products.parquet
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/parquet/products.parquet
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.parquet.ParquetToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.parquet.ParquetToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.parquet.ParquetReader"
@@ -66,8 +65,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     static {
         ParquetTools.handleLogger();
@@ -79,7 +77,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
 
     public Output run(RunContext runContext) throws Exception {
         // reader
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // New ion file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
