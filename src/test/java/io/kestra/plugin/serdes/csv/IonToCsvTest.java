@@ -45,7 +45,7 @@ class IonToCsvTest {
     @Test
     void map() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             Arrays
                 .asList(
                     ImmutableMap.builder()
@@ -90,16 +90,16 @@ class IonToCsvTest {
     @Test
     void list() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             Arrays
                 .asList(
                     Arrays.asList(
-                         "string",
-                         2,
-                         3.2F,
-                         3.2D,
-                         Instant.now(),
-                         ZonedDateTime.now()
+                        "string",
+                        2,
+                        3.2F,
+                        3.2D,
+                        Instant.now(),
+                        ZonedDateTime.now()
                     ),
                     Arrays.asList(
                         "string",
@@ -134,7 +134,7 @@ class IonToCsvTest {
     @Test
     void ion() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
                     ImmutableMap.builder()
                         .put("String", "string")
@@ -161,7 +161,7 @@ class IonToCsvTest {
                 .from(Property.of(uri.toString()))
                 .alwaysDelimitText(Property.of(true))
                 .header(Property.of(false))
-                .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
+                .timeZoneId(Property.of(ZoneId.of("Europe/Lisbon").toString()))
                 .build();
 
             IonToCsv.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));

@@ -73,7 +73,7 @@ public class IonToExcelTest {
         ExcelToIon reader = ExcelToIon.builder()
             .id(ExcelToIonTest.class.getSimpleName())
             .type(ExcelToIon.class.getName())
-            .from(source.toString())
+            .from(Property.of(source.toString()))
             .skipRows(4)
             .header(Property.of(false))
             .build();
@@ -119,7 +119,7 @@ public class IonToExcelTest {
         ExcelToIon reader = ExcelToIon.builder()
             .id(ExcelToIonTest.class.getSimpleName())
             .type(ExcelToIon.class.getName())
-            .from(output.getUri().toString())
+            .from(Property.of(output.getUri().toString()))
             .build();
 
         runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
@@ -163,7 +163,7 @@ public class IonToExcelTest {
         ExcelToIon reader = ExcelToIon.builder()
             .id(ExcelToIonTest.class.getSimpleName())
             .type(ExcelToIon.class.getName())
-            .from(output.getUri().toString())
+            .from(Property.of(output.getUri().toString()))
             .build();
 
         runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());

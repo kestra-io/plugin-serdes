@@ -33,59 +33,59 @@ import java.net.URI;
             full = true,
             title = "Convert a CSV file to the Avro format.",
             code = """
-id: divvy_tripdata
-namespace: company.team
+                id: divvy_tripdata
+                namespace: company.team
 
-variables:
-  file_id: "{{ execution.startDate | dateAdd(-3, 'MONTHS') | date('yyyyMM') }}"
+                variables:
+                  file_id: "{{ execution.startDate | dateAdd(-3, 'MONTHS') | date('yyyyMM') }}"
 
-tasks:
-  - id: get_zipfile
-    type: io.kestra.plugin.core.http.Download
-    uri: "https://divvy-tripdata.s3.amazonaws.com/{{ render(vars.file_id) }}-divvy-tripdata.zip"
+                tasks:
+                  - id: get_zipfile
+                    type: io.kestra.plugin.core.http.Download
+                    uri: "https://divvy-tripdata.s3.amazonaws.com/{{ render(vars.file_id) }}-divvy-tripdata.zip"
 
-  - id: unzip
-    type: io.kestra.plugin.compress.ArchiveDecompress
-    algorithm: ZIP
-    from: "{{ outputs.get_zipfile.uri }}"
+                  - id: unzip
+                    type: io.kestra.plugin.compress.ArchiveDecompress
+                    algorithm: ZIP
+                    from: "{{ outputs.get_zipfile.uri }}"
 
-  - id: convert
-    type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{ outputs.unzip.files[render(vars.file_id) ~ '-divvy-tripdata.csv'] }}"
+                  - id: convert
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.unzip.files[render(vars.file_id) ~ '-divvy-tripdata.csv'] }}"
 
-  - id: to_avro
-    type: io.kestra.plugin.serdes.avro.IonToAvro
-    from: "{{ outputs.convert.uri }}"
-    datetimeFormat: "yyyy-MM-dd' 'HH:mm:ss"
-    schema: |
-      {
-        "type": "record",
-        "name": "Ride",
-        "namespace": "com.example.bikeshare",
-        "fields": [
-          {"name": "ride_id", "type": "string"},
-          {"name": "rideable_type", "type": "string"},
-          {"name": "started_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
-          {"name": "ended_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
-          {"name": "start_station_name", "type": "string"},
-          {"name": "start_station_id", "type": "string"},
-          {"name": "end_station_name", "type": "string"},
-          {"name": "end_station_id", "type": "string"},
-          {"name": "start_lat", "type": "double"},
-          {"name": "start_lng", "type": "double"},
-          {
-            "name": "end_lat",
-            "type": ["null", "double"],
-            "default": null
-          },
-          {
-            "name": "end_lng",
-            "type": ["null", "double"],
-            "default": null
-          },
-          {"name": "member_casual", "type": "string"}
-        ]
-      }"""
+                  - id: to_avro
+                    type: io.kestra.plugin.serdes.avro.IonToAvro
+                    from: "{{ outputs.convert.uri }}"
+                    datetimeFormat: "yyyy-MM-dd' 'HH:mm:ss"
+                    schema: |
+                      {
+                        "type": "record",
+                        "name": "Ride",
+                        "namespace": "com.example.bikeshare",
+                        "fields": [
+                          {"name": "ride_id", "type": "string"},
+                          {"name": "rideable_type", "type": "string"},
+                          {"name": "started_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+                          {"name": "ended_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+                          {"name": "start_station_name", "type": "string"},
+                          {"name": "start_station_id", "type": "string"},
+                          {"name": "end_station_name", "type": "string"},
+                          {"name": "end_station_id", "type": "string"},
+                          {"name": "start_lat", "type": "double"},
+                          {"name": "start_lng", "type": "double"},
+                          {
+                            "name": "end_lat",
+                            "type": ["null", "double"],
+                            "default": null
+                          },
+                          {
+                            "name": "end_lng",
+                            "type": ["null", "double"],
+                            "default": null
+                          },
+                          {"name": "member_casual", "type": "string"}
+                        ]
+                      }"""
         )
     },
     aliases = "io.kestra.plugin.serdes.avro.AvroWriter"

@@ -35,7 +35,7 @@ public class ExcelToIonTest {
     @Test
     void ion() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
 
             File sourceFile = SerdesUtils.resourceToFile("excel/insurance_sample.xlsx");
             URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
@@ -43,7 +43,7 @@ public class ExcelToIonTest {
             ExcelToIon reader = ExcelToIon.builder()
                 .id(ExcelToIonTest.class.getSimpleName())
                 .type(ExcelToIon.class.getName())
-                .from(source.toString())
+                .from(Property.of(source.toString()))
                 .header(Property.of(true))
                 .build();
             ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
@@ -58,7 +58,7 @@ public class ExcelToIonTest {
     @Test
     void multiSheets() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
 
             File sourceFile = SerdesUtils.resourceToFile("excel/insurance_sample_multiple_sheets.xlsx");
             URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
@@ -66,7 +66,7 @@ public class ExcelToIonTest {
             ExcelToIon reader = ExcelToIon.builder()
                 .id(ExcelToIonTest.class.getSimpleName())
                 .type(ExcelToIon.class.getName())
-                .from(source.toString())
+                .from(Property.of(source.toString()))
                 .sheetsTitle(Property.of(
                     List.of(
                         "Worksheet_1",

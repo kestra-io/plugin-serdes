@@ -43,18 +43,18 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
             full = true,
             title = "Convert an XML file to the Amazon Ion format.",
             code = """
-id: xml_to_ion
-namespace: company.team
+                id: xml_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/xml/products.xml
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/xml/products.xml
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.xml.XmlToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.xml.XmlToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.xml.XmlReader"
@@ -102,9 +102,9 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
-            var renderdParserConfig = runContext.render(parserConfiguration.getForceList()).asList(String.class);
-            if (!renderdParserConfig.isEmpty()) {
-                xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(renderdParserConfig));
+            if (parserConfiguration != null) {
+                var renderedParserConfig = runContext.render(parserConfiguration.getForceList()).asList(String.class);
+                xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(renderedParserConfig));
             }
             JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
 

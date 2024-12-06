@@ -42,26 +42,26 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 )
 @Plugin(
     examples = {
-    @Example(
-        full = true,
-        title = "Download a CSV file and convert it to a JSON format.",
-        code = """
-id: ion_to_json
-namespace: company.team
+        @Example(
+            full = true,
+            title = "Download a CSV file and convert it to a JSON format.",
+            code = """
+                id: ion_to_json
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
 
-  - id: convert
-    type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{ outputs.http_download.uri }}"
+                  - id: convert
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.http_download.uri }}"
 
-  - id: to_json
-    type: io.kestra.plugin.serdes.json.IonToJson
-    from: "{{ outputs.convert.uri }}"
-"""
+                  - id: to_json
+                    type: io.kestra.plugin.serdes.json.IonToJson
+                    from: "{{ outputs.convert.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.json.JsonWriter"

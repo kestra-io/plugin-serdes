@@ -51,55 +51,55 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
             full = true,
             title = "Download a CSV file and convert it to the Excel file format.",
             code = """
-id: ion_to_excel
-namespace: company.team
+                id: ion_to_excel
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
 
-  - id: convert
-    type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{ outputs.http_download.uri }}"
+                  - id: convert
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.http_download.uri }}"
 
-  - id: to_excel
-    type: io.kestra.plugin.serdes.excel.IonToExcel
-    from: "{{ outputs.convert.uri }}"
-"""
+                  - id: to_excel
+                    type: io.kestra.plugin.serdes.excel.IonToExcel
+                    from: "{{ outputs.convert.uri }}"
+                """
         ),
-	@Example(
-	    full = true,
-	    title = "Download CSV files and convert them into an Excel file with dedicated sheets.",
-	    code = """
-id: excel
-namespace: company.team
+        @Example(
+            full = true,
+            title = "Download CSV files and convert them into an Excel file with dedicated sheets.",
+            code = """
+                id: excel
+                namespace: company.team
 
-tasks:
-  - id: dataset1
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
+                tasks:
+                  - id: dataset1
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
 
-  - id: dataset2
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/fruit.csv
+                  - id: dataset2
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/fruit.csv
 
-  - id: convert1
-    type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{ outputs.dataset1.uri }}"
+                  - id: convert1
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.dataset1.uri }}"
 
-  - id: convert2
-    type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{ outputs.dataset2.uri }}"
+                  - id: convert2
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.dataset2.uri }}"
 
-  - id: write
-    type: io.kestra.plugin.serdes.excel.IonToExcel
-    from:
-      Sheet_1: "{{ outputs.convert1.uri }}"
-      Sheet_2: "{{ outputs.convert2.uri }}"
-"""
-	)
-}
+                  - id: write
+                    type: io.kestra.plugin.serdes.excel.IonToExcel
+                    from:
+                      Sheet_1: "{{ outputs.convert1.uri }}"
+                      Sheet_2: "{{ outputs.convert2.uri }}"
+                """
+        )
+    }
 )
 public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonToExcel.Output> {
 
@@ -155,13 +155,13 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                     .size(lineCount)
                     .build();
             }
-        } else if (from instanceof Map<?,?> fromMap) {
+        } else if (from instanceof Map<?, ?> fromMap) {
             try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
                 File tempFile = runContext.workingDir().createTempFile(".xlsx").toFile();
 
                 lineCount = runContext.renderMap((Map<String, String>) fromMap).entrySet()
-	                .stream()
-	                .map(throwFunction(entry -> writeQuery(runContext, entry.getKey(), entry.getValue(), tempFile, workbook)))
+                    .stream()
+                    .map(throwFunction(entry -> writeQuery(runContext, entry.getKey(), entry.getValue(), tempFile, workbook)))
                     .mapToLong(Long::longValue)
                     .sum();
 
@@ -185,7 +185,8 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             var renderedHeaderValue = runContext.render(this.header).as(Boolean.class).orElseThrow();
-            var renderedStyles =runContext.render(this.styles).as(Boolean.class).orElseThrow();
+            var renderedStyles = runContext.render(this.styles).as(Boolean.class).orElseThrow();
+            var renderedTimeZoneId = runContext.render(this.getTimeZoneId()).as(String.class).orElse(null);
 
             SXSSFSheet sheet = workbook.createSheet(title);
             Flux<Object> flowable = FileSerde.readAll(reader)
@@ -205,7 +206,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
                             int cellAt = 0;
                             for (final Object value : casted) {
-                                createCell(workbook, sheet, value, xssfRow, cellAt, renderedStyles);
+                                createCell(workbook, sheet, value, xssfRow, cellAt, renderedStyles, renderedTimeZoneId);
                                 ++cellAt;
                             }
 
@@ -217,7 +218,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                                 if (renderedHeaderValue) {
                                     int cellAt = 0;
                                     for (final Object value : casted.keySet()) {
-                                        createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles);
+                                        createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles, renderedTimeZoneId);
                                     }
                                     xssfRow = sheet.createRow(rowAt++);
                                 }
@@ -225,7 +226,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
                             int cellAt = 0;
                             for (final Object value : casted.values()) {
-                                createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles);
+                                createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles, renderedTimeZoneId);
                             }
                         }
                     }
@@ -242,7 +243,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         return lineCount;
     }
 
-    private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber, boolean styles) {
+    private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber, boolean styles, String renderedTimeZoneId) {
         SXSSFCell cell = xssfRow.createCell(rowNumber);
 
         switch (value) {
@@ -291,8 +292,8 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                     sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
                 }
 
-                if (getTimeZoneId() != null) {
-                    LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(getTimeZoneId()));
+                if (renderedTimeZoneId != null) {
+                    LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(renderedTimeZoneId));
                     cell.setCellValue(DateUtil.getExcelDate(date));
                 } else {
                     Date date = Date.from(instant);

@@ -99,7 +99,7 @@ class XmlToIonWriterTest {
     @Test
     void ion() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
                     ImmutableMap.builder()
                         .put("String", "string")
@@ -151,7 +151,7 @@ class XmlToIonWriterTest {
     }
 
     @Test
-    // Assert that there is no exception throw when reading an empty file
+        // Assert that there is no exception throw when reading an empty file
     void readEmpty() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
@@ -161,7 +161,7 @@ class XmlToIonWriterTest {
     }
 
     @Test
-    // Assert that there is no exception throw when reading an empty file
+        // Assert that there is no exception throw when reading an empty file
     void readEmptyTagBadQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
@@ -171,7 +171,7 @@ class XmlToIonWriterTest {
     }
 
     @Test
-    // Assert that there is no exception throw when reading an empty file
+        // Assert that there is no exception throw when reading an empty file
     void readEmptyTagGoodQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/catalog");

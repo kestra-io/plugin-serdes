@@ -73,7 +73,7 @@ public class AvroConverterTest {
             IonToAvroTest.avroSize(this.storageInterface.get(null, null, avroRunOutput.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                    .getResource("csv/full.avro"))
+                        .getResource("csv/full.avro"))
                     .toURI())))
             )
         );
@@ -108,7 +108,7 @@ public class AvroConverterTest {
             IonToAvroTest.avroSize(this.storageInterface.get(null, null, avroRunOutput.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                    .getResource("csv/full.avro"))
+                        .getResource("csv/full.avro"))
                     .toURI())))
             )
         );
@@ -338,7 +338,7 @@ public class AvroConverterTest {
             IonToAvroTest.avroSize(this.storageInterface.get(null, null, avroRunOutput.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                    .getResource("csv/portfolio_aliases.avro"))
+                        .getResource("csv/portfolio_aliases.avro"))
                     .toURI())))
             )
         );

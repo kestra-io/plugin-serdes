@@ -83,6 +83,7 @@ public class AvroConverter {
     protected final String timeZoneId = ZoneId.systemDefault().toString();
 
     private static final GenericData GENERIC_DATA = new GenericData();
+
     static {
         GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
         GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
@@ -340,7 +341,7 @@ public class AvroConverter {
         return (Instant) data;
     }
 
-    protected Instant parseDateTime(String data){
+    protected Instant parseDateTime(String data) {
         try {
             return ZonedDateTime.parse(data, DateTimeFormatter.ofPattern(this.getDatetimeFormat()))
                 .toInstant();

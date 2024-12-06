@@ -144,7 +144,7 @@ public abstract class AbstractAvroConverter extends Task {
                 try {
                     consumer.accept(datum);
                 } catch (Throwable e) {
-                    var avroException =  new AvroConverter.IllegalRowConvertion(
+                    var avroException = new AvroConverter.IllegalRowConvertion(
                         datum.getSchema()
                             .getFields()
                             .stream()
@@ -179,7 +179,7 @@ public abstract class AbstractAvroConverter extends Task {
 
                 throw new IllegalArgumentException("Unable to convert row of type: " + row.getClass());
             } catch (Throwable e) {
-                var avroException =  new AvroConverter.IllegalRow(
+                var avroException = new AvroConverter.IllegalRow(
                     row,
                     e
                 );

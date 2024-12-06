@@ -40,18 +40,18 @@ import java.util.concurrent.atomic.AtomicInteger;
             full = true,
             title = "Convert a CSV file to the Amazon Ion format.",
             code = """
-id: csv_to_ion
-namespace: company.team
+                id: csv_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/products.csv
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.csv.CsvReader"
@@ -78,7 +78,6 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Schema(
         title = "The text delimiter character"
     )
-    @PluginProperty
     private final Property<Character> textDelimiter = Property.of('"');
 
     @Builder.Default

@@ -15,11 +15,11 @@ import java.util.stream.Stream;
 public class ComplexUnionTest {
     static Stream<Arguments> source() {
         return Stream.of(
-            Arguments.of("null", Arrays.asList(Schema.Type.NULL, Schema.Type.BOOLEAN),  null),
-            Arguments.of("null", Arrays.asList(Schema.Type.BOOLEAN, Schema.Type.NULL),  null),
+            Arguments.of("null", Arrays.asList(Schema.Type.NULL, Schema.Type.BOOLEAN), null),
+            Arguments.of("null", Arrays.asList(Schema.Type.BOOLEAN, Schema.Type.NULL), null),
             Arguments.of("1", Arrays.asList(Schema.Type.INT, Schema.Type.NULL), 1),
             Arguments.of("n/a", Arrays.asList(Schema.Type.NULL, Schema.Type.STRING), null),
-            Arguments.of("n/a", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL),  new Utf8("n/a"))
+            Arguments.of("n/a", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), new Utf8("n/a"))
         );
     }
 

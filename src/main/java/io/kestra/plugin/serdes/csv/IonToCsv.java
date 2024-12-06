@@ -41,33 +41,33 @@ import java.util.function.Consumer;
             full = true,
             title = "Download a CSV file, transform it in SQL and store the transformed data as a CSV file.",
             code = """
-id: ion_to_csv
-namespace: company.team
+                id: ion_to_csv
+                namespace: company.team
 
-tasks:
-  - id: download_csv
-    type: io.kestra.plugin.core.http.Download
-    description: salaries of data professionals from 2020 to 2023 (source ai-jobs.net)
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
+                tasks:
+                  - id: download_csv
+                    type: io.kestra.plugin.core.http.Download
+                    description: salaries of data professionals from 2020 to 2023 (source ai-jobs.net)
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
 
-  - id: avg_salary_by_job_title
-    type: io.kestra.plugin.jdbc.duckdb.Query
-    inputFiles:
-      data.csv: "{{ outputs.download_csv.uri }}"
-    sql: |
-      SELECT
-        job_title,
-        ROUND(AVG(salary),2) AS avg_salary
-      FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
-      GROUP BY job_title
-      HAVING COUNT(job_title) > 10
-      ORDER BY avg_salary DESC;
-    store: true
+                  - id: avg_salary_by_job_title
+                    type: io.kestra.plugin.jdbc.duckdb.Query
+                    inputFiles:
+                      data.csv: "{{ outputs.download_csv.uri }}"
+                    sql: |
+                      SELECT
+                        job_title,
+                        ROUND(AVG(salary),2) AS avg_salary
+                      FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
+                      GROUP BY job_title
+                      HAVING COUNT(job_title) > 10
+                      ORDER BY avg_salary DESC;
+                    store: true
 
-  - id: result
-    type: io.kestra.plugin.serdes.csv.IonToCsv
-    from: "{{ outputs.avg_salary_by_job_title.uri }}"
-"""
+                  - id: result
+                    type: io.kestra.plugin.serdes.csv.IonToCsv
+                    from: "{{ outputs.avg_salary_by_job_title.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.csv.CsvWriter"
@@ -107,14 +107,12 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Schema(
         title = "Whether fields should always be delimited using the textDelimiter option."
     )
-    @PluginProperty
     private final Property<Boolean> alwaysDelimitText = Property.of(false);
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
-    @PluginProperty
     private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
 
 
@@ -131,7 +129,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
 
         try (
             Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
-            Writer fileWriter = new BufferedWriter(new  FileWriter(tempFile, Charset.forName(runContext.render(this.charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
+            Writer fileWriter = new BufferedWriter(new FileWriter(tempFile, Charset.forName(runContext.render(this.charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
             de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter(fileWriter, runContext)
         ) {
 
@@ -194,7 +192,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         var builder = de.siegmar.fastcsv.writer.CsvWriter.builder();
 
         runContext.render(this.textDelimiter).as(Character.class)
-                .ifPresent(builder::quoteCharacter);
+            .ifPresent(builder::quoteCharacter);
 
         runContext.render(this.fieldSeparator).as(Character.class)
             .ifPresent(builder::fieldSeparator);

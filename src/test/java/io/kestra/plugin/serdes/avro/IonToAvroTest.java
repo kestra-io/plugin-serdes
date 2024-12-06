@@ -57,7 +57,7 @@ class IonToAvroTest {
             null,
             new URI("/" + FriendlyId.createFriendlyId()),
             new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                .getResource(file))
+                    .getResource(file))
                 .toURI()))
         );
 
@@ -80,7 +80,7 @@ class IonToAvroTest {
             IonToAvroTest.avroSize(this.storageInterface.get(null, null, run.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                    .getResource("csv/insurance_sample.avro"))
+                        .getResource("csv/insurance_sample.avro"))
                     .toURI())))
             )
         );
@@ -98,7 +98,7 @@ class IonToAvroTest {
     @Test
     void ion() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try(OutputStream output = new FileOutputStream(tempFile)) {
+        try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
                     ImmutableMap.builder()
                         .put("String", "string")

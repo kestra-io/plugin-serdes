@@ -59,7 +59,7 @@ class ParquetToIonWriterTest {
             IonToParquet writer = IonToParquet.builder()
                 .id(IonToParquet.class.getSimpleName())
                 .type(IonToParquet.class.getName())
-                .from(uri.toString())
+                .from(Property.of(uri.toString()))
                 .schema(IOUtils.toString(
                     Objects.requireNonNull(ParquetToIonWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
                     StandardCharsets.UTF_8

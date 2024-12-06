@@ -40,18 +40,18 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
             full = true,
             title = "Convert an Avro file to the Amazon Ion format.",
             code = """
-id: avro_to_ion
-namespace: company.team
+                id: avro_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/avro/products.avro
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/avro/products.avro
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.avro.AvroToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.avro.AvroToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.avro.AvroReader"
@@ -70,7 +70,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         // New ion file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
-        try(
+        try (
             InputStream in = runContext.storage().getFile(from);
             var output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
         ) {
@@ -97,7 +97,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
     private Consumer<FluxSink<GenericRecord>> nextRow(DataFileStream<GenericRecord> dataFileStream) throws IOException {
         return throwConsumer(s -> {
             GenericRecord record = null;
-            while(dataFileStream.hasNext()){
+            while (dataFileStream.hasNext()) {
                 record = dataFileStream.next(record);
                 s.next(record);
             }

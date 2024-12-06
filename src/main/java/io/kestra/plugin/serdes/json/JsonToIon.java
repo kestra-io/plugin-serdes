@@ -41,24 +41,24 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Schema(
     title = "Read a JSON file and write it to an ION serialized data file.",
     description = """
-    Please note that we support JSONL format only, i.e. one JSON dictionary/map per line.
+        Please note that we support JSONL format only, i.e. one JSON dictionary/map per line.
 
-    Here is how a sample JSON file content might look like:
-    ```
-    {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
-    {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
-    {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
-    ```
-
-    We do NOT support an array of JSON objects. A JSON file in the following array format is not supported:
-    ```
-    [
+        Here is how a sample JSON file content might look like:
+        ```
         {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
         {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
         {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
-    ]
-    ```
-    """
+        ```
+
+        We do NOT support an array of JSON objects. A JSON file in the following array format is not supported:
+        ```
+        [
+            {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
+            {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
+            {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
+        ]
+        ```
+        """
 )
 @Plugin(
     examples = {
@@ -66,18 +66,18 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
             full = true,
             title = "Convert a JSON file to the Amazon Ion format.",
             code = """
-id: json_to_ion
-namespace: company.team
+                id: json_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/json/products.json
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/json/products.json
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.json.JsonToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.json.JsonToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.json.JsonReader"
@@ -107,10 +107,9 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
     @Builder.Default
     @Schema(
         title = "Is the file is a json new line (JSON-NL)",
-        description ="Is the file is a json with new line separator\n" +
+        description = "Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
-    @PluginProperty
     private final Property<Boolean> newLine = Property.of(true);
 
     @Override

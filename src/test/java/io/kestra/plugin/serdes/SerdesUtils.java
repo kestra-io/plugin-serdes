@@ -26,7 +26,7 @@ public class SerdesUtils {
 
     public static File resourceToFile(String file) throws URISyntaxException {
         return new File(Objects.requireNonNull(SerdesUtils.class.getClassLoader()
-            .getResource(file))
+                .getResource(file))
             .toURI());
     }
 

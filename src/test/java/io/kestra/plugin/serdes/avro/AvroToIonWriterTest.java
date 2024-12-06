@@ -62,7 +62,7 @@ public class AvroToIonWriterTest {
             .inferAllFields(Property.of(false))
             .schema(
                 Files.asCharSource(
-                    new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource(file.replace(".avro",".avsc"))).toURI()),
+                    new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource(file.replace(".avro", ".avsc"))).toURI()),
                     Charsets.UTF_8
                 ).read()
             )

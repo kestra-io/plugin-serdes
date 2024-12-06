@@ -44,43 +44,43 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
             full = true,
             title = "Read a CSV file, transform it and store the transformed data as a parquet file.",
             code = """
-id: ion_to_parquet
-namespace: company.team
-
-tasks:
-  - id: download_csv
-    type: io.kestra.plugin.core.http.Download
-    description: salaries of data professionals from 2020 to 2023 (source ai-jobs.net)
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
-
-  - id: avg_salary_by_job_title
-    type: io.kestra.plugin.jdbc.duckdb.Query
-    inputFiles:
-      data.csv: "{{ outputs.download_csv.uri }}"
-    sql: |
-      SELECT
-        job_title,
-        ROUND(AVG(salary),2) AS avg_salary
-      FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
-      GROUP BY job_title
-      HAVING COUNT(job_title) > 10
-      ORDER BY avg_salary DESC;
-    store: true
-
-  - id: result
-    type: io.kestra.plugin.serdes.parquet.IonToParquet
-    from: "{{ outputs.avg_salary_by_job_title.uri }}"
-    schema: |
-      {
-        "type": "record",
-        "name": "Salary",
-        "namespace": "com.example.salary",
-        "fields": [
-          {"name": "job_title", "type": "string"},
-          {"name": "avg_salary", "type": "double"}
-        ]
-      }
-"""
+                id: ion_to_parquet
+                namespace: company.team
+                
+                tasks:
+                  - id: download_csv
+                    type: io.kestra.plugin.core.http.Download
+                    description: salaries of data professionals from 2020 to 2023 (source ai-jobs.net)
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
+                
+                  - id: avg_salary_by_job_title
+                    type: io.kestra.plugin.jdbc.duckdb.Query
+                    inputFiles:
+                      data.csv: "{{ outputs.download_csv.uri }}"
+                    sql: |
+                      SELECT
+                        job_title,
+                        ROUND(AVG(salary),2) AS avg_salary
+                      FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
+                      GROUP BY job_title
+                      HAVING COUNT(job_title) > 10
+                      ORDER BY avg_salary DESC;
+                    store: true
+                
+                  - id: result
+                    type: io.kestra.plugin.serdes.parquet.IonToParquet
+                    from: "{{ outputs.avg_salary_by_job_title.uri }}"
+                    schema: |
+                      {
+                        "type": "record",
+                        "name": "Salary",
+                        "namespace": "com.example.salary",
+                        "fields": [
+                          {"name": "job_title", "type": "string"},
+                          {"name": "avg_salary", "type": "double"}
+                        ]
+                      }
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.parquet.ParquetWriter"
@@ -167,8 +167,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         try (
             org.apache.parquet.hadoop.ParquetWriter<GenericData.Record> writer = parquetWriterBuilder.build();
             Reader inputStream = new InputStreamReader(runContext.storage().getFile(from))
-        )
-        {
+        ) {
             Long lineCount = this.convert(inputStream, schema, writer::write, runContext);
 
             // metrics & finalize

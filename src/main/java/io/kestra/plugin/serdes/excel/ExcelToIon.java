@@ -44,18 +44,18 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
             full = true,
             title = "Convert an Excel file to the Ion format.",
             code = """
-id: excel_to_ion
-namespace: company.team
+                id: excel_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/excel/Products.xlsx
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/excel/Products.xlsx
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.excel.ExcelToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.excel.ExcelToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     }
 )
@@ -64,8 +64,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     @Schema(
         title = "The sheets title to be included"
@@ -114,9 +113,9 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-        try(Workbook workbook = StreamingReader.builder().rowCacheSize(1).open(runContext.storage().getFile(from))) {
+        try (Workbook workbook = StreamingReader.builder().rowCacheSize(1).open(runContext.storage().getFile(from))) {
 
             List<Sheet> sheets = new ArrayList<>();
             workbook.sheetIterator().forEachRemaining(sheets::add);
@@ -186,7 +185,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
             case BOOLEAN -> rowValues.add(cell.getBooleanCellValue());
             case NUMERIC -> rowValues.add(convertNumeric(cell, dateTimeRender));
             case FORMULA -> {
-                switch (cell.getCachedFormulaResultType()){
+                switch (cell.getCachedFormulaResultType()) {
                     case NUMERIC -> rowValues.add(convertNumeric(cell, dateTimeRender));
                     case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
                 }
@@ -225,7 +224,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     }
 
     private Object convertNumeric(Cell cell, DateTimeRender dateTimeRender) {
-        if(DateUtil.isCellDateFormatted(cell)) {
+        if (DateUtil.isCellDateFormatted(cell)) {
             return switch (dateTimeRender) {
                 case SERIAL_NUMBER -> cell.getNumericCellValue();
                 case FORMATTED_STRING -> {

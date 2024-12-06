@@ -44,18 +44,18 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
             full = true,
             title = "Convert a parquet file to the Amazon Ion format.",
             code = """
-id: parquet_to_ion
-namespace: company.team
+                id: parquet_to_ion
+                namespace: company.team
 
-tasks:
-  - id: http_download
-    type: io.kestra.plugin.core.http.Download
-    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/parquet/products.parquet
+                tasks:
+                  - id: http_download
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/parquet/products.parquet
 
-  - id: to_ion
-    type: io.kestra.plugin.serdes.parquet.ParquetToIon
-    from: "{{ outputs.http_download.uri }}"
-"""
+                  - id: to_ion
+                    type: io.kestra.plugin.serdes.parquet.ParquetToIon
+                    from: "{{ outputs.http_download.uri }}"
+                """
         )
     },
     aliases = "io.kestra.plugin.serdes.parquet.ParquetReader"
