@@ -64,7 +64,7 @@ class IonToAvroTest {
         IonToAvro task = IonToAvro.builder()
             .id(IonToAvroTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(source.toString())
+            .from(Property.of(source.toString()))
             .inferAllFields(Property.of(false))
             .schema(
                 Files.asCharSource(
@@ -122,7 +122,7 @@ class IonToAvroTest {
             IonToAvro writer = IonToAvro.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
+                .from(Property.of(uri.toString()))
                 .schema(IOUtils.toString(
                     Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("avro/all.avsc")),
                     StandardCharsets.UTF_8

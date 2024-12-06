@@ -49,7 +49,7 @@ public class AvroToIonWriterTest {
         AvroToIon reader = AvroToIon.builder()
             .id(AvroToIonWriterTest.class.getSimpleName())
             .type(AvroToIon.class.getName())
-            .from(source.toString())
+            .from(Property.of(source.toString()))
             .build();
 
         AvroToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
@@ -57,7 +57,7 @@ public class AvroToIonWriterTest {
         IonToAvro writer = IonToAvro.builder()
             .id(IonToAvroTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(readerRunOutput.getUri().toString())
+            .from(Property.of(readerRunOutput.getUri().toString()))
             .inferAllFields(Property.of(false))
             .schema(
                 Files.asCharSource(

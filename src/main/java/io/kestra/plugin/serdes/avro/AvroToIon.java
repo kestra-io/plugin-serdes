@@ -4,6 +4,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.models.tasks.Task;
@@ -40,7 +41,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         @Example(
             full = true,
             title = "Convert an Avro file to the Amazon Ion format.",
-            code = """     
+            code = """
 id: avro_to_ion
 namespace: company.team
 
@@ -62,12 +63,11 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     public Output run(RunContext runContext) throws Exception {
         // reader
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // New ion file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();

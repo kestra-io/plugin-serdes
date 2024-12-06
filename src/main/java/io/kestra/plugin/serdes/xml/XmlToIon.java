@@ -1,9 +1,11 @@
 package io.kestra.plugin.serdes.xml;
 
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
@@ -41,7 +43,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         @Example(
             full = true,
             title = "Convert an XML file to the Amazon Ion format.",
-            code = """     
+            code = """
 id: xml_to_ion
 namespace: company.team
 
@@ -63,39 +65,41 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    @PluginProperty
-    private final String charset = StandardCharsets.UTF_8.name();
+    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
 
     @Schema(
         title = "XPath use to query in the XML file."
     )
-    @PluginProperty
-    private String query;
+    private Property<String> query;
 
     @Schema(
         title = "XML parser configuration."
     )
-    @PluginProperty
     private ParserConfiguration parserConfiguration;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         try (
-            Reader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), charset), FileSerde.BUFFER_SIZE);
+            Reader input = new BufferedReader(
+                new InputStreamReader(
+                    runContext.storage().getFile(from),
+                    runContext.render(charset).as(String.class).orElseThrow()
+                ),
+                FileSerde.BUFFER_SIZE
+            );
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
@@ -104,7 +108,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             }
             JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
 
-            Object result = result(jsonObject);
+            Object result = result(jsonObject, runContext);
 
             if (result instanceof JSONObject) {
                 Map<String, Object> map = ((JSONObject) result).toMap();
@@ -129,10 +133,11 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             .build();
     }
 
-    private Object result(JSONObject jsonObject) {
-        if (this.query != null) {
+    private Object result(JSONObject jsonObject, RunContext runContext) throws IllegalVariableEvaluationException {
+        var renderedQuery = runContext.render(this.query).as(String.class);
+        if (renderedQuery.isPresent()) {
             try {
-                return jsonObject.query(this.query);
+                return jsonObject.query(renderedQuery.get());
             } catch (Exception e) {
                 log.debug("JsonObject query failed, Object maybe null or empty.");
                 return null;

@@ -12,6 +12,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
@@ -46,7 +47,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         @Example(
             full = true,
             title = "Read a CSV file, transform it and store the transformed data as an XML file.",
-            code = """     
+            code = """
 id: ion_to_xml
 namespace: company.team
 
@@ -61,7 +62,7 @@ tasks:
     inputFiles:
       data.csv: "{{ outputs.download_csv.uri }}"
     sql: |
-      SELECT 
+      SELECT
         job_title,
         ROUND(AVG(salary),2) AS avg_salary
       FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
@@ -83,40 +84,36 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    @PluginProperty(dynamic = true)
-    private final String charset = StandardCharsets.UTF_8.name();
+    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
 
     @NotNull
     @Builder.Default
     @Schema(
         title = "Xml root name"
     )
-    @PluginProperty(dynamic = true)
-    private final String rootName = "items";
+    private final Property<String> rootName = Property.of("items");
 
     @Builder.Default
     @Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
-    @PluginProperty(dynamic = true)
-    private final String timeZoneId = ZoneId.systemDefault().toString();
+    private final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
 
     @Override
     public IonToXml.Output run(RunContext runContext) throws Exception {
         File tempFile = runContext.workingDir().createTempFile(".xml").toFile();
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         try (
-            Writer outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(charset)), FileSerde.BUFFER_SIZE);
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), Charset.forName(charset)), FileSerde.BUFFER_SIZE)
+            Writer outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(runContext.render(charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
+            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), Charset.forName(runContext.render(charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE)
         ) {
             XmlMapper mapper = new XmlMapper();
 
@@ -124,13 +121,13 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
                 .enable(SerializationFeature.INDENT_OUTPUT)
                 .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
                 .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-                .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId))))
+                .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow())))
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module());
 
 
             ObjectWriter objectWriter = mapper.writer()
-                .withRootName(runContext.render(this.rootName))
+                .withRootName(runContext.render(this.rootName).as(String.class).orElseThrow())
                 .withFeatures(ToXmlGenerator.Feature.WRITE_XML_DECLARATION);
 
             List<Object> list = FileSerde.readAll(inputStream).collectList().block();

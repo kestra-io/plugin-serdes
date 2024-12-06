@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
@@ -50,8 +51,8 @@ class XmlToIonWriterTest {
         XmlToIon reader = XmlToIon.builder()
             .id(XmlToIon.class.getSimpleName())
             .type(XmlToIon.class.getName())
-            .query(query)
-            .from(source.toString())
+            .query(Property.of(query))
+            .from(Property.of(source.toString()))
             .build();
 
         return reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
@@ -61,7 +62,7 @@ class XmlToIonWriterTest {
         IonToXml writer = IonToXml.builder()
             .id(IonToJson.class.getSimpleName())
             .type(IonToJson.class.getName())
-            .from(from.toString())
+            .from(Property.of(from.toString()))
             .build();
 
         return writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
@@ -122,8 +123,8 @@ class XmlToIonWriterTest {
             IonToXml writer = IonToXml.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
-                .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
+                .from(Property.of(uri.toString()))
+                .timeZoneId(Property.of(ZoneId.of("Europe/Lisbon").toString()))
                 .build();
 
             IonToXml.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
