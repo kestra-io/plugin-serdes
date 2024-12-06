@@ -4,6 +4,7 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
@@ -49,7 +50,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
         @Example(
             full = true,
             title = "Download a CSV file and convert it to the Excel file format.",
-            code = """     
+            code = """
 id: ion_to_excel
 namespace: company.team
 
@@ -93,7 +94,7 @@ tasks:
 
   - id: write
     type: io.kestra.plugin.serdes.excel.IonToExcel
-    from: 
+    from:
       Sheet_1: "{{ outputs.convert1.uri }}"
       Sheet_2: "{{ outputs.convert2.uri }}"
 """
@@ -115,23 +116,20 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         defaultValue = "UTF-8"
     )
     @Builder.Default
-    @PluginProperty
-    private String charset = "UTF-8";
+    private Property<String> charset = Property.of("UTF-8");
 
     @Schema(
         title = "The sheet title to be used when writing data to an Excel spreadsheet",
         defaultValue = "Sheet"
     )
     @Builder.Default
-    @PluginProperty
-    private String sheetsTitle = "Sheet";
+    private Property<String> sheetsTitle = Property.of("Sheet");
 
     @Schema(
         title = "Whether header should be written as the first line"
     )
     @Builder.Default
-    @PluginProperty
-    private boolean header = true;
+    private Property<Boolean> header = Property.of(true);
 
     @Schema(
         title = "Whether styles should be applied to format values",
@@ -139,8 +137,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             "removed this options when you have a lots of values."
     )
     @Builder.Default
-    @PluginProperty
-    private boolean styles = true;
+    private Property<Boolean> styles = Property.of(true);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -151,7 +148,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
                 File tempFile = runContext.workingDir().createTempFile(".xlsx").toFile();
 
-                lineCount = writeQuery(runContext, sheetsTitle, runContext.render(fromStr), tempFile, workbook);
+                lineCount = writeQuery(runContext, runContext.render(sheetsTitle).as(String.class).orElseThrow(), runContext.render(fromStr), tempFile, workbook);
 
                 return Output.builder()
                     .uri(runContext.storage().putFile(tempFile))
@@ -184,9 +181,12 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         Long lineCount;
 
         try (
-            Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(fromUri), Charset.forName(this.charset)), FileSerde.BUFFER_SIZE);
+            Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(fromUri), Charset.forName(runContext.render(this.charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
+            var renderedHeaderValue = runContext.render(this.header).as(Boolean.class).orElseThrow();
+            var renderedStyles =runContext.render(this.styles).as(Boolean.class).orElseThrow();
+
             SXSSFSheet sheet = workbook.createSheet(title);
             Flux<Object> flowable = FileSerde.readAll(reader)
                 .doOnNext(new Consumer<>() {
@@ -199,13 +199,13 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                         if (row instanceof List casted) {
                             SXSSFRow xssfRow = sheet.createRow(rowAt++);
 
-                            if (header) {
+                            if (renderedHeaderValue) {
                                 throw new IllegalArgumentException("Invalid data of type List with header");
                             }
 
                             int cellAt = 0;
                             for (final Object value : casted) {
-                                createCell(workbook, sheet, value, xssfRow, cellAt);
+                                createCell(workbook, sheet, value, xssfRow, cellAt, renderedStyles);
                                 ++cellAt;
                             }
 
@@ -214,10 +214,10 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
                             if (!first) {
                                 this.first = true;
-                                if (header) {
+                                if (renderedHeaderValue) {
                                     int cellAt = 0;
                                     for (final Object value : casted.keySet()) {
-                                        createCell(workbook, sheet, value, xssfRow, cellAt++);
+                                        createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles);
                                     }
                                     xssfRow = sheet.createRow(rowAt++);
                                 }
@@ -225,7 +225,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
                             int cellAt = 0;
                             for (final Object value : casted.values()) {
-                                createCell(workbook, sheet, value, xssfRow, cellAt++);
+                                createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles);
                             }
                         }
                     }
@@ -242,7 +242,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         return lineCount;
     }
 
-    private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber) {
+    private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber, boolean styles) {
         SXSSFCell cell = xssfRow.createCell(rowNumber);
 
         switch (value) {
@@ -271,7 +271,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                 cell.setCellType(CellType.NUMERIC);
             }
             case LocalDate date -> {
-                if (this.styles) {
+                if (styles) {
                     sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
                 }
 
@@ -279,7 +279,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                 cell.setCellType(CellType.NUMERIC);
             }
             case LocalDateTime date -> {
-                if (this.styles) {
+                if (styles) {
                     sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
                 }
 
@@ -287,7 +287,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                 cell.setCellType(CellType.NUMERIC);
             }
             case Instant instant -> {
-                if (this.styles) {
+                if (styles) {
                     sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
                 }
 

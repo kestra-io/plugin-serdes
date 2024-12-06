@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.excel;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.TestsUtils;
@@ -43,7 +44,7 @@ public class ExcelToIonTest {
                 .id(ExcelToIonTest.class.getSimpleName())
                 .type(ExcelToIon.class.getName())
                 .from(source.toString())
-                .header(true)
+                .header(Property.of(true))
                 .build();
             ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -66,14 +67,14 @@ public class ExcelToIonTest {
                 .id(ExcelToIonTest.class.getSimpleName())
                 .type(ExcelToIon.class.getName())
                 .from(source.toString())
-                .sheetsTitle(
+                .sheetsTitle(Property.of(
                     List.of(
                         "Worksheet_1",
                         "Worksheet_2",
                         "Worksheet_3"
                     )
-                )
-                .header(true)
+                ))
+                .header(Property.of(true))
                 .build();
 
             ExcelToIon.Output ionOutput = reader.run(
