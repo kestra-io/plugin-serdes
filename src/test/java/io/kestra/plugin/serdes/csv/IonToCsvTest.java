@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.csv;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
@@ -69,10 +70,10 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToCsvTest.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
-                .fieldSeparator(";".charAt(0))
-                .alwaysDelimitText(true)
-                .header(true)
+                .from(Property.of(uri.toString()))
+                .fieldSeparator(Property.of(";".charAt(0)))
+                .alwaysDelimitText(Property.of(true))
+                .header(Property.of(true))
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -114,10 +115,10 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToCsvTest.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
-                .fieldSeparator(";".charAt(0))
-                .alwaysDelimitText(true)
-                .header(false)
+                .from(Property.of(uri.toString()))
+                .fieldSeparator(Property.of(";".charAt(0)))
+                .alwaysDelimitText(Property.of(true))
+                .header(Property.of(false))
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -155,9 +156,9 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(uri.toString())
-                .alwaysDelimitText(true)
-                .header(false)
+                .from(Property.of(uri.toString()))
+                .alwaysDelimitText(Property.of(true))
+                .header(Property.of(false))
                 .timeZoneId(ZoneId.of("Europe/Lisbon").toString())
                 .build();
 

@@ -2,8 +2,10 @@ package io.kestra.plugin.serdes.csv;
 
 import de.siegmar.fastcsv.writer.LineDelimiter;
 import de.siegmar.fastcsv.writer.QuoteStrategies;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.property.Property;
 import io.kestra.plugin.serdes.AbstractTextWriter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -39,7 +41,7 @@ import reactor.core.publisher.Mono;
         @Example(
             full = true,
             title = "Download a CSV file, transform it in SQL and store the transformed data as a CSV file.",
-            code = """     
+            code = """
 id: ion_to_csv
 namespace: company.team
 
@@ -54,7 +56,7 @@ tasks:
     inputFiles:
       data.csv: "{{ outputs.download_csv.uri }}"
     sql: |
-      SELECT 
+      SELECT
         job_title,
         ROUND(AVG(salary),2) AS avg_salary
       FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
@@ -76,50 +78,48 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(dynamic = true)
-    private String from;
+    private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "Specifies if the first line should be the header"
     )
-    @PluginProperty
-    private final Boolean header = true;
+    private final Property<Boolean> header = Property.of(true);
 
     @Builder.Default
     @Schema(
         title = "The field separator character"
     )
     @PluginProperty
-    private final Character fieldSeparator = ',';
+    private final Property<Character> fieldSeparator = Property.of(',');
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
     @PluginProperty
-    private final Character textDelimiter = '"';
+    private final Property<Character> textDelimiter = Property.of('"');
 
     @Builder.Default
     @Schema(
         title = "The character used to separate rows"
     )
     @PluginProperty
-    private final String lineDelimiter = "\n";
+    private final Property<String> lineDelimiter = Property.of("\n");
 
     @Builder.Default
     @Schema(
         title = "Whether fields should always be delimited using the textDelimiter option."
     )
     @PluginProperty
-    private final Boolean alwaysDelimitText = false;
+    private final Property<Boolean> alwaysDelimitText = Property.of(false);
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
     @PluginProperty
-    private final String charset = StandardCharsets.UTF_8.name();
+    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
 
 
     @Override
@@ -128,18 +128,18 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         File tempFile = runContext.workingDir().createTempFile(".csv").toFile();
 
         // reader
-        URI from = new URI(runContext.render(this.from));
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // formatter
         this.init(runContext);
 
         try (
             Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
-            Writer fileWriter = new BufferedWriter(new  FileWriter(tempFile, Charset.forName(this.charset)), FileSerde.BUFFER_SIZE);
-            de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter(fileWriter)
+            Writer fileWriter = new BufferedWriter(new  FileWriter(tempFile, Charset.forName(runContext.render(this.charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
+            de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter(fileWriter, runContext)
         ) {
 
-            
+            var headerValue = runContext.render(header).as(Boolean.class).orElseThrow();
             Flux<Object> flowable = FileSerde.readAll(inputStream)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
@@ -150,7 +150,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
                         if (row instanceof List) {
                             List<Object> casted = (List<Object>) row;
 
-                            if (header) {
+                            if (headerValue) {
                                 throw new IllegalArgumentException("Invalid data of type List with header");
                             }
 
@@ -161,7 +161,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
 
                             if (!first) {
                                 this.first = true;
-                                if (header) {
+                                if (headerValue) {
                                     var record = casted.keySet().stream().map(field -> convert(field)).toList();
                                     csvWriter.writeRecord(record);
                                 }
@@ -194,15 +194,21 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         private URI uri;
     }
 
-    private de.siegmar.fastcsv.writer.CsvWriter csvWriter(Writer writer) {
+    private de.siegmar.fastcsv.writer.CsvWriter csvWriter(Writer writer, RunContext runContext) throws IllegalVariableEvaluationException {
         var builder = de.siegmar.fastcsv.writer.CsvWriter.builder();
 
-        builder.quoteCharacter(this.textDelimiter);
-        builder.fieldSeparator(this.fieldSeparator);
-        builder.lineDelimiter(LineDelimiter.of(this.lineDelimiter));
-        if (this.alwaysDelimitText) {
-            builder.quoteStrategy(QuoteStrategies.ALWAYS);
-        }
+        runContext.render(this.textDelimiter).as(Character.class)
+                .ifPresent(builder::quoteCharacter);
+
+        runContext.render(this.fieldSeparator).as(Character.class)
+            .ifPresent(builder::fieldSeparator);
+
+        runContext.render(this.lineDelimiter).as(String.class)
+            .map(LineDelimiter::of)
+            .ifPresent(builder::lineDelimiter);
+
+        runContext.render(this.alwaysDelimitText).as(Boolean.class)
+            .ifPresent(b -> builder.quoteStrategy(QuoteStrategies.ALWAYS));
 
         return builder.build(writer);
     }

@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.avro;
 
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.plugin.serdes.avro.converter.AvroConverterConfig;
 import io.kestra.core.junit.annotations.KestraTest;
 import org.apache.avro.Schema;
@@ -52,9 +53,9 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(csv.toString())
-            .fieldSeparator(",".charAt(0))
-            .header(true)
+            .from(Property.of(csv.toString()))
+            .fieldSeparator(Property.of(",".charAt(0)))
+            .header(Property.of(true))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -124,9 +125,9 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(csv.toString())
-            .fieldSeparator(",".charAt(0))
-            .header(true)
+            .from(Property.of(csv.toString()))
+            .fieldSeparator(Property.of(",".charAt(0)))
+            .header(Property.of(true))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -158,9 +159,9 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(csv.toString())
-            .fieldSeparator(",".charAt(0))
-            .header(false)
+            .from(Property.of(csv.toString()))
+            .fieldSeparator(Property.of(",".charAt(0)))
+            .header(Property.of(false))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -192,9 +193,9 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(csv.toString())
-            .fieldSeparator(",".charAt(0))
-            .header(true)
+            .from(Property.of(csv.toString()))
+            .fieldSeparator(Property.of(",".charAt(0)))
+            .header(Property.of(true))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -363,9 +364,9 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(csv.toString())
-            .fieldSeparator(",".charAt(0))
-            .header(false)
+            .from(Property.of(csv.toString()))
+            .fieldSeparator(Property.of(",".charAt(0)))
+            .header(Property.of(false))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 

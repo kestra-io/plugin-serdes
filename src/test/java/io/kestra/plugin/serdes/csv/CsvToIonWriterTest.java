@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.csv;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import org.junit.jupiter.api.Test;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.runners.RunContext;
@@ -38,20 +39,20 @@ class CsvToIonWriterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(CsvToIonWriterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(source.toString())
-            .fieldSeparator(";".charAt(0))
-            .header(header)
+            .from(Property.of(source.toString()))
+            .fieldSeparator(Property.of(";".charAt(0)))
+            .header(Property.of(header))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToCsv writer = IonToCsv.builder()
             .id(CsvToIonWriterTest.class.getSimpleName())
             .type(IonToCsv.class.getName())
-            .from(readerRunOutput.getUri().toString())
-            .fieldSeparator(";".charAt(0))
-            .alwaysDelimitText(true)
-            .lineDelimiter((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n"))
-            .header(header)
+            .from(Property.of(readerRunOutput.getUri().toString()))
+            .fieldSeparator(Property.of(";".charAt(0)))
+            .alwaysDelimitText(Property.of(true))
+            .lineDelimiter(Property.of((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n")))
+            .header(Property.of(header))
             .build();
         IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -79,10 +80,10 @@ class CsvToIonWriterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(CsvToIonWriterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(source.toString())
-            .fieldSeparator(";".charAt(0))
-            .skipRows(4)
-            .header(false)
+            .from(Property.of(source.toString()))
+            .fieldSeparator(Property.of(";".charAt(0)))
+            .skipRows(Property.of(4))
+            .header(Property.of(false))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
