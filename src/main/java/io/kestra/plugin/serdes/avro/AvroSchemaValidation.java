@@ -3,7 +3,8 @@ package io.kestra.plugin.serdes.avro;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = AvroSchemaValidator.class)

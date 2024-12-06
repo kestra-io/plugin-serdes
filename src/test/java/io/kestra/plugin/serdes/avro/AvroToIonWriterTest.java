@@ -3,16 +3,17 @@ package io.kestra.plugin.serdes.avro;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.core.junit.annotations.KestraTest;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
-import jakarta.inject.Inject;
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
 import java.net.URI;
 import java.util.Objects;
 

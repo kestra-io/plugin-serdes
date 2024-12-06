@@ -3,7 +3,6 @@ package io.kestra.plugin.serdes.xml;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -11,6 +10,7 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -19,13 +19,12 @@ import org.json.JSONObject;
 import org.json.XML;
 import org.json.XMLParserConfiguration;
 
-import jakarta.validation.constraints.NotNull;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -103,8 +102,9 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
-            if (parserConfiguration != null) {
-                xmlParserConfiguration = xmlParserConfiguration.withForceList(parserConfiguration.getForceList());
+            var renderdParserConfig = runContext.render(parserConfiguration.getForceList()).asList(String.class);
+            if (!renderdParserConfig.isEmpty()) {
+                xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(renderdParserConfig));
             }
             JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
 
@@ -163,7 +163,6 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         @Schema(
             title = "List of XML tags that must be parsed as lists."
         )
-        @PluginProperty
-        private Set<String> forceList;
+        private Property<List<String>> forceList;
     }
 }

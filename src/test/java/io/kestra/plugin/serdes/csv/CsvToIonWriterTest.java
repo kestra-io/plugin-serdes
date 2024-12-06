@@ -3,20 +3,20 @@ package io.kestra.plugin.serdes.csv;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
 import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.property.Property;
-import org.junit.jupiter.api.Test;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
+import jakarta.inject.Inject;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
-import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;

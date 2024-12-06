@@ -1,9 +1,15 @@
 package io.kestra.plugin.serdes.avro;
 
 import com.google.common.collect.ImmutableMap;
-import io.kestra.core.models.property.Property;
-import io.kestra.plugin.serdes.avro.converter.AvroConverterConfig;
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.serdes.SerdesUtils;
+import io.kestra.plugin.serdes.csv.CsvToIon;
+import io.kestra.plugin.serdes.json.JsonToIon;
+import jakarta.inject.Inject;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.SchemaParseException;
@@ -14,14 +20,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.*;
 import org.junit.jupiter.api.Test;
-import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.plugin.serdes.csv.CsvToIon;
-import io.kestra.plugin.serdes.json.JsonToIon;
 
-import jakarta.inject.Inject;
 import java.io.*;
 import java.net.URI;
 import java.util.HashMap;

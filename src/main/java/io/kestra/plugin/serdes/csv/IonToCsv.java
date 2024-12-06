@@ -5,16 +5,19 @@ import de.siegmar.fastcsv.writer.QuoteStrategies;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.property.Property;
-import io.kestra.plugin.serdes.AbstractTextWriter;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.plugin.serdes.AbstractTextWriter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.net.URI;
@@ -23,10 +26,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-
-import jakarta.validation.constraints.NotNull;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 @SuperBuilder
 @ToString
@@ -90,21 +89,18 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Schema(
         title = "The field separator character"
     )
-    @PluginProperty
     private final Property<Character> fieldSeparator = Property.of(',');
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
-    @PluginProperty
     private final Property<Character> textDelimiter = Property.of('"');
 
     @Builder.Default
     @Schema(
         title = "The character used to separate rows"
     )
-    @PluginProperty
     private final Property<String> lineDelimiter = Property.of("\n");
 
     @Builder.Default

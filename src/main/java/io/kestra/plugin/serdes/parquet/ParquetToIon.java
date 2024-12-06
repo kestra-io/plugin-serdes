@@ -2,7 +2,6 @@ package io.kestra.plugin.serdes.parquet;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -11,6 +10,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroDeserializer;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.generic.GenericRecord;
@@ -19,16 +19,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.net.URI;
 import java.util.Map;
 import java.util.function.Consumer;
-
-import jakarta.validation.constraints.NotNull;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 

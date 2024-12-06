@@ -2,7 +2,6 @@ package io.kestra.plugin.serdes.avro;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.validations.DateFormat;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;

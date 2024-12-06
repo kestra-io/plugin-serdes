@@ -2,21 +2,19 @@ package io.kestra.plugin.serdes.avro;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.runners.RunContext;
 import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
-
-import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;

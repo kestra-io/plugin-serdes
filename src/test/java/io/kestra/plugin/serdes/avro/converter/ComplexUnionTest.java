@@ -1,11 +1,11 @@
 package io.kestra.plugin.serdes.avro.converter;
 
+import io.kestra.plugin.serdes.avro.AvroConverterTest;
 import org.apache.avro.Schema;
 import org.apache.avro.util.Utf8;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import io.kestra.plugin.serdes.avro.AvroConverterTest;
 
 import java.util.Arrays;
 import java.util.List;

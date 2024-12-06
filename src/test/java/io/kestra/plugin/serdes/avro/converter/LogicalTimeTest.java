@@ -1,8 +1,8 @@
 package io.kestra.plugin.serdes.avro.converter;
 
+import io.kestra.plugin.serdes.avro.AvroConverterTest;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
-import io.kestra.plugin.serdes.avro.AvroConverterTest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;

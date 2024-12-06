@@ -8,20 +8,19 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.Rethrow;
 import io.kestra.core.validations.DateFormat;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.function.Function;
-
-import jakarta.validation.constraints.NotNull;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 @SuperBuilder
 @ToString
@@ -99,7 +98,6 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
         description = "Default value is '.'"
     )
-    @PluginProperty(dynamic = true)
     protected final Property<Character> decimalSeparator = Property.of('.');
 
     @Builder.Default
@@ -122,7 +120,6 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Timezone to use when no timezone can be parsed on the source.",
         description = "If null, the timezone will be `UTC` Default value is system timezone"
     )
-    @PluginProperty
     protected final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
 
 

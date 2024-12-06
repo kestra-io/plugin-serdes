@@ -1,7 +1,6 @@
 package io.kestra.plugin.serdes.excel;
 
 import com.github.pjfanning.xlsx.StreamingReader;
-
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -14,15 +13,17 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.ListUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.poi.ss.usermodel.*;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.PositiveOrZero;
 import reactor.core.publisher.Flux;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -89,7 +90,6 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         description = "Possible values: SERIAL_NUMBER, FORMATTED_STRING"
     )
     @Builder.Default
-    @PluginProperty
     private Property<DateTimeRender> dateTimeRender = Property.of(DateTimeRender.UNFORMATTED_VALUE);
 
     @Schema(
