@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.avro;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.TestsUtils;
@@ -57,7 +58,7 @@ public class AvroToIonWriterTest {
             .id(IonToAvroTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
             .from(readerRunOutput.getUri().toString())
-            .inferAllFields(false)
+            .inferAllFields(Property.of(false))
             .schema(
                 Files.asCharSource(
                     new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource(file.replace(".avro",".avsc"))).toURI()),

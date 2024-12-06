@@ -32,7 +32,7 @@ import jakarta.validation.constraints.NotNull;
         @Example(
             full = true,
             title = "Convert a CSV file to the Avro format.",
-            code = """     
+            code = """
 id: divvy_tripdata
 namespace: company.team
 
@@ -118,7 +118,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
-            Long lineCount = this.convert(inputStream, schema, dataFileWriter::append);
+            Long lineCount = this.convert(inputStream, schema, dataFileWriter::append, runContext);
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));

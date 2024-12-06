@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.parquet;
 
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
@@ -63,7 +64,7 @@ class ParquetToIonWriterTest {
                     Objects.requireNonNull(ParquetToIonWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
                     StandardCharsets.UTF_8
                 ))
-                .timeZoneId("UTC")
+                .timeZoneId(Property.of("UTC"))
                 .build();
 
             IonToParquet.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
@@ -71,7 +72,7 @@ class ParquetToIonWriterTest {
             ParquetToIon reader = ParquetToIon.builder()
                 .id(ParquetToIon.class.getSimpleName())
                 .type(ParquetToIon.class.getName())
-                .from(writerOutput.getUri().toString())
+                .from(Property.of(writerOutput.getUri().toString()))
                 .build();
 
             ParquetToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));

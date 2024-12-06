@@ -42,7 +42,7 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
         @Example(
             full = true,
             title = "Read a CSV file, transform it and store the transformed data as a parquet file.",
-            code = """     
+            code = """
 id: ion_to_parquet
 namespace: company.team
 
@@ -57,7 +57,7 @@ tasks:
     inputFiles:
       data.csv: "{{ outputs.download_csv.uri }}"
     sql: |
-      SELECT 
+      SELECT
         job_title,
         ROUND(AVG(salary),2) AS avg_salary
       FROM read_csv_auto('{{ workingDir }}/data.csv', header=True)
@@ -174,7 +174,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
             Reader inputStream = new InputStreamReader(runContext.storage().getFile(from))
         )
         {
-            Long lineCount = this.convert(inputStream, schema, writer::write);
+            Long lineCount = this.convert(inputStream, schema, writer::write, runContext);
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));

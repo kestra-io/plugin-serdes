@@ -1,7 +1,10 @@
 package io.kestra.plugin.serdes.avro;
 
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.Rethrow;
 import io.kestra.core.validations.DateFormat;
@@ -10,9 +13,7 @@ import lombok.experimental.SuperBuilder;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.Reader;
 import java.time.ZoneId;
 import java.util.*;
@@ -20,7 +21,6 @@ import java.util.function.Function;
 
 import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 @SuperBuilder
@@ -41,22 +41,19 @@ public abstract class AbstractAvroConverter extends Task {
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Values to consider as True"
     )
-    @PluginProperty(dynamic = true)
-    protected final List<String> trueValues = Arrays.asList("t", "true", "enabled", "1", "on", "yes");
+    protected final Property<List<String>> trueValues = Property.of(Arrays.asList("t", "true", "enabled", "1", "on", "yes"));
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Values to consider as False"
     )
-    @PluginProperty(dynamic = true)
-    protected final List<String> falseValues = Arrays.asList("f", "false", "disabled", "0", "off", "no", "");
+    protected final Property<List<String>> falseValues = Property.of(Arrays.asList("f", "false", "disabled", "0", "off", "no", ""));
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Values to consider as null"
     )
-    @PluginProperty(dynamic = true)
-    protected final List<String> nullValues = Arrays.asList(
+    protected final Property<List<String>> nullValues = Property.of(Arrays.asList(
         "",
         "#N/A",
         "#N/A N/A",
@@ -70,7 +67,7 @@ public abstract class AbstractAvroConverter extends Task {
         "n/a",
         "nan",
         "null"
-    );
+    ));
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -103,15 +100,14 @@ public abstract class AbstractAvroConverter extends Task {
         description = "Default value is '.'"
     )
     @PluginProperty(dynamic = true)
-    protected final Character decimalSeparator = '.';
+    protected final Property<Character> decimalSeparator = Property.of('.');
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Whether to consider a field present in the data but not declared in the schema as an error",
         description = "Default value is false"
     )
-    @PluginProperty
-    protected Boolean strictSchema = Boolean.FALSE;
+    protected Property<Boolean> strictSchema = Property.of(Boolean.FALSE);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -119,8 +115,7 @@ public abstract class AbstractAvroConverter extends Task {
         description = "If true, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`." +
             "If false, we will infer bool & null only on field declared on schema as `null` and `bool`."
     )
-    @PluginProperty
-    protected Boolean inferAllFields = false;
+    protected Property<Boolean> inferAllFields = Property.of(false);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -128,11 +123,23 @@ public abstract class AbstractAvroConverter extends Task {
         description = "If null, the timezone will be `UTC` Default value is system timezone"
     )
     @PluginProperty
-    protected final String timeZoneId = ZoneId.systemDefault().toString();
+    protected final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
 
 
-    protected <E extends Exception> Long convert(Reader inputStream, Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer) throws IOException {
-        AvroConverter converter = new AvroConverter(this);
+    protected <E extends Exception> Long convert(Reader inputStream, Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext) throws IOException, IllegalVariableEvaluationException {
+        AvroConverter converter = AvroConverter.builder()
+            .schema(runContext.render(this.schema))
+            .nullValues(runContext.render(this.nullValues).asList(String.class))
+            .trueValues(runContext.render(this.trueValues).asList(String.class))
+            .falseValues(runContext.render(this.falseValues).asList(String.class))
+            .dateFormat(runContext.render(this.dateFormat))
+            .timeFormat(runContext.render(this.timeFormat))
+            .datetimeFormat(runContext.render(this.datetimeFormat))
+            .decimalSeparator(runContext.render(this.decimalSeparator).as(Character.class).orElseThrow())
+            .strictSchema(runContext.render(this.strictSchema).as(Boolean.class).orElseThrow())
+            .inferAllFields(runContext.render(this.inferAllFields).as(Boolean.class).orElseThrow())
+            .timeZoneId(runContext.render(this.timeZoneId).as(String.class).orElseThrow())
+            .build();
 
         Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
             .map(this.convertToAvro(schema, converter))

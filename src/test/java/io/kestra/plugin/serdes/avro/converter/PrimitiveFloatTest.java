@@ -41,7 +41,7 @@ public class PrimitiveFloatTest {
     @MethodSource("separator")
     void convertSeparator(Object v, float expected, Character separator) throws Exception {
         AvroConverterTest.Utils.oneField(
-            new AvroConverter(AvroConverterConfig.builder().decimalSeparator(separator).build()),
+            AvroConverter.builder().decimalSeparator(separator).build(),
             v,
             expected,
             Schema.create(Schema.Type.FLOAT)

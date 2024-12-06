@@ -4,6 +4,7 @@ import com.devskiller.friendly_id.FriendlyId;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
@@ -64,7 +65,7 @@ class IonToAvroTest {
             .id(IonToAvroTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
             .from(source.toString())
-            .inferAllFields(false)
+            .inferAllFields(Property.of(false))
             .schema(
                 Files.asCharSource(
                     new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("csv/insurance_sample.avsc")).toURI()),

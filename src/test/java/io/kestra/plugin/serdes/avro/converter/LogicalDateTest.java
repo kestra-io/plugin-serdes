@@ -51,11 +51,10 @@ class LogicalDateTest {
     @ParameterizedTest
     @MethodSource("withFormat")
     void convertWithFormat(CharSequence v, String format, LocalDate expected) throws Exception {
-        AvroConverter avroConverter = new AvroConverter(AvroConverterConfig
+        AvroConverter avroConverter = AvroConverter
             .builder()
             .dateFormat(format)
-            .build()
-        );
+            .build();
 
         AvroConverterTest.Utils.oneField(avroConverter, v, expected, LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)));
     }

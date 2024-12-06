@@ -45,7 +45,7 @@ public class LogicalDecimalTest {
     @MethodSource("separator")
     void convertSeparator(Object v, BigDecimal expected, Integer precision, Integer scale, Character separator) throws Exception {
         AvroConverterTest.Utils.oneField(
-            new AvroConverter(AvroConverterConfig.builder().decimalSeparator(separator).build()),
+            AvroConverter.builder().decimalSeparator(separator).build(),
             v,
             expected,
             LogicalTypes.decimal(precision, scale).addToSchema(Schema.create(Schema.Type.BYTES))
