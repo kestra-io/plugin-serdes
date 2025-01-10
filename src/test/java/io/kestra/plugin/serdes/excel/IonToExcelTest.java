@@ -28,7 +28,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 
 @KestraTest
-public class IonToExcelTest {
+class IonToExcelTest {
     @Inject
     RunContextFactory runContextFactory;
 

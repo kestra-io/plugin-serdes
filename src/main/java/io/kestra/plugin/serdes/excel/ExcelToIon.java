@@ -60,11 +60,10 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
     }
 )
 public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> {
-    @NotBlank
     @Schema(
         title = "Source file URI"
     )
-    private Property<String> from;
+    private Property<@NotBlank String> from;
 
     @Schema(
         title = "The sheets title to be included"
