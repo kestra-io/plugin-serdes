@@ -14,6 +14,7 @@ import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.ListUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -63,7 +64,8 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     @Schema(
         title = "Source file URI"
     )
-    private Property<@NotBlank String> from;
+    @NotNull
+    private Property<String> from;
 
     @Schema(
         title = "The sheets title to be included"
