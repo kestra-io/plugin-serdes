@@ -1,5 +1,5 @@
 id: ion_to_avro
-namespace: qa
+namespace: sanitychecks
 
 tasks:
   - id: create_csv
