@@ -102,7 +102,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target row group size"
     )
-    private Property<Version> version = Property.of(Version.V2);
+    private Property<Version> parquetVersion = Property.of(Version.V2);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -153,7 +153,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
 
         AvroParquetWriter.Builder<GenericData.Record> parquetWriterBuilder = AvroParquetWriter
             .<GenericData.Record>builder(outfileFile)
-            .withWriterVersion(runContext.render(version).as(Version.class).orElseThrow() == Version.V2 ? PARQUET_2_0 : PARQUET_1_0)
+            .withWriterVersion(runContext.render(parquetVersion).as(Version.class).orElseThrow() == Version.V2 ? PARQUET_2_0 : PARQUET_1_0)
             .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
             .withCompressionCodec(codec)
             .withDictionaryEncoding(true)
