@@ -8,6 +8,7 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -71,6 +72,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
     @Schema(
         title = "Source file URI"
     )
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Builder.Default

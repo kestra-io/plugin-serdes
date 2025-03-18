@@ -95,6 +95,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Builder.Default

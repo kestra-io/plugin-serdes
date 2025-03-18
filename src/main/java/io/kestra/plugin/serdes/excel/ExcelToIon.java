@@ -65,6 +65,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         title = "Source file URI"
     )
     @NotNull
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Schema(

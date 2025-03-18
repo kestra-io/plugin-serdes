@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.xml;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -64,6 +65,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Builder.Default

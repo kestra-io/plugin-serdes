@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.avro;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -61,6 +62,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Source file URI"
     )
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     public Output run(RunContext runContext) throws Exception {

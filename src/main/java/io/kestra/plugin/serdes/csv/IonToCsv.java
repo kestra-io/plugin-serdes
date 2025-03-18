@@ -77,6 +77,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Schema(
         title = "Source file URI"
     )
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Builder.Default

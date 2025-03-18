@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.parquet;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -46,13 +47,13 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
             code = """
                 id: ion_to_parquet
                 namespace: company.team
-                
+
                 tasks:
                   - id: download_csv
                     type: io.kestra.plugin.core.http.Download
                     description: salaries of data professionals from 2020 to 2023 (source ai-jobs.net)
                     uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
-                
+
                   - id: avg_salary_by_job_title
                     type: io.kestra.plugin.jdbc.duckdb.Query
                     inputFiles:
@@ -66,7 +67,7 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
                       HAVING COUNT(job_title) > 10
                       ORDER BY avg_salary DESC;
                     store: true
-                
+
                   - id: result
                     type: io.kestra.plugin.serdes.parquet.IonToParquet
                     from: "{{ outputs.avg_salary_by_job_title.uri }}"
@@ -90,6 +91,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Source file URI"
     )
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Builder.Default

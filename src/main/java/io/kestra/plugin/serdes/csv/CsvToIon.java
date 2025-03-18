@@ -60,6 +60,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @NotNull
     @Schema(
         title = "Source file URI")
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Builder.Default
