@@ -1,4 +1,4 @@
-id: ion_to_excel
+id: excel
 namespace: sanitychecks.plugin-serdes
 variables:
   sheet_title: my_sheet-123

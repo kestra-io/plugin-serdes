@@ -1,4 +1,4 @@
-id: csv_to_ion
+id: csv
 namespace: sanitychecks.plugin-serdes
 
 tasks:
