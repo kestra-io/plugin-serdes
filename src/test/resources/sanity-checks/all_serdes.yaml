@@ -1,4 +1,4 @@
-id: all
+id: all_serdes
 namespace: sanitychecks.plugin-serdes
 
 tasks:
