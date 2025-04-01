@@ -1,4 +1,4 @@
-id: ion_to_avro
+id: avro
 namespace: sanitychecks.plugin-serdes
 
 tasks:
