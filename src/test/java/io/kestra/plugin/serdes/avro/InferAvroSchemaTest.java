@@ -26,7 +26,7 @@ import java.util.List;
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
 @KestraTest
-public class InferIonToAvroTest {
+public class InferAvroSchemaTest {
     @Inject
     StorageInterface storageInterface;
 
@@ -35,7 +35,7 @@ public class InferIonToAvroTest {
 
     @Test
     void ion() throws Exception {
-        var tempFile = File.createTempFile(InferIonToAvroTest.class.getSimpleName().toLowerCase() + "_", ".ion");
+        var tempFile = File.createTempFile(InferAvroSchemaTest.class.getSimpleName().toLowerCase() + "_", ".ion");
         try (var output = new FileOutputStream(tempFile)) {
             List.of(
                     ImmutableMap.builder()

@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.avro;
 import io.kestra.core.serializers.FileSerde;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -19,22 +20,30 @@ public class InferAvroSchema {
     private InferAvroSchema() {
     }
 
-    public static void inferAvroSchemaFromIon(Reader inputStream, OutputStream output) throws IOException {
+    public static void inferAvroSchemaFromIon(Reader inputStream, OutputStream output) {
         var foundFields = new ArrayList<Schema.Field>();
-        var flowable = FileSerde.readAll(inputStream)
-                .take(1)// TODO improve
-                .doOnNext(row -> {
-                    // TODO handle array / string
-                    foundFields.add(
-                            inferField("root_name_to_name", row)// TODO name
-                    );
-                });
+        Flux<Object> flowable = null;
+        try {
+            flowable = FileSerde.readAll(inputStream)
+                    .take(1)// TODO see for better inference algo, since the user wants to do an API call > JSON > Parquet
+                    .doOnNext(row -> {
+                        foundFields.add(
+                                inferField("root_name_to_name", row)// TODO name
+                        );
+                    });
+        } catch (IOException e) {
+            throw new RuntimeException("could not parse Ion input stream, err: " + e.getMessage(), e);
+        }
         flowable.count().block();
-        output.write(foundFields.stream().findFirst().get().schema().toString().getBytes(StandardCharsets.UTF_8));
+        try {
+            output.write(foundFields.stream().findFirst().get().schema().toString().getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new RuntimeException("could not write Avro schema in output stream, err: " + e.getMessage(), e);
+        }
     }
 
     @SuppressWarnings("unchecked")
-    public static Schema.Field inferField(String name, Object node) {
+    private static Schema.Field inferField(String name, Object node) {
         if (node instanceof Map) {
             var map = (Map<String, Object>) node;
             var inferredFields = new ArrayList<Schema.Field>();
@@ -67,32 +76,32 @@ public class InferAvroSchema {
             }
             // TODO handle this case
         } else if (node instanceof byte[]) {
-            return new Schema.Field(name, Schema.create(Schema.Type.BYTES));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.BYTES)));
         } else if (node instanceof String) {
-            return new Schema.Field(name, Schema.create(Schema.Type.STRING));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.STRING)));
         } else if (node instanceof Integer) {
-            return new Schema.Field(name, Schema.create(Schema.Type.INT));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.INT)));
         } else if (node instanceof Float) {
-            return new Schema.Field(name, Schema.create(Schema.Type.FLOAT));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.FLOAT)));
         } else if (node instanceof Double) {
-            return new Schema.Field(name, Schema.create(Schema.Type.DOUBLE));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.DOUBLE)));
         } else if (node instanceof Boolean) {
-            return new Schema.Field(name, Schema.create(Schema.Type.LONG));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.LONG)));
         } else if (
                 Stream.of(Instant.class, ZonedDateTime.class, LocalDateTime.class, OffsetDateTime.class)
                         .anyMatch(c -> c.isInstance(node))
         ) {
-            return new Schema.Field(name, Schema.createUnion(LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG))));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG))));
         } else if (node instanceof LocalDate || node instanceof Date) {
-            return new Schema.Field(name, Schema.createUnion(LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT))));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT))));
         } else if (node instanceof LocalTime || node instanceof OffsetTime) {
-            return new Schema.Field(name, Schema.createUnion(LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT))));
+            return new Schema.Field(name, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT))));
         }
-        // TODO optional avro fields with Union
+
         // TODO add unit test with complex nested structure, with clashing names (generate fields name ? UUID ?)
         // TODO generate ion file with kestra, and check if we always output the same structure per line -> do we remove null or empty fields/arrays ?
-        // TODO check most kestra generated ion are handled
-        // TODO see for better inference algo, since the user wants to do an API call > JSON > Parquet
+        // TODO check if most kestra generated ion are handled
+
         throw new IllegalArgumentException("Unhandled node " + name + " with content: " + node);
     }
 }
