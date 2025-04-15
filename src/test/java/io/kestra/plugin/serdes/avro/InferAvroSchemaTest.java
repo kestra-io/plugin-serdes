@@ -69,56 +69,56 @@ public class InferAvroSchemaTest {
             JSONAssert.assertEquals("""
                     {
                       "type": "record",
-                      "name": "root_name_to_name",
+                      "name": "root",
                       "namespace": "io.kestra.plugin.serdes.avro",
                       "fields": [
                         {
                           "name": "myString",
-                          "type": "string"
+                          "type": ["null", "string"]
                         },
                         {
                           "name": "myInt",
-                          "type": "int"
+                          "type": ["null", "int"]
                         },
                         {
                           "name": "myFloat",
-                          "type": "double"
+                          "type": ["null", "double"]
                         },
                         {
                           "name": "myDouble",
-                          "type": "double"
+                          "type": ["null", "double"]
                         },
                         {
                           "name": "myInstant",
-                          "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+                          "type": ["null", {"type": "long", "logicalType": "local-timestamp-millis"}]
                         },
                         {
                           "name": "myZonedDateTime",
-                          "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+                          "type": ["null", {"type": "long", "logicalType": "local-timestamp-millis"}]
                         },
                         {
                           "name": "myLocalDateTime",
-                          "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+                          "type": ["null", {"type": "long", "logicalType": "local-timestamp-millis"}]
                         },
                         {
                           "name": "myOffsetDateTime",
-                          "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+                          "type": ["null", {"type": "long", "logicalType": "local-timestamp-millis"}]
                         },
                         {
                           "name": "myLocalDate",
-                          "type": [{"type": "int", "logicalType": "date"}]
+                          "type": ["null", {"type": "int", "logicalType": "date"}]
                         },
                         {
                           "name": "myLocalTime",
-                          "type": [{"type": "int", "logicalType": "time-millis"}]
+                          "type": ["null", {"type": "int", "logicalType": "time-millis"}]
                         },
                         {
                           "name": "myOffsetTime",
-                          "type": [{"type": "int", "logicalType": "time-millis"}]
+                          "type": ["null", {"type": "int", "logicalType": "time-millis"}]
                         },
                         {
                           "name": "myDate",
-                          "type": [{"type": "long", "logicalType": "local-timestamp-millis"}]
+                          "type": ["null", {"type": "long", "logicalType": "local-timestamp-millis"}]
                         }
                       ]
                     }

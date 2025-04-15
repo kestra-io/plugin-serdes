@@ -17,8 +17,6 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 
-import static io.kestra.plugin.serdes.avro.InferAvroSchema.inferAvroSchemaFromIon;
-
 
 @SuperBuilder
 @ToString
@@ -48,7 +46,7 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
             var inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
             var output = new BufferedOutputStream(new FileOutputStream(tempAvroSchemaFile), FileSerde.BUFFER_SIZE);
         ) {
-            inferAvroSchemaFromIon(inputStream, output);
+            new InferAvroSchema().inferAvroSchemaFromIon(inputStream, output);
             output.flush();
         }
 

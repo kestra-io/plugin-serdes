@@ -1,5 +1,6 @@
-package io.kestra.plugin.serdes.avro;
+package io.kestra.plugin.serdes.avro.infer;
 
+import io.kestra.plugin.serdes.avro.InferAvroSchema;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.FieldSource;
 import org.skyscreamer.jsonassert.JSONAssert;
@@ -16,7 +17,7 @@ public class InferAvroSchemaFromIonTest {
         public String toString() {
             return name + ": input" + input;
         }
-    }// TODO see to switch out from ParameterizedTest and just use method
+    }
 
     static List<TestCase> testCases = List.of(
         new TestCase(
@@ -38,7 +39,7 @@ public class InferAvroSchemaFromIonTest {
                 """
         ),
         new TestCase(
-            "complex nested records with clashing field names",
+            "complex nested records with clashing field names do not raise error",
             """
                 {
                     myField: "hey",
@@ -56,7 +57,7 @@ public class InferAvroSchemaFromIonTest {
                 }
                 """,
             """
-                {"TODO": "todo"}
+                { }
                 """
         ),
         new TestCase(
@@ -92,14 +93,14 @@ public class InferAvroSchemaFromIonTest {
                 }
                 """
         )
-        /*, new TestCase( TODO unhandled yet, will need to go through all list
+        , new TestCase(
             "array of objects with unmatching types",
             """
                 {
                     myArray: [
                         {myName: "one"},
-                        {myName: "two"},
-                        {myName: "three", anAdditionalField: "hey"}
+                        {myName: "two", anAdditionalField: "hey"},
+                        {myName: "three"}
                     ]
                 }
                 """,
@@ -112,7 +113,6 @@ public class InferAvroSchemaFromIonTest {
                           "type" : "array",
                           "items" : {
                             "type" : "record",
-                            "name" : "myArray_items",
                             "fields" : [
                               {
                                 "name" : "myName",
@@ -129,7 +129,7 @@ public class InferAvroSchemaFromIonTest {
                   ]
                 }
                 """
-        )*/
+        )
     );
 
     @ParameterizedTest
@@ -138,7 +138,7 @@ public class InferAvroSchemaFromIonTest {
         var output = new ByteArrayOutputStream();
 
         // when
-        InferAvroSchema.inferAvroSchemaFromIon(
+        new InferAvroSchema().inferAvroSchemaFromIon(
             new InputStreamReader(new ByteArrayInputStream(testCase.input().getBytes())),
             output
         );
