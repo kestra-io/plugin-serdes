@@ -35,7 +35,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read a XML file and write it to an ion serialized data file."
+    title = "Convert an XML file into ION."
 )
 @Slf4j
 @Plugin(

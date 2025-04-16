@@ -33,7 +33,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @io.swagger.v3.oas.annotations.media.Schema(
-    title = "Read a provided avro file and convert it to ion serialized data file."
+    title = "Convert an Avro file into ION."
 )
 @Plugin(
     examples = {

@@ -37,7 +37,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read data from Excel into a row-wise ION-serialized format"
+    title = "Convert an Excel file into ION."
 )
 @Plugin(
     examples = {
