@@ -88,9 +88,7 @@ public class InferAvroSchemaFromIonTest {
                                    "type": [
                                      "string",
                                      "null"
-                                   ],
-                                   "doc": "",
-                                   "default": null
+                                   ]
                                  }
                                ]
                              },
@@ -120,26 +118,38 @@ public class InferAvroSchemaFromIonTest {
             """
                 {
                   "fields": [
-                    {
-                        "name" : "myArray",
-                        "type" : {
-                          "type" : "array",
-                          "items" : {
-                            "type" : "record",
-                            "fields" : [
+                      {
+                        "name": "myArray",
+                        "type": [
+                          {
+                            "type": "array",
+                            "items": [
+                              "null",
                               {
-                                "name" : "myName",
-                                "type" : [ "null", "string" ]
-                              },
-                              {
-                                "name" : "anAdditionalField",
-                                "type" : [ "null", "string" ]
+                                "type": "record",
+                                "fields": [
+                                  {
+                                    "name": "myName",
+                                    "type": [
+                                      "null",
+                                      "string"
+                                    ]
+                                  },
+                                  {
+                                    "name": "anAdditionalField",
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                ]
                               }
                             ]
-                          }
-                        }
-                    }
-                  ]
+                          },
+                          "null"
+                        ]
+                      }
+                    ]
                 }
                 """
         );

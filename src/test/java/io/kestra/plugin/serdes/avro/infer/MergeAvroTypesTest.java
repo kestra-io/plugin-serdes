@@ -141,6 +141,35 @@ public class MergeAvroTypesTest {
             });
     }
 
+    @Test
+    void mergeBothAreUnionOfRecords_AHasAnAdditionalType() {
+        assertThat(mergeTypes(
+            new Field(rndStr(), Schema.createUnion(Schema.create(NULL),
+                Schema.createRecord(rndStr(), "doc", "namespace", false,
+                    List.of(
+                        new Field("fieldOne", Schema.create(STRING)),
+                        new Field("fieldTwo", Schema.create(STRING))
+                    )
+                ))),
+            new Field(rndStr(), Schema.createUnion(Schema.create(NULL),
+                Schema.createRecord(rndStr(), "doc", "namespace", false,
+                    List.of(
+                        new Field("fieldOne", Schema.create(STRING))
+                    )
+                )))
+        )).extracting(Field::schema)
+            .satisfies(schema -> {
+                assertThat(schema).extracting(Schema::getType).isEqualTo(UNION);
+                assertThat(schema.getTypes())
+                    .extracting(Schema::getType)
+                    .containsOnly(NULL, RECORD);
+                assertThat(schema.getTypes().stream().filter(x -> x.getType().equals(RECORD)).findFirst().get()).satisfies(record -> {
+                    assertThat(record.getFields())
+                        .extracting(Field::name).containsOnly("fieldOne", "fieldTwo");
+                });
+            });
+    }
+
     String rndStr() {
         java.util.Random random = new java.util.Random();
         return "rnd_" + random.nextLong(0, Long.MAX_VALUE);

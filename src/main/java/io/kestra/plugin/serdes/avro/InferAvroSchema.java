@@ -158,7 +158,7 @@ public class InferAvroSchema {
     public static Field mergeTypes(Field a, Field b) {
 
         if (a.schema().getType() == UNION || b.schema().getType() == UNION) {
-            var set = new LinkedHashSet<Schema>();
+            var set = new HashSet<Schema>();
             if (a.schema().getType() == UNION) {
                 set.addAll(a.schema().getTypes());
             } else {
@@ -168,6 +168,11 @@ public class InferAvroSchema {
                 set.addAll(b.schema().getTypes());
             } else {
                 set.add(b.schema());
+            }
+            var recordsToMerge = set.stream().filter(x -> RECORD.equals(x.getType())).toList();
+            if (recordsToMerge.size() > 1) {
+                set = (HashSet<Schema>) set.stream().filter(x -> !RECORD.equals(x.getType())).collect(Collectors.toSet());
+                set.add(mergeTwoRecords(new Field("tmp", recordsToMerge.get(0)), new Field("tmp2", recordsToMerge.get(1))).schema());
             }
             return new Field(a, Schema.createUnion(new ArrayList<>(set)));
         } else if (a.schema().getType() == RECORD || b.schema().getType() == RECORD) {
