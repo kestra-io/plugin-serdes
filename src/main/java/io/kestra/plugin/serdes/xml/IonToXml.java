@@ -35,7 +35,7 @@ import java.util.TimeZone;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read an ion serialized data file and write it to a XML file."
+    title = "Convert an ION file into XML."
 )
 @Plugin(
     examples = {

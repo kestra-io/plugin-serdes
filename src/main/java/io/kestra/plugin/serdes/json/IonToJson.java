@@ -39,7 +39,8 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read an ion serialized data file and write it to a new line delimited json file."
+    title = "Convert an ION file into a JSONL file.",
+    description = "JSONL is the referrer for newline-delimited JSON."
 )
 @Plugin(
     examples = {

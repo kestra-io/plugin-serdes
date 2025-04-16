@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read a csv file and write it to an ion serialized data file."
+    title = "Convert a CSV file into ION."
 )
 @Plugin(
     examples = {

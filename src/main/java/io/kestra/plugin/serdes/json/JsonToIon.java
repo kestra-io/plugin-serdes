@@ -39,7 +39,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read a JSON file and write it to an ION serialized data file.",
+    title = "Convert a JSONL file into ION.",
     description = """
         Please note that we support JSONL format only, i.e. one JSON dictionary/map per line.
 

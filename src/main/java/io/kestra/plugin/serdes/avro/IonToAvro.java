@@ -26,7 +26,7 @@ import java.net.URI;
 @Getter
 @NoArgsConstructor
 @io.swagger.v3.oas.annotations.media.Schema(
-    title = "Read a provided file containing ion serialized data and convert it to avro."
+    title = "Convert an ION file into Avro."
 )
 @Plugin(
     examples = {

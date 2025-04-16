@@ -33,7 +33,7 @@ import java.util.function.Consumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Read an ion serialized data file and write it to a csv file."
+    title = "Convert an ION file into CSV."
 )
 @Plugin(
     examples = {

@@ -37,7 +37,7 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
 @Getter
 @NoArgsConstructor
 @io.swagger.v3.oas.annotations.media.Schema(
-    title = "Read a provided file containing ion serialized data and convert it to parquet."
+    title = "Convert an ION file into Parquet."
 )
 @Plugin(
     examples = {
