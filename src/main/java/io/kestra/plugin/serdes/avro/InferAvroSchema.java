@@ -15,6 +15,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.avro.Schema.Field.NULL_DEFAULT_VALUE;
 import static org.apache.avro.Schema.Type.RECORD;
 import static org.apache.avro.Schema.Type.UNION;
 
@@ -31,7 +32,7 @@ public class InferAvroSchema {
                     .take(1)// TODO see for better inference algo, since the user wants to do an API call > JSON > Parquet
                     .doOnNext(row -> {
                         foundFields.add(
-                                inferField(".", "root", row)// TODO name
+                            inferField(".", "root", row)
                         );
                     });
         } catch (IOException e) {
@@ -60,16 +61,28 @@ public class InferAvroSchema {
                         )
                 );
             }
-            inferredField = new Field(
-                    fieldName,
-                    Schema.createRecord(
-                            fieldName,
-                            null,
-                            "io.kestra.plugin.serdes.avro",
-                            false,
-                            inferredFields
-                    )
+
+            var recordSchema = Schema.createRecord(
+                fieldName,
+                null,
+                "io.kestra.plugin.serdes.avro",
+                false,
+                inferredFields
             );
+            if ("root".equals(fieldName)) {
+                inferredField = new Field(
+                    fieldName,
+                    recordSchema
+                );
+            } else {
+                inferredField = new Field(
+                    fieldName,
+                    Schema.createUnion(
+                        recordSchema,
+                        Schema.create(Schema.Type.NULL)
+                    )
+                );
+            }
         } else if (node instanceof List) {
             var list = (List<Object>) node;
             if (!list.isEmpty()) {
@@ -81,33 +94,45 @@ public class InferAvroSchema {
                 } else {
                     inferredType = inferField(fieldFullPath + "_" + fieldName + "_items", fieldName + "_items", list.get(0));
                 }
-                inferredField = new Field(
+                if ("root".equals(fieldName)) {
+                    inferredField = new Field(
                         fieldName,
-                        Schema.createArray(inferredType.schema())
-                );
+                        Schema.createArray(inferredType.schema()),
+                        "",
+                        Collections.emptyList()
+                    );
+                } else {
+                    inferredField = new Field(
+                        fieldName,
+                        Schema.createUnion(
+                            Schema.createArray(inferredType.schema()),
+                            Schema.create(Schema.Type.NULL)
+                        )
+                    );
+                }
             }
             // TODO handle this case
         } else if (node instanceof byte[]) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.BYTES)));
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.BYTES), Schema.create(Schema.Type.NULL)), "", null);
         } else if (node instanceof String) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.STRING)));
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.NULL)), "", NULL_DEFAULT_VALUE);
         } else if (node instanceof Integer) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.INT)));
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.INT), Schema.create(Schema.Type.NULL)), "", null);
         } else if (node instanceof Float) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.FLOAT)));
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.FLOAT), Schema.create(Schema.Type.NULL)), "", null);
         } else if (node instanceof Double) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.DOUBLE)));
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.DOUBLE), Schema.create(Schema.Type.NULL)), "", null);
         } else if (node instanceof Boolean) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.LONG)));
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.LONG), Schema.create(Schema.Type.NULL)), "", null);
         } else if (
                 Stream.of(Instant.class, ZonedDateTime.class, LocalDateTime.class, OffsetDateTime.class)
                         .anyMatch(c -> c.isInstance(node))
         ) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG))));
+            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)), Schema.create(Schema.Type.NULL)), "", null);
         } else if (node instanceof LocalDate || node instanceof Date) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT))));
+            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), "", null);
         } else if (node instanceof LocalTime || node instanceof OffsetTime) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT))));
+            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), "", null);
         }
 
         if (inferredField == null) {
@@ -123,8 +148,6 @@ public class InferAvroSchema {
                 return inferredField;
             }
         }
-        // TODO generate ion file with kestra, and check if we always output the same structure per line -> do we remove null or empty fields/arrays ?
-        // TODO check if most kestra generated ion are handled
     }
 
     /**

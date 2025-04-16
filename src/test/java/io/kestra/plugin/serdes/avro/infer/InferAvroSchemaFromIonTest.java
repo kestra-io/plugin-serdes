@@ -1,45 +1,42 @@
 package io.kestra.plugin.serdes.avro.infer;
 
 import io.kestra.plugin.serdes.avro.InferAvroSchema;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.FieldSource;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompareMode;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.List;
 
 public class InferAvroSchemaFromIonTest {
-    private record TestCase(String name, String input, String expected) {
-        @Override
-        public String toString() {
-            return name + ": input" + input;
-        }
-    }
-
-    static List<TestCase> testCases = List.of(
-        new TestCase(
-            "simple string should be optional",
+    @Test
+    void simple_string_should_be_optional() throws IOException {
+        this.run(
             """
                 {myString: "hello"}
                 """,
             """
                 {"fields": [{"name": "myString", "type": ["null","string"]}]}
                 """
-        ),
-        new TestCase(
-            "arrays of string",
+        );
+    }
+
+    @Test
+    void array_of_strings() throws IOException {
+        this.run(
             """
                 ["one", "two", "three"]
                 """,
             """
                 {"type": "array", "items": [ "null", "string" ]}
-                """
-        ),
-        new TestCase(
-            "complex nested records with clashing field names do not raise error",
+                """);
+    }
+
+    @Test
+    void complex_nested_records_with_clashing_field_names_do_not_raise_error() throws IOException {
+        this.run(
             """
                 {
                     myField: "hey",
@@ -59,9 +56,12 @@ public class InferAvroSchemaFromIonTest {
             """
                 { }
                 """
-        ),
-        new TestCase(
-            "array of objects",
+        );
+    }
+
+    @Test
+    void array_of_objects() throws IOException {
+        this.run(
             """
                 {
                     myArray: [
@@ -72,30 +72,43 @@ public class InferAvroSchemaFromIonTest {
                 """,
             """
                 {
-                  "fields": [
-                    {
-                        "name" : "myArray",
-                        "type" : {
-                          "type" : "array",
-                          "items" : {
-                            "type" : "record",
-                            "name" : "myArray_items",
-                            "fields" : [
-                              {
-                                "name" : "myName",
-                                "type" : [ "null", "string" ]
-                              }
-                            ]
-                          }
-                        }
-                    }
-                  ]
-                }
+                   "fields": [
+                     {
+                       "name": "myArray",
+                       "type": [
+                         {
+                           "type": "array",
+                           "items": [
+                             {
+                               "type": "record",
+                               "name": "myArray_items",
+                               "fields": [
+                                 {
+                                   "name": "myName",
+                                   "type": [
+                                     "string",
+                                     "null"
+                                   ],
+                                   "doc": "",
+                                   "default": null
+                                 }
+                               ]
+                             },
+                             "null"
+                           ]
+                         },
+                         "null"
+                       ]
+                     }
+                   ]
+                 }
                 """
-        )
-        , new TestCase(
-            "array of objects with unmatching types",
-            """
+        );
+    }
+
+    @Test
+    void array_of_objects_with_unmatching_types() throws IOException {
+        this.run("""
                 {
                     myArray: [
                         {myName: "one"},
@@ -129,17 +142,15 @@ public class InferAvroSchemaFromIonTest {
                   ]
                 }
                 """
-        )
-    );
+        );
+    }
 
-    @ParameterizedTest
-    @FieldSource("testCases")
-    void ok(TestCase testCase) throws IOException {
+    void run(String input, String expected) throws IOException {
         var output = new ByteArrayOutputStream();
 
         // when
         new InferAvroSchema().inferAvroSchemaFromIon(
-            new InputStreamReader(new ByteArrayInputStream(testCase.input().getBytes())),
+            new InputStreamReader(new ByteArrayInputStream(input.getBytes())),
             output
         );
 
@@ -147,9 +158,9 @@ public class InferAvroSchemaFromIonTest {
         try (ByteArrayInputStream in = new ByteArrayInputStream(output.toByteArray())) {
             var resultingAvroSchema = new String(in.readAllBytes());
             JSONAssert.assertEquals(
-                testCase.expected(),
+                expected,
                 resultingAvroSchema,
-                false
+                JSONCompareMode.LENIENT
             );
         }
     }

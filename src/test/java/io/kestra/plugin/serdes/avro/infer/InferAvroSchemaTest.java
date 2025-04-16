@@ -1,4 +1,4 @@
-package io.kestra.plugin.serdes.avro;
+package io.kestra.plugin.serdes.avro.infer;
 
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.junit.annotations.KestraTest;
@@ -8,6 +8,7 @@ import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon;
 import io.kestra.plugin.serdes.csv.IonToCsv;
 import jakarta.inject.Inject;
 import org.apache.commons.io.IOUtils;
