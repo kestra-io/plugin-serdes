@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Reader;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
@@ -134,9 +135,9 @@ public class InferAvroSchema {
                     )
                 );
             }
-        } else if (node instanceof byte[]) {
+        } else if (node instanceof byte[]) {  // primitive types
             inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.BYTES), Schema.create(Schema.Type.NULL)), "", null);
-        } else if (node instanceof String) {
+        } else if (node instanceof String || node instanceof BigDecimal) {
             inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.NULL)), "", NULL_DEFAULT_VALUE);
         } else if (node instanceof Integer) {
             inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.INT), Schema.create(Schema.Type.NULL)), "", null);
@@ -155,6 +156,8 @@ public class InferAvroSchema {
             inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), "", null);
         } else if (node instanceof LocalTime || node instanceof OffsetTime) {
             inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), "", null);
+        } else if (node == null) {
+            inferredField = new Field(fieldName, Schema.create(Schema.Type.NULL));
         }
 
         if (inferredField == null) {

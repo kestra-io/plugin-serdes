@@ -31,6 +31,27 @@ public class FullIonAvroConversionTest {
     RunContextFactory runContextFactory;
 
     @Test
+    void primitiveTypes() throws Exception {
+        this.run(
+            """
+            {
+                Int:1,
+                String:"my string1",
+                Float:-0.12e4,
+                Decimal:7.47
+            }
+            """,
+            """
+           {
+                Int:1,
+                String:"my string1",
+                Float:-0.12e4,
+                Decimal:"7.47"
+            }
+           """);
+    }
+
+    @Test
     void allData_matching() throws Exception {
         var input = """
             {order_id:1,str1:"my string1",customer_name:"null",customer_email:"jenniferschneider@example.com",product_id:11,price:166.88999938964844e0,quantity:1,total:166.88999938964844e0}
