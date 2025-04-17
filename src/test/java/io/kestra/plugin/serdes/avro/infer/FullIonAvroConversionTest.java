@@ -54,6 +54,21 @@ public class FullIonAvroConversionTest {
         );// FIXME "null" String hack
     }
 
+    @Test
+    void someData_missingFields_forFirstRow_requiringFullSearch() throws Exception {
+        this.run("""
+                {}
+                {id:1, str1:"my string1", labels:["lab1"], data1: {field1: "hey"}}
+                {id:2, str1:"my string2", labels:["lab2"], data1: {field1: "heya"}}
+                """,
+            """
+                {id:null, str1:"null", labels:null, data1: null}
+                {id:1, str1:"my string1", labels:["lab1"], data1: {field1: "hey"}}
+                {id:2, str1:"my string2", labels:["lab2"], data1: {field1: "heya"}}
+                """
+        );
+    }
+
     void run(String ionInput, String expectedOutputIon) throws Exception {
         var ionInputStream = IOUtils.toInputStream(ionInput, StandardCharsets.UTF_8);
         var inputIonFileUri = storageInterface.put(null, null, URI.create("/" + IdUtils.create() + ".ion"), ionInputStream);

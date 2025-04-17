@@ -1,10 +1,10 @@
-package io.kestra.plugin.serdes.avro;
+package io.kestra.plugin.serdes.avro.infer;
 
 import io.kestra.core.serializers.FileSerde;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
-import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -16,31 +16,46 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.avro.Schema.Field.NULL_DEFAULT_VALUE;
-import static org.apache.avro.Schema.Type.RECORD;
-import static org.apache.avro.Schema.Type.UNION;
+import static org.apache.avro.Schema.Type.*;
 
 public class InferAvroSchema {
     private final boolean deepSearch = true;
+    private int numberOfRowToScan = 100;
 
-    final Map<String, Field> knownFields = new HashMap<>();
+    private final Map<String, Field> knownFields = new HashMap<>();
 
+    public InferAvroSchema() {
+    }
+
+    public InferAvroSchema(int numberOfRowToScan) {
+        this.numberOfRowToScan = numberOfRowToScan;
+    }
+
+    /**
+     * infer an Avro schema from a Ion source
+     *
+     * @param inputStream Ion source
+     * @param output      where the resulting Avro schema will be written
+     */
     public void inferAvroSchemaFromIon(Reader inputStream, OutputStream output) {
-        var foundFields = new ArrayList<Field>();
-        Flux<Object> flowable = null;
+        if (numberOfRowToScan < 1) {
+            throw new IllegalArgumentException("Number of rows to scan must be greater than 0");
+        }
+
+        Mono<Schema> inferedSchema = null;
         try {
-            flowable = FileSerde.readAll(inputStream)
-                    .take(1)// TODO see for better inference algo, since the user wants to do an API call > JSON > Parquet
-                    .doOnNext(row -> {
-                        foundFields.add(
-                            inferField(".", "root", row)
-                        );
-                    });
+            inferedSchema = FileSerde.readAll(inputStream)
+                .take(numberOfRowToScan)
+                .map(row -> inferField(".", "root", row))
+                .reduce(
+                    InferAvroSchema::mergeTypes
+                )
+                .map(Field::schema);
         } catch (IOException e) {
             throw new RuntimeException("could not parse Ion input stream, err: " + e.getMessage(), e);
         }
-        flowable.count().block();
         try {
-            output.write(foundFields.stream().findFirst().get().schema().toString().getBytes(StandardCharsets.UTF_8));
+            output.write(inferedSchema.block().toString().getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new RuntimeException("could not write Avro schema in output stream, err: " + e.getMessage(), e);
         }
@@ -110,8 +125,15 @@ public class InferAvroSchema {
                         )
                     );
                 }
+            } else {
+                inferredField = new Field(
+                    fieldName,
+                    Schema.createUnion(
+                        Schema.createArray(Schema.create(STRING)),
+                        Schema.create(Schema.Type.NULL)
+                    )
+                );
             }
-            // TODO handle this case
         } else if (node instanceof byte[]) {
             inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.BYTES), Schema.create(Schema.Type.NULL)), "", null);
         } else if (node instanceof String) {
@@ -156,24 +178,8 @@ public class InferAvroSchema {
      * @return the merge Avro Field, same as input if both inputs are relatively equals
      */
     public static Field mergeTypes(Field a, Field b) {
-
         if (a.schema().getType() == UNION || b.schema().getType() == UNION) {
-            var set = new HashSet<Schema>();
-            if (a.schema().getType() == UNION) {
-                set.addAll(a.schema().getTypes());
-            } else {
-                set.add(a.schema());
-            }
-            if (b.schema().getType() == UNION) {
-                set.addAll(b.schema().getTypes());
-            } else {
-                set.add(b.schema());
-            }
-            var recordsToMerge = set.stream().filter(x -> RECORD.equals(x.getType())).toList();
-            if (recordsToMerge.size() > 1) {
-                set = (HashSet<Schema>) set.stream().filter(x -> !RECORD.equals(x.getType())).collect(Collectors.toSet());
-                set.add(mergeTwoRecords(new Field("tmp", recordsToMerge.get(0)), new Field("tmp2", recordsToMerge.get(1))).schema());
-            }
+            var set = mergeAtLeastOneUnion(a, b);
             return new Field(a, Schema.createUnion(new ArrayList<>(set)));
         } else if (a.schema().getType() == RECORD || b.schema().getType() == RECORD) {
             if (a.schema().getType() == RECORD && b.schema().getType() == RECORD) {
@@ -186,6 +192,35 @@ public class InferAvroSchema {
         } else {
             return new Field(a, Schema.createUnion(a.schema(), b.schema()));
         }
+    }
+
+    private static LinkedHashSet<Schema> mergeAtLeastOneUnion(Field a, Field b) {
+        var set = new LinkedHashSet<Schema>();
+        if (a.schema().getType() == UNION) {
+            set.addAll(a.schema().getTypes());
+        } else {
+            set.add(a.schema());
+        }
+        if (b.schema().getType() == UNION) {
+            set.addAll(b.schema().getTypes());
+        } else {
+            set.add(b.schema());
+        }
+        var recordsToMerge = set.stream().filter(x -> RECORD.equals(x.getType())).toList();
+        var arraysToMerge = set.stream().filter(x -> ARRAY.equals(x.getType())).toList();
+        if (recordsToMerge.size() > 1) {
+            var everythingButRecords = set.stream().filter(x -> !RECORD.equals(x.getType())).collect(Collectors.toSet());
+            set = new LinkedHashSet<>();
+            // there is a bug in the parser if an UNION start with a NULL it will transform a STRING into a BYTE
+            set.add(mergeTwoRecords(new Field("tmp", recordsToMerge.get(0)), new Field("tmp2", recordsToMerge.get(1))).schema());
+            set.addAll(everythingButRecords);
+        } else if (arraysToMerge.size() > 1) {
+            var eveythingButArrays = set.stream().filter(x -> !ARRAY.equals(x.getType())).collect(Collectors.toSet());
+            set = new LinkedHashSet<>();
+            set.add(mergeTypes(new Field("tmp", arraysToMerge.get(0)), new Field("tmp2", arraysToMerge.get(1))).schema());
+            set.addAll(eveythingButArrays);
+        }
+        return set;
     }
 
     private static Field mergeTwoRecords(Field a, Field b) {

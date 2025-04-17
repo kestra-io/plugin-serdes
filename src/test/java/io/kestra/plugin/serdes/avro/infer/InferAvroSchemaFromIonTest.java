@@ -1,6 +1,5 @@
 package io.kestra.plugin.serdes.avro.infer;
 
-import io.kestra.plugin.serdes.avro.InferAvroSchema;
 import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;

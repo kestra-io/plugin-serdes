@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static io.kestra.plugin.serdes.avro.InferAvroSchema.mergeTypes;
+import static io.kestra.plugin.serdes.avro.infer.InferAvroSchema.mergeTypes;
 import static org.apache.avro.Schema.Type.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
