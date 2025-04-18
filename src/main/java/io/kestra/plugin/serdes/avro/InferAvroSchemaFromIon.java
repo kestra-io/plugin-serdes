@@ -8,6 +8,7 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -24,7 +25,7 @@ import java.net.URI;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@io.swagger.v3.oas.annotations.media.Schema(
+@Schema(
     title = "Try to infer an Avro schema from a ION file."
 )
 @Plugin(
@@ -32,7 +33,7 @@ import java.net.URI;
 )
 public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAvroSchemaFromIon.Output> {
     @NotNull
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "ION source file URI"
     )
     @PluginProperty(internalStorageURI = true)
@@ -40,10 +41,10 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
 
     @NotNull
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Number of row that will be scanned. The bigger it is, the more precise the output schema will be."
     )
-    private Property<Integer> numberOfRowToScan = Property.of(100);
+    private Property<Integer> numberOfRowsToScan = Property.of(100);
 
     @Override
     public InferAvroSchemaFromIon.Output run(RunContext runContext) throws Exception {
@@ -56,7 +57,7 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
             var output = new BufferedOutputStream(new FileOutputStream(tempAvroSchemaFile), FileSerde.BUFFER_SIZE);
         ) {
             new InferAvroSchema(
-                runContext.render(this.numberOfRowToScan).as(Integer.class).orElseThrow()
+                runContext.render(this.numberOfRowsToScan).as(Integer.class).orElseThrow()
             ).inferAvroSchemaFromIon(inputStream, output);
             output.flush();
         }
@@ -70,7 +71,7 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @io.swagger.v3.oas.annotations.media.Schema(
+        @Schema(
             title = "Avro schema file URI"
         )
         private URI uri;

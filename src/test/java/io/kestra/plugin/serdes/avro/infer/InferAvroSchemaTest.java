@@ -22,6 +22,7 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.time.*;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
@@ -39,20 +40,23 @@ public class InferAvroSchemaTest {
         var tempFile = File.createTempFile(InferAvroSchemaTest.class.getSimpleName().toLowerCase() + "_", ".ion");
         try (var output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("myString", "string")
-                        .put("myInt", 2)
-                        .put("myFloat", 3.2F)
-                        .put("myDouble", 3.2D)// note there is no double in Ion, don't know why we parsed that
-                        .put("myInstant", Instant.now())
-                        .put("myZonedDateTime", ZonedDateTime.now())
-                        .put("myLocalDateTime", LocalDateTime.now())
-                        .put("myOffsetDateTime", OffsetDateTime.now())
-                        .put("myLocalDate", LocalDate.now())
-                        .put("myLocalTime", LocalTime.now())
-                        .put("myOffsetTime", OffsetTime.now())
-                        .put("myDate", new Date())
-                        .build()
+                    new HashMap<>() {
+                        {
+                            put("myString", "string");
+                            put("myInt", 2);
+                            put("myFloat", 3.2F);
+                            put("myDouble", 3.2D);
+                            put("myInstant", Instant.now());
+                            put("myZonedDateTime", ZonedDateTime.now());
+                            put("myLocalDateTime", LocalDateTime.now());
+                            put("myOffsetDateTime", OffsetDateTime.now());
+                            put("myLocalDate", LocalDate.now());
+                            put("myLocalTime", LocalTime.now());
+                            put("myOffsetTime", OffsetTime.now());
+                            put("myDate", new Date());
+
+                        }
+                    }
                 )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 

@@ -20,6 +20,8 @@ import static org.apache.avro.Schema.Field.NULL_DEFAULT_VALUE;
 import static org.apache.avro.Schema.Type.*;
 
 public class InferAvroSchema {
+    public static final String NULL_DEFAULT_DESCRIPTION = "";
+    
     private final boolean deepSearch = true;
     private int numberOfRowToScan = 100;
 
@@ -30,6 +32,9 @@ public class InferAvroSchema {
 
     public InferAvroSchema(int numberOfRowToScan) {
         this.numberOfRowToScan = numberOfRowToScan;
+        if (numberOfRowToScan < 1) {
+            throw new IllegalArgumentException("Number of rows to scan must be greater than 0");
+        }
     }
 
     /**
@@ -39,10 +44,6 @@ public class InferAvroSchema {
      * @param output      where the resulting Avro schema will be written
      */
     public void inferAvroSchemaFromIon(Reader inputStream, OutputStream output) {
-        if (numberOfRowToScan < 1) {
-            throw new IllegalArgumentException("Number of rows to scan must be greater than 0");
-        }
-
         Mono<Schema> inferedSchema = null;
         try {
             inferedSchema = FileSerde.readAll(inputStream)
@@ -114,7 +115,7 @@ public class InferAvroSchema {
                     inferredField = new Field(
                         fieldName,
                         Schema.createArray(inferredType.schema()),
-                        "",
+                        NULL_DEFAULT_DESCRIPTION,
                         Collections.emptyList()
                     );
                 } else {
@@ -136,26 +137,26 @@ public class InferAvroSchema {
                 );
             }
         } else if (node instanceof byte[]) {  // primitive types
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.BYTES), Schema.create(Schema.Type.NULL)), "", null);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.BYTES), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof String || node instanceof BigDecimal) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.NULL)), "", NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof Integer) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.INT), Schema.create(Schema.Type.NULL)), "", null);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.INT), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof Float) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.FLOAT), Schema.create(Schema.Type.NULL)), "", null);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.FLOAT), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof Double) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.DOUBLE), Schema.create(Schema.Type.NULL)), "", null);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.DOUBLE), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof Boolean) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.LONG), Schema.create(Schema.Type.NULL)), "", null);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.LONG), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (
                 Stream.of(Instant.class, ZonedDateTime.class, LocalDateTime.class, OffsetDateTime.class)
                         .anyMatch(c -> c.isInstance(node))
         ) {
-            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)), Schema.create(Schema.Type.NULL)), "", null);
+            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof LocalDate || node instanceof Date) {
-            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), "", null);
+            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof LocalTime || node instanceof OffsetTime) {
-            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), "", null);
+            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node == null) {
             inferredField = new Field(fieldName, Schema.create(Schema.Type.NULL));
         }
