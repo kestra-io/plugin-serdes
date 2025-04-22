@@ -2,7 +2,7 @@
     "name": "insurance",
     "type": "record",
     "fields": [
-        {"name":"policyID", "type":"string"},
+        {"name":"policyID", "type":["null","string"],"default": null},
         {"name":"statecode", "type":"string"},
         {"name":"county", "type":"string"},
         {"name":"eq_site_limit", "type":"string"},

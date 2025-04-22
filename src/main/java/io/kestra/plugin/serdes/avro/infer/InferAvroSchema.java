@@ -21,7 +21,7 @@ import static org.apache.avro.Schema.Type.*;
 
 public class InferAvroSchema {
     public static final String NULL_DEFAULT_DESCRIPTION = "";
-    
+
     private final boolean deepSearch = true;
     private int numberOfRowToScan = 100;
 
@@ -137,26 +137,26 @@ public class InferAvroSchema {
                 );
             }
         } else if (node instanceof byte[]) {  // primitive types
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.BYTES), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.BYTES)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof String || node instanceof BigDecimal) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.STRING)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof Integer) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.INT), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.INT)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof Float) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.FLOAT), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.FLOAT)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof Double) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.DOUBLE), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.DOUBLE)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof Boolean) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.LONG), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.BOOLEAN)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (
                 Stream.of(Instant.class, ZonedDateTime.class, LocalDateTime.class, OffsetDateTime.class)
                         .anyMatch(c -> c.isInstance(node))
         ) {
-            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG))), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof LocalDate || node instanceof Date) {
-            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT))), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof LocalTime || node instanceof OffsetTime) {
-            inferredField = new Field(fieldName, Schema.createUnion(LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT)), Schema.create(Schema.Type.NULL)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT))), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node == null) {
             inferredField = new Field(fieldName, Schema.create(Schema.Type.NULL));
         }
@@ -213,23 +213,19 @@ public class InferAvroSchema {
         var recordsToMerge = set.stream().filter(x -> RECORD.equals(x.getType())).toList();
         var arraysToMerge = set.stream().filter(x -> ARRAY.equals(x.getType())).toList();
         if (recordsToMerge.size() > 1) {
-            var everythingButRecords = set.stream().filter(x -> !RECORD.equals(x.getType())).collect(Collectors.toSet());
-            set = new LinkedHashSet<>();
-            // there is a bug in the parser if an UNION start with a NULL it will transform a STRING into a BYTE
+            // this will keep NULL as first type
+            set = set.stream().filter(x -> !RECORD.equals(x.getType())).collect(Collectors.toCollection(LinkedHashSet::new));
             set.add(mergeTwoRecords(new Field("tmp", recordsToMerge.get(0)), new Field("tmp2", recordsToMerge.get(1))).schema());
-            set.addAll(everythingButRecords);
         } else if (arraysToMerge.size() > 1) {
-            var eveythingButArrays = set.stream().filter(x -> !ARRAY.equals(x.getType())).collect(Collectors.toSet());
-            set = new LinkedHashSet<>();
+            set = set.stream().filter(x -> !ARRAY.equals(x.getType())).collect(Collectors.toCollection(LinkedHashSet::new));
             set.add(mergeTypes(new Field("tmp", arraysToMerge.get(0)), new Field("tmp2", arraysToMerge.get(1))).schema());
-            set.addAll(eveythingButArrays);
         }
         return set;
     }
 
     private static Field mergeTwoRecords(Field a, Field b) {
         var mergedFields = new ArrayList<Field>();
-        var allCommonField = Stream.concat(a.schema().getFields().stream().map(Field::name), b.schema().getFields().stream().map(Field::name)).collect(Collectors.toSet());
+        var allCommonField = Stream.concat(a.schema().getFields().stream().map(Field::name), b.schema().getFields().stream().map(Field::name)).collect(Collectors.toCollection(LinkedHashSet::new));
         for (String commonField : allCommonField) {
             var fieldFromA = a.schema().getField(commonField);
             var fieldFromB = b.schema().getField(commonField);
