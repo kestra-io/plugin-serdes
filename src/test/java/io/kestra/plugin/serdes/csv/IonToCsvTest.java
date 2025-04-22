@@ -74,16 +74,16 @@ class IonToCsvTest {
                 .type(IonToCsv.class.getName())
                 .from(Property.of(uri.toString()))
                 .fieldSeparator(Property.of(";".charAt(0)))
-                .alwaysDelimitText(Property.of(true))
+                .alwaysDelimitText(Property.of(false))
                 .header(Property.of(true))
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri())));
 
-            assertThat(out, containsString("\"string\";\"int\""));
-            assertThat(out, containsString("\"3.2\";\"" + ZonedDateTime.now().getYear()));
-            assertThat(out, containsString("\"3.4\";\"" + ZonedDateTime.now().getYear()));
+            assertThat(out, containsString("string;int"));
+            assertThat(out, containsString("3.2;" + ZonedDateTime.now().getYear()));
+            assertThat(out, containsString("3.4;" + ZonedDateTime.now().getYear()));
         }
     }
 

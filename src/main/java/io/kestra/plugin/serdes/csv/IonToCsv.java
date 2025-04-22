@@ -203,6 +203,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
             .ifPresent(builder::lineDelimiter);
 
         runContext.render(this.alwaysDelimitText).as(Boolean.class)
+            .filter(Boolean.TRUE::equals)
             .ifPresent(b -> builder.quoteStrategy(QuoteStrategies.ALWAYS));
 
         return builder.build(writer);
