@@ -8,6 +8,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -104,14 +105,23 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
 
+        // reader
+        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+
         // avro writer
-        Schema.Parser parser = new Schema.Parser();
-        Schema schema = parser.parse(runContext.render(this.schema));
+        var schemaParser = new Schema.Parser();
+        Schema schema = null;
+        if (this.schema == null) {
+            var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from));
+            var schemaOutputStream = new ByteArrayOutputStream();
+            new InferAvroSchema().inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
+            schema = schemaParser.parse(schemaOutputStream.toString());
+        } else {
+            schema = schemaParser.parse(runContext.render(this.schema));
+        }
 
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
 
-        // reader
-        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         try (
             Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
