@@ -153,9 +153,9 @@ public class AvroConverter {
             if (this.getInferAllFields()) {
                 if (data instanceof String && this.contains(this.getNullValues(), (String) data)) {
                     return null;
-                } else if (data instanceof String && this.contains(this.getNullValues(), (String) data)) {
+                } else if (data instanceof String && this.contains(this.getTrueValues(), (String) data)) {
                     return true;
-                } else if (data instanceof String && this.contains(this.getNullValues(), (String) data)) {
+                } else if (data instanceof String && this.contains(this.getFalseValues(), (String) data)) {
                     return false;
                 }
             }

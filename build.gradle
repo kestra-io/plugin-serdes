@@ -64,6 +64,7 @@ dependencies {
     api group: 'org.apache.poi', name: 'poi', version: '5.4.0'
     api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.4.0'
     api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.0.3'
+    implementation("com.amazon.ion:ion-java:1.11.10")
     api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.4.1') {
         exclude group: 'org.slf4j'
         exclude group: 'com.fasterxml.jackson.core'
@@ -119,6 +120,8 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter-params"
 
     testImplementation group: 'com.devskiller.friendly-id', name: 'friendly-id'
+
+    testImplementation("org.skyscreamer:jsonassert:1.5.3")
 }
 
 

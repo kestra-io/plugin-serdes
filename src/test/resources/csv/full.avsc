@@ -14,9 +14,10 @@
     {
       "name": "nameNullable",
       "type": [
-        "string",
-        "null"
-      ]
+          "null",
+        "string"
+      ],
+        "default": null
     },
     {
       "name": "email",

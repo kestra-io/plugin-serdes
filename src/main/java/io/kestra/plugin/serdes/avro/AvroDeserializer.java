@@ -123,7 +123,7 @@ public class AvroDeserializer {
         }
 
         // then, evaluate each type and return the first that didn't generate an exception
-        for (var type : schema.getTypes()) {
+        for (var type : schema.getTypes().stream().filter(t -> t.getType() != Type.NULL).toList()) {
             // try to deserialized by each type and return the first that works
             try {
                 return AvroDeserializer.objectDeserializer(value, type);
