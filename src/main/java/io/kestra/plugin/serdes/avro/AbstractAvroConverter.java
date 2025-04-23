@@ -28,13 +28,20 @@ import java.util.function.Function;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractAvroConverter extends Task {
-    @NotNull
     @io.swagger.v3.oas.annotations.media.Schema(
-        title = "The avro schema associated to the data"
+        title = "The avro schema associated to the data",
+        description = "If empty the task will try to infer the schema from current data, you can use 'numberOfRowsToScan' property if needed"
     )
     @AvroSchemaValidation
     @PluginProperty(dynamic = true)
     protected String schema;
+
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "Number of row that will be scanned while inferring. The bigger it is, the more precise the output schema will be.",
+        description = "Only use when 'schema' property is empty"
+    )
+    private Property<Integer> numberOfRowsToScan = Property.of(100);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(

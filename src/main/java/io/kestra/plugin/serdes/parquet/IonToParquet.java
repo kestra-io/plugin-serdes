@@ -10,6 +10,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.serdes.avro.AbstractAvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverter;
+import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -142,12 +143,20 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
 
         BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
 
-        // avro options
-        Schema.Parser parser = new Schema.Parser();
-        Schema schema = parser.parse(runContext.render(this.schema));
-
         // reader
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+
+        // avro schema
+        var schemaParser = new Schema.Parser();
+        Schema schema = null;
+        if(this.schema == null){
+            var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from));
+            var schemaOutputStream = new ByteArrayOutputStream();
+            new InferAvroSchema().inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
+            schema = schemaParser.parse(schemaOutputStream.toString());
+        } else {
+            schema = schemaParser.parse(runContext.render(this.schema));
+        }
 
         // parquet options
         CompressionCodecName codec = runContext.render(this.compressionCodec).as(CompressionCodec.class).orElseThrow().parquetCodec();

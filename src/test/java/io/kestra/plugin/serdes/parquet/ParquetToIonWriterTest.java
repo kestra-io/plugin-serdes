@@ -31,9 +31,21 @@ class ParquetToIonWriterTest {
     @Inject
     RunContextFactory runContextFactory;
 
-    @SuppressWarnings("unchecked")
     @Test
-    void ion() throws Exception {
+    void ionWithInputSchema() throws Exception {
+        testWithSchema(IOUtils.toString(
+            Objects.requireNonNull(ParquetToIonWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
+            StandardCharsets.UTF_8
+        ));
+    }
+
+    @Test
+    void ionWithInferredSchema() throws Exception {
+        testWithSchema(null);
+    }
+
+    @SuppressWarnings("unchecked")
+    void testWithSchema(String schema) throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
@@ -60,10 +72,7 @@ class ParquetToIonWriterTest {
                 .id(IonToParquet.class.getSimpleName())
                 .type(IonToParquet.class.getName())
                 .from(Property.of(uri.toString()))
-                .schema(IOUtils.toString(
-                    Objects.requireNonNull(ParquetToIonWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
-                    StandardCharsets.UTF_8
-                ))
+                .schema(schema)
                 .timeZoneId(Property.of("UTC"))
                 .build();
 
