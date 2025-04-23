@@ -1,0 +1,53 @@
+id: infer_ion_avro
+namespace: sanitychecks.plugin-serdes
+
+tasks:
+  - id: create_csv
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/orders.csv
+  - id: convert_to_ion
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.create_csv.uri}}"
+  - id: convert_to_json
+    type: io.kestra.plugin.serdes.json.IonToJson
+    from: "{{ outputs.convert_to_ion.uri}}"
+
+  # OLD WAY
+  - id: convert_to_avro_with_a_know_schema
+    type: io.kestra.plugin.serdes.avro.IonToAvro
+    from: "{{ outputs.convert_to_ion.uri}}"
+    schema: |
+      {
+        "type": "record",
+        "name": "Order",
+        "namespace": "com.example.orders",
+        "fields": [
+          { "name": "order_id", "type": "string" },
+          { "name": "ustomer_name", "type": "string" },
+          { "name": "customer_email", "type": "string" },
+          { "name": "product_id", "type": "int" },
+          { "name": "price", "type": "float" },
+          { "name": "quantity", "type": "int" },
+          { "name": "total", "type": "float" }
+        ]
+      }
+  - id: convert_back_to_ion_known_schema
+    type: io.kestra.plugin.serdes.avro.AvroToIon
+    from: "{{ outputs.convert_to_avro_with_a_know_schema.uri }}"
+
+  # NEW WAY WITH INFERENCE
+  - id: infer_avro_schema_from_ion
+    type: io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon
+    from: "{{ outputs.convert_to_ion.uri}}"
+  - id: convert_ion_to_avro_using_an_inferred_schema
+    type: io.kestra.plugin.serdes.avro.IonToAvro
+    from: "{{ outputs.convert_to_ion.uri }}"
+    schema: "{{ read(outputs.infer_avro_schema_from_ion.uri) }}"
+  - id: convert_back_to_ion_inferred_schema
+    type: io.kestra.plugin.serdes.avro.AvroToIon
+    from: "{{ outputs.convert_ion_to_avro_using_an_inferred_schema.uri }}"
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - '{{ fromIon(read(outputs.convert_back_to_ion_known_schema["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion_inferred_schema["uri"])).order_id }}'

@@ -13,6 +13,13 @@ import static org.hamcrest.Matchers.is;
 @KestraTest(startRunner = true)
 class RunnerTest {
     @Test
+    @ExecuteFlow("sanity-checks/avro.yaml")
+    void avro(Execution execution) {
+        assertThat(execution.getTaskRunList(), hasSize(5));
+        assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
+    }
+
+    @Test
     @ExecuteFlow("sanity-checks/csv.yaml")
     void csv(Execution execution) {
         assertThat(execution.getTaskRunList(), hasSize(4));
@@ -23,6 +30,13 @@ class RunnerTest {
     @ExecuteFlow("sanity-checks/excel.yaml")
     void excel(Execution execution) {
         assertThat(execution.getTaskRunList(), hasSize(4));
+        assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
+    }
+
+    @Test
+    @ExecuteFlow("sanity-checks/infer_ion_avro.yaml")
+    void infer_ion_avro(Execution execution) {
+        assertThat(execution.getTaskRunList(), hasSize(9));
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
     }
 }
