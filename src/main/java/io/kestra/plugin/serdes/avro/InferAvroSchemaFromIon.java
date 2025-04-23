@@ -29,7 +29,8 @@ import java.net.URI;
     title = "Try to infer an Avro schema from a ION file."
 )
 @Plugin(
-    aliases = "io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon"
+    aliases = "io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon",
+    beta = true
 )
 public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAvroSchemaFromIon.Output> {
     @NotNull
