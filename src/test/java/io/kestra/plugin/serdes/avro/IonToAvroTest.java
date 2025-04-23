@@ -97,6 +97,18 @@ class IonToAvroTest {
 
     @Test
     void ion() throws Exception {
+        runIonToAvroTestWithSchema(IOUtils.toString(
+            Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("avro/all.avsc")),
+            StandardCharsets.UTF_8
+        ));
+    }
+
+    @Test
+    void ionWithoutSchema() throws Exception {
+        runIonToAvroTestWithSchema(null);
+    }
+
+    void runIonToAvroTestWithSchema(String schema) throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
@@ -123,10 +135,7 @@ class IonToAvroTest {
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
                 .from(Property.of(uri.toString()))
-                .schema(IOUtils.toString(
-                    Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("avro/all.avsc")),
-                    StandardCharsets.UTF_8
-                ))
+                .schema(schema)
                 .build();
             writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
         }
