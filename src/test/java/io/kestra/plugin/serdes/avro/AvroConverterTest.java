@@ -10,9 +10,9 @@ import io.kestra.plugin.serdes.SerdesUtils;
 import io.kestra.plugin.serdes.csv.CsvToIon;
 import io.kestra.plugin.serdes.json.JsonToIon;
 import jakarta.inject.Inject;
+import jakarta.validation.ConstraintViolationException;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
-import org.apache.avro.SchemaParseException;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
@@ -301,11 +301,11 @@ public class AvroConverterTest {
             .timeFormat("H:mm")
             .build();
 
-        RuntimeException spe = assertThrows(SchemaParseException.class, () -> {
+        RuntimeException spe = assertThrows(ConstraintViolationException.class, () -> {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 
-        assertThat(spe.getMessage(), is("Illegal character in: nbJH_DTP-Helpdesk"));
+        assertThat(spe.getMessage(), containsString("Illegal character in: nbJH_DTP-Helpdesk"));
     }
 
     @Test

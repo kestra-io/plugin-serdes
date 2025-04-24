@@ -1,0 +1,23 @@
+id: infer_ion_parquet
+namespace: sanitychecks.plugin-serdes
+
+tasks:
+  - id: create_csv
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/orders.csv
+  - id: convert_to_ion
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.create_csv.uri}}"
+
+  - id: convert_ion_to_parquet_using_an_inferred_schema
+    type: io.kestra.plugin.serdes.parquet.IonToParquet
+    from: "{{ outputs.convert_to_ion.uri }}"
+
+  - id: convert_back_to_ion
+    type: io.kestra.plugin.serdes.parquet.ParquetToIon
+    from: "{{ outputs.convert_ion_to_parquet_using_an_inferred_schema.uri }}"
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - '{{ fromIon(read(outputs.convert_to_ion["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion["uri"])).order_id }}'
