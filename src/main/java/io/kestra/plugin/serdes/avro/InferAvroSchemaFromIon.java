@@ -43,7 +43,7 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
     @NotNull
     @Builder.Default
     @Schema(
-        title = "Number of row that will be scanned. The bigger it is, the more precise the output schema will be."
+        title = "The number of rows that will be scanned; the larger the number of rows, the more precise the output schema will be."
     )
     private Property<Integer> numberOfRowsToScan = Property.of(100);
 
