@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.avro.infer.fullconversion;
 import com.amazon.ion.system.IonSystemBuilder;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.avro.AvroToIon;
@@ -22,7 +23,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
     @Override
     void run(String ionInput, String expectedOutputIon) throws Exception {
         var ionInputStream = IOUtils.toInputStream(ionInput, StandardCharsets.UTF_8);
-        var inputIonFileUri = storageInterface.put(null, null, URI.create("/" + IdUtils.create() + ".ion"), ionInputStream);
+        var inputIonFileUri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), ionInputStream);
 
         // infer Avro schema from Ion
         var inferAvroSchemaFromIon = InferAvroSchemaFromIon.builder()

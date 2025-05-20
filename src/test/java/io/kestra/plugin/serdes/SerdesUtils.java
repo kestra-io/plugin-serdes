@@ -4,6 +4,7 @@ import com.devskiller.friendly_id.FriendlyId;
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
 import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
 import jakarta.inject.Inject;
 
 import java.io.File;
@@ -36,7 +37,7 @@ public class SerdesUtils {
 
     public URI resourceToStorageObject(File file) throws URISyntaxException, IOException {
         return storageInterface.put(
-            null,
+            TenantService.MAIN_TENANT,
             null,
             new URI("/" + FriendlyId.createFriendlyId()),
             new FileInputStream(file)
