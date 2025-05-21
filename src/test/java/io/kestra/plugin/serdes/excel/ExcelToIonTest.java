@@ -89,7 +89,7 @@ public class ExcelToIonTest {
             String outWorkSheet1 = CharStreams.toString(
                 new InputStreamReader(
                     storageInterface.get(
-                        null,
+                        TenantService.MAIN_TENANT,
                         null,
                         ionOutput.getUris().get("Worksheet_1")
                     )
@@ -102,7 +102,7 @@ public class ExcelToIonTest {
             String outWorkSheet2 = CharStreams.toString(
                 new InputStreamReader(
                     storageInterface.get(
-                        null,
+                        TenantService.MAIN_TENANT,
                         null,
                         ionOutput.getUris().get("Worksheet_2")
                     )
@@ -115,7 +115,7 @@ public class ExcelToIonTest {
             String outWorkSheet3 = CharStreams.toString(
                 new InputStreamReader(
                     storageInterface.get(
-                        null,
+                        TenantService.MAIN_TENANT,
                         null,
                         ionOutput.getUris().get("Worksheet_3")
                     )
