@@ -61,7 +61,7 @@ dependencies {
         exclude group: 'com.fasterxml.jackson.core'
     }
     api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.15.2'
-    api group: 'org.apache.poi', name: 'poi', version: '5.4.0'
+    api group: 'org.apache.poi', name: 'poi', version: '5.4.1'
     api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.4.1'
     api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.0.4'
     implementation("com.amazon.ion:ion-java:1.11.10")
