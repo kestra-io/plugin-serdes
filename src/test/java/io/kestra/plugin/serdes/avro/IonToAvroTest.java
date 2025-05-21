@@ -78,7 +78,7 @@ class IonToAvroTest {
         IonToAvro.Output run = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
         assertThat(
-            IonToAvroTest.avroSize(this.storageInterface.get(null, null, run.getUri())),
+            IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri())),
             is(IonToAvroTest.avroSize(
                 new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
                         .getResource("csv/insurance_sample.avro"))

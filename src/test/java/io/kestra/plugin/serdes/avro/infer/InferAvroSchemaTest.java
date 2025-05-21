@@ -71,7 +71,7 @@ public class InferAvroSchemaTest {
             var run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             // then
-            var resultingSchemaStr = IOUtils.toString(new InputStreamReader(this.storageInterface.get(null, null, run.getUri())));
+            var resultingSchemaStr = IOUtils.toString(new InputStreamReader(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri())));
             JSONAssert.assertEquals("""
                     {
                       "type": "record",

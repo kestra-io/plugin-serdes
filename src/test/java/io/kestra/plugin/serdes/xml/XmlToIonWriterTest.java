@@ -78,7 +78,7 @@ class XmlToIonWriterTest {
         IonToXml.Output writerRunOutput = this.writer(readerRunOutput.getUri());
 
         assertThat(
-            IOUtils.toString(new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri()))),
+            IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri()))),
             is(IOUtils.toString(new FileInputStream(resultFile), Charsets.UTF_8))
         );
     }
@@ -92,7 +92,7 @@ class XmlToIonWriterTest {
         IonToXml.Output writerRunOutput = this.writer(readerRunOutput.getUri());
 
         assertThat(
-            IOUtils.toString(new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri()))),
+            IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri()))),
             is(IOUtils.toString(new FileInputStream(resultFile), Charsets.UTF_8))
         );
     }
@@ -131,7 +131,7 @@ class XmlToIonWriterTest {
             IonToXml.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             assertThat(
-                IOUtils.toString(this.storageInterface.get(null, null, run.getUri()), Charsets.UTF_8),
+                IOUtils.toString(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri()), Charsets.UTF_8),
                 is("<?xml version='1.0' encoding='UTF-8'?>\n<items>\n  <item>\n    " +
                     "<String>string</String>\n    " +
                     "<Int>2</Int>\n    " +

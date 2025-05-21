@@ -38,7 +38,7 @@ public class FullIonParquetConversionTest extends FullIonConversionAbstractTest 
             .type(IonToParquet.class.getName())
             .from(Property.of(inputIonFileUri.toString()))
             .schema(
-                IOUtils.toString(new InputStreamReader(storageInterface.get(null, null, inferAvroSchemaFromIonOutput.getUri())))
+                IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, inferAvroSchemaFromIonOutput.getUri())))
             )
             .build();
         var ionToParquetOutput = ionToParquet.run(TestsUtils.mockRunContext(runContextFactory, ionToParquet, ImmutableMap.of()));
@@ -54,7 +54,7 @@ public class FullIonParquetConversionTest extends FullIonConversionAbstractTest 
         var ion = IonSystemBuilder.standard().build();
         assertThat(
             IteratorUtils.toList(
-                ion.iterate(IOUtils.toString(new InputStreamReader(storageInterface.get(null, null, parquetToIonOutput.getUri()))))
+                ion.iterate(IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, parquetToIonOutput.getUri()))))
             )
         ).isEqualTo(
             IteratorUtils.toList(

@@ -77,7 +77,7 @@ class JsonWriterToIonTest {
         IonToJson.Output writerRunOutput = this.writer(readerRunOutput.getUri(), true);
 
         assertThat(
-            mapper.readTree(new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri()))),
+            mapper.readTree(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri()))),
             is(mapper.readTree(new InputStreamReader(new FileInputStream(sourceFile))))
         );
         assertThat(
@@ -107,7 +107,7 @@ class JsonWriterToIonTest {
         IonToJson.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
 
         assertThat(
-            mapper.readTree(new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri()))),
+            mapper.readTree(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri()))),
             is(mapper.readTree(new InputStreamReader(new FileInputStream(sourceFile))))
         );
     }
@@ -121,7 +121,7 @@ class JsonWriterToIonTest {
 
 
         List<Map> objects = Arrays.asList(mapper.readValue(
-            new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri())),
+            new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri())),
             Map[].class
         ));
 
@@ -162,7 +162,7 @@ class JsonWriterToIonTest {
             IonToJson.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
             assertThat(
-                IOUtils.toString(this.storageInterface.get(null, null, run.getUri()), Charsets.UTF_8),
+                IOUtils.toString(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri()), Charsets.UTF_8),
                 is("{" +
                     "\"String\":\"string\"," +
                     "\"Int\":2," +

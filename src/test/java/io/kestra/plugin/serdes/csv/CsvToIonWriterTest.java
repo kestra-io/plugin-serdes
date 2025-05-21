@@ -8,6 +8,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 import jakarta.inject.Inject;
@@ -57,7 +58,7 @@ class CsvToIonWriterTest {
         IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
         assertThat(
-            CharStreams.toString(new InputStreamReader(storageInterface.get(null, null, writerRunOutput.getUri()))),
+            CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri()))),
             is(CharStreams.toString(new InputStreamReader(new FileInputStream(sourceFile))))
         );
     }

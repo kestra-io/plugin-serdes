@@ -39,7 +39,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
             .type(IonToAvro.class.getName())
             .from(Property.of(inputIonFileUri.toString()))
             .schema(
-                IOUtils.toString(new InputStreamReader(storageInterface.get(null, null, inferAvroSchemaFromIonOutput.getUri())))
+                IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, inferAvroSchemaFromIonOutput.getUri())))
             )
             .build();
         var ionToAvroOutput = ionToAvro.run(TestsUtils.mockRunContext(runContextFactory, ionToAvro, ImmutableMap.of()));
@@ -56,7 +56,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
         var ion = IonSystemBuilder.standard().build();
         assertThat(
             IteratorUtils.toList(
-                ion.iterate(IOUtils.toString(new InputStreamReader(storageInterface.get(null, null, avroToIonOutput.getUri()))))
+                ion.iterate(IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, avroToIonOutput.getUri()))))
             )
         ).isEqualTo(
             IteratorUtils.toList(

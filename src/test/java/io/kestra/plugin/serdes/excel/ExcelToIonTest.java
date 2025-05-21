@@ -6,6 +6,7 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 import jakarta.inject.Inject;
@@ -48,7 +49,7 @@ public class ExcelToIonTest {
                 .build();
             ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(null, null, ionOutput.getUris().get("Worksheet"))));
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Worksheet"))));
 
             assertThat(out, containsString("policyID:\"333743\""));
             assertThat(out, containsString("point_latitude:30.102261"));

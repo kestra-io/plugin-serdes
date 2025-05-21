@@ -51,7 +51,7 @@ class IonToExcelTest {
             .build();
         IonToExcel.Output excelOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(null, null, (URI) excelOutput.getUri()));
+        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(TenantService.MAIN_TENANT, null, (URI) excelOutput.getUri()));
         XSSFWorkbook expected = new XSSFWorkbook(new FileInputStream(SerdesUtils.resourceToFile(expectedExcelResourcePath)));
         assertThat(actual, WorkbookMatcher.sameWorkbook(expected));
     }
@@ -199,7 +199,7 @@ class IonToExcelTest {
             )
         );
 
-        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(null, null, excelOutput.getUri()));
+        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(TenantService.MAIN_TENANT, null, excelOutput.getUri()));
         XSSFWorkbook expected = new XSSFWorkbook(
             new FileInputStream(
                 SerdesUtils.resourceToFile("excel/insurance_sample_multiple_sheets.xlsx")
