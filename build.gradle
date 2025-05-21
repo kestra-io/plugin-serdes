@@ -69,7 +69,7 @@ dependencies {
         exclude group: 'org.slf4j'
         exclude group: 'com.fasterxml.jackson.core'
     }
-    api group: 'org.json', name: 'json', version: '20250107'
+    api group: 'org.json', name: 'json', version: '20250517'
 }
 
 
