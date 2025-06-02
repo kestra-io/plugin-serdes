@@ -49,7 +49,7 @@ public abstract class AbstractTextWriter extends Task {
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
-    private final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
+    private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     @Getter(AccessLevel.NONE)
     private transient DateTimeFormatter dateFormatter;

@@ -87,20 +87,20 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
+    private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @NotNull
     @Builder.Default
     @Schema(
         title = "Xml root name"
     )
-    private final Property<String> rootName = Property.of("items");
+    private final Property<String> rootName = Property.ofValue("items");
 
     @Builder.Default
     @Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
-    private final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
+    private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     @Override
     public IonToXml.Output run(RunContext runContext) throws Exception {

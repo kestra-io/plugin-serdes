@@ -40,20 +40,20 @@ class CsvToIonWriterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(CsvToIonWriterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(Property.of(source.toString()))
-            .fieldSeparator(Property.of(";".charAt(0)))
-            .header(Property.of(header))
+            .from(Property.ofValue(source.toString()))
+            .fieldSeparator(Property.ofValue(";".charAt(0)))
+            .header(Property.ofValue(header))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToCsv writer = IonToCsv.builder()
             .id(CsvToIonWriterTest.class.getSimpleName())
             .type(IonToCsv.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
-            .fieldSeparator(Property.of(";".charAt(0)))
-            .alwaysDelimitText(Property.of(true))
-            .lineDelimiter(Property.of((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n")))
-            .header(Property.of(header))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
+            .fieldSeparator(Property.ofValue(";".charAt(0)))
+            .alwaysDelimitText(Property.ofValue(true))
+            .lineDelimiter(Property.ofValue((file.equals("csv/insurance_sample.csv") ? "\r\n" : "\n")))
+            .header(Property.ofValue(header))
             .build();
         IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -81,10 +81,10 @@ class CsvToIonWriterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(CsvToIonWriterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(Property.of(source.toString()))
-            .fieldSeparator(Property.of(";".charAt(0)))
-            .skipRows(Property.of(4))
-            .header(Property.of(false))
+            .from(Property.ofValue(source.toString()))
+            .fieldSeparator(Property.ofValue(";".charAt(0)))
+            .skipRows(Property.ofValue(4))
+            .header(Property.ofValue(false))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
