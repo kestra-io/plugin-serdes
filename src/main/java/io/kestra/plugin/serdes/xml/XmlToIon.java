@@ -73,7 +73,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
+    private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Schema(
         title = "XPath use to query in the XML file."

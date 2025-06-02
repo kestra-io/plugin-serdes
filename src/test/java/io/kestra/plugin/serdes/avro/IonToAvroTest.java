@@ -65,8 +65,8 @@ class IonToAvroTest {
         IonToAvro task = IonToAvro.builder()
             .id(IonToAvroTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(source.toString()))
-            .inferAllFields(Property.of(false))
+            .from(Property.ofValue(source.toString()))
+            .inferAllFields(Property.ofValue(false))
             .schema(
                 Files.asCharSource(
                     new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("csv/insurance_sample.avsc")).toURI()),
@@ -135,7 +135,7 @@ class IonToAvroTest {
             IonToAvro writer = IonToAvro.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(Property.of(uri.toString()))
+                .from(Property.ofValue(uri.toString()))
                 .schema(schema)
                 .build();
             writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));

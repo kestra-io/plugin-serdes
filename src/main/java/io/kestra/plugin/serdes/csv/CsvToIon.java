@@ -67,43 +67,43 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Schema(
         title = "Specifies if the first line should be the header"
     )
-    private final Property<Boolean> header = Property.of(true);
+    private final Property<Boolean> header = Property.ofValue(true);
 
     @Builder.Default
     @Schema(
         title = "The field separator character"
     )
-    private final Property<Character> fieldSeparator = Property.of(',');
+    private final Property<Character> fieldSeparator = Property.ofValue(',');
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
-    private final Property<Character> textDelimiter = Property.of('"');
+    private final Property<Character> textDelimiter = Property.ofValue('"');
 
     @Builder.Default
     @Schema(
         title = "Specifies if empty rows should be skipped"
     )
-    private final Property<Boolean> skipEmptyRows = Property.of(false);
+    private final Property<Boolean> skipEmptyRows = Property.ofValue(false);
 
     @Builder.Default
     @Schema(
         title = "Specifies if an exception should be thrown, if CSV data contains different field count"
     )
-    private final Property<Boolean> errorOnDifferentFieldCount = Property.of(false);
+    private final Property<Boolean> errorOnDifferentFieldCount = Property.ofValue(false);
 
     @Builder.Default
     @Schema(
         title = "Number of lines to skip at the start of the file"
     )
-    private final Property<Integer> skipRows = Property.of(0);
+    private final Property<Integer> skipRows = Property.ofValue(0);
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
-    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
+    private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Override
     public Output run(RunContext runContext) throws Exception {

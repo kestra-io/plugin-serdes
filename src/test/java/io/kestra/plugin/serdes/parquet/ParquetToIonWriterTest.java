@@ -72,9 +72,9 @@ class ParquetToIonWriterTest {
             IonToParquet writer = IonToParquet.builder()
                 .id(IonToParquet.class.getSimpleName())
                 .type(IonToParquet.class.getName())
-                .from(Property.of(uri.toString()))
+                .from(Property.ofValue(uri.toString()))
                 .schema(schema)
-                .timeZoneId(Property.of("UTC"))
+                .timeZoneId(Property.ofValue("UTC"))
                 .build();
 
             IonToParquet.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
@@ -82,7 +82,7 @@ class ParquetToIonWriterTest {
             ParquetToIon reader = ParquetToIon.builder()
                 .id(ParquetToIon.class.getSimpleName())
                 .type(ParquetToIon.class.getName())
-                .from(Property.of(writerOutput.getUri().toString()))
+                .from(Property.ofValue(writerOutput.getUri().toString()))
                 .build();
 
             ParquetToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));

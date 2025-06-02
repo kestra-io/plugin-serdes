@@ -29,7 +29,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
         var inferAvroSchemaFromIon = InferAvroSchemaFromIon.builder()
             .id(InferAvroSchemaFromIon.class.getSimpleName())
             .type(InferAvroSchemaFromIon.class.getName())
-            .from(Property.of(inputIonFileUri.toString()))
+            .from(Property.ofValue(inputIonFileUri.toString()))
             .build();
         var inferAvroSchemaFromIonOutput = inferAvroSchemaFromIon.run(TestsUtils.mockRunContext(runContextFactory, inferAvroSchemaFromIon, ImmutableMap.of()));
 
@@ -37,7 +37,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
         var ionToAvro = IonToAvro.builder()
             .id(IonToAvro.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(inputIonFileUri.toString()))
+            .from(Property.ofValue(inputIonFileUri.toString()))
             .schema(
                 IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, inferAvroSchemaFromIonOutput.getUri())))
             )
@@ -48,7 +48,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
         var avroToIon = AvroToIon.builder()
             .id(AvroToIon.class.getSimpleName())
             .type(AvroToIon.class.getName())
-            .from(Property.of(ionToAvroOutput.getUri().toString()))
+            .from(Property.ofValue(ionToAvroOutput.getUri().toString()))
             .build();
         var avroToIonOutput = avroToIon.run(TestsUtils.mockRunContext(runContextFactory, avroToIon, ImmutableMap.of()));
 

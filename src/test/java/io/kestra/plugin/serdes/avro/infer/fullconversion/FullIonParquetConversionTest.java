@@ -29,14 +29,14 @@ public class FullIonParquetConversionTest extends FullIonConversionAbstractTest 
         var inferAvroSchemaFromIon = InferAvroSchemaFromIon.builder()
             .id(InferAvroSchemaFromIon.class.getSimpleName())
             .type(InferAvroSchemaFromIon.class.getName())
-            .from(Property.of(inputIonFileUri.toString()))
+            .from(Property.ofValue(inputIonFileUri.toString()))
             .build();
         var inferAvroSchemaFromIonOutput = inferAvroSchemaFromIon.run(TestsUtils.mockRunContext(runContextFactory, inferAvroSchemaFromIon, ImmutableMap.of()));
 
         var ionToParquet = IonToParquet.builder()
             .id(IonToParquet.class.getSimpleName())
             .type(IonToParquet.class.getName())
-            .from(Property.of(inputIonFileUri.toString()))
+            .from(Property.ofValue(inputIonFileUri.toString()))
             .schema(
                 IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, inferAvroSchemaFromIonOutput.getUri())))
             )
@@ -46,7 +46,7 @@ public class FullIonParquetConversionTest extends FullIonConversionAbstractTest 
         var parquetToIon = ParquetToIon.builder()
             .id(ParquetToIon.class.getSimpleName())
             .type(ParquetToIon.class.getName())
-            .from(Property.of(ionToParquetOutput.getUri().toString()))
+            .from(Property.ofValue(ionToParquetOutput.getUri().toString()))
             .build();
         var parquetToIonOutput = parquetToIon.run(TestsUtils.mockRunContext(runContextFactory, parquetToIon, ImmutableMap.of()));
 
