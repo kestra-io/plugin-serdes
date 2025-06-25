@@ -205,15 +205,16 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     private URI convertToIon(RunContext runContext, List<Object> values) throws IOException, IllegalVariableEvaluationException {
         if (runContext.render(header).as(Boolean.class).orElseThrow()) {
             List<Object> headers = (List<Object>) values.remove(0);
-            List<Object> convertedSheet = new LinkedList<>();
+            List<Object> convertedSheet = new ArrayList<>();
 
             for (Object value : values) {
                 List<Object> list = (List<Object>) value;
-                Map<Object, Object> row = new LinkedHashMap<>();
+                Map<String, Object> row = new LinkedHashMap<>();
 
-                for (int j = 0, headerPosition = 0; j < headers.size(); j++) {
-                    Object header = headers.get(headerPosition++);
-                    row.put(header, list.get(j));
+                for (int j = 0; j < headers.size(); j++) {
+                    String headerValue = String.valueOf(headers.get(j));
+                    Object cellValue = j < list.size() ? list.get(j) : null;
+                    row.put(headerValue, cellValue);
                 }
 
                 convertedSheet.add(row);

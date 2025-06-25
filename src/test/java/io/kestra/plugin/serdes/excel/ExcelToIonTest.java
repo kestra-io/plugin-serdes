@@ -126,4 +126,26 @@ public class ExcelToIonTest {
             assertThat(outWorkSheet3, containsString("point_latitude:30.102261"));
         }
     }
+
+    @Test
+    void ion_with_missing_cells() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream unused = new FileOutputStream(tempFile)) {
+
+            File sourceFile = SerdesUtils.resourceToFile("excel/missing_cells_sample.xlsx");
+            URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+            ExcelToIon reader = ExcelToIon.builder()
+                .id(ExcelToIonTest.class.getSimpleName())
+                .type(ExcelToIon.class.getName())
+                .from(Property.of(source.toString()))
+                .header(Property.of(true))
+                .build();
+            ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1"))));
+
+            assertThat(out, containsString("abc"));
+        }
+    }
 }
