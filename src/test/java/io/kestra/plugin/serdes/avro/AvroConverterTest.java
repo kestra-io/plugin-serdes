@@ -53,16 +53,16 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(Property.of(csv.toString()))
-            .fieldSeparator(Property.of(",".charAt(0)))
-            .header(Property.of(true))
+            .from(Property.ofValue(csv.toString()))
+            .fieldSeparator(Property.ofValue(",".charAt(0)))
+            .header(Property.ofValue(true))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
@@ -90,14 +90,14 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(Property.of(csv.toString()))
+            .from(Property.ofValue(csv.toString()))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
@@ -125,20 +125,20 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(Property.of(csv.toString()))
-            .fieldSeparator(Property.of(",".charAt(0)))
-            .header(Property.of(true))
+            .from(Property.ofValue(csv.toString()))
+            .fieldSeparator(Property.ofValue(",".charAt(0)))
+            .header(Property.ofValue(true))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
-            .strictSchema(Property.of(true))
+            .strictSchema(Property.ofValue(true))
             .build();
 
         RuntimeException re = assertThrows(RuntimeException.class, () -> {
@@ -159,20 +159,20 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(Property.of(csv.toString()))
-            .fieldSeparator(Property.of(",".charAt(0)))
-            .header(Property.of(false))
+            .from(Property.ofValue(csv.toString()))
+            .fieldSeparator(Property.ofValue(",".charAt(0)))
+            .header(Property.ofValue(false))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
-            .strictSchema(Property.of(true))
+            .strictSchema(Property.ofValue(true))
             .build();
 
         RuntimeException re = assertThrows(RuntimeException.class, () -> {
@@ -193,16 +193,16 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(Property.of(csv.toString()))
-            .fieldSeparator(Property.of(",".charAt(0)))
-            .header(Property.of(true))
+            .from(Property.ofValue(csv.toString()))
+            .fieldSeparator(Property.ofValue(",".charAt(0)))
+            .header(Property.ofValue(true))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
@@ -222,18 +222,18 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(Property.of(csv.toString()))
+            .from(Property.ofValue(csv.toString()))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
-            .strictSchema(Property.of(true))
+            .strictSchema(Property.ofValue(true))
             .build();
 
         RuntimeException re = assertThrows(RuntimeException.class, () -> {
@@ -254,18 +254,18 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(Property.of(csv.toString()))
+            .from(Property.ofValue(csv.toString()))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
-            .strictSchema(Property.of(true))
+            .strictSchema(Property.ofValue(true))
             .build();
 
         RuntimeException re = assertThrows(RuntimeException.class, () -> {
@@ -288,15 +288,15 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(Property.of(csv.toString()))
-            .newLine(Property.of(Boolean.FALSE))
+            .from(Property.ofValue(csv.toString()))
+            .newLine(Property.ofValue(Boolean.FALSE))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
@@ -319,15 +319,15 @@ public class AvroConverterTest {
         JsonToIon reader = JsonToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(JsonToIon.class.getName())
-            .from(Property.of(csv.toString()))
-            .newLine(Property.of(Boolean.FALSE))
+            .from(Property.ofValue(csv.toString()))
+            .newLine(Property.ofValue(Boolean.FALSE))
             .build();
         JsonToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")
@@ -364,16 +364,16 @@ public class AvroConverterTest {
         CsvToIon reader = CsvToIon.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(CsvToIon.class.getName())
-            .from(Property.of(csv.toString()))
-            .fieldSeparator(Property.of(",".charAt(0)))
-            .header(Property.of(false))
+            .from(Property.ofValue(csv.toString()))
+            .fieldSeparator(Property.ofValue(",".charAt(0)))
+            .header(Property.ofValue(false))
             .build();
         CsvToIon.Output readerRunOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
         IonToAvro task = IonToAvro.builder()
             .id(AvroConverterTest.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(readerRunOutput.getUri().toString()))
+            .from(Property.ofValue(readerRunOutput.getUri().toString()))
             .schema(read)
             .dateFormat("yyyy/MM/dd")
             .timeFormat("H:mm")

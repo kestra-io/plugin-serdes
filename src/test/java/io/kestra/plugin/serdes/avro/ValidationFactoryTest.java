@@ -28,7 +28,7 @@ class ValidationFactoryTest {
         var validator = modelValidator.isValid(
             IonToAvro.builder()
                 .id("unit")
-                .from(Property.of("unit"))
+                .from(Property.ofValue("unit"))
                 .type(IonToAvro.class.getName())
                 .schema(schema)
                 .build()
@@ -38,7 +38,7 @@ class ValidationFactoryTest {
         validator = modelValidator.isValid(
             IonToAvro.builder()
                 .id("unit")
-                .from(Property.of("unit"))
+                .from(Property.ofValue("unit"))
                 .type(IonToAvro.class.getName())
                 .schema("{\"invalid\": \"avro schema\"}")
                 .build()
@@ -49,7 +49,7 @@ class ValidationFactoryTest {
         validator = modelValidator.isValid(
             IonToAvro.builder()
                 .id("unit")
-                .from(Property.of("unit"))
+                .from(Property.ofValue("unit"))
                 .type(IonToAvro.class.getName())
                 .schema("{\"invalid json schema\"}")
                 .build()
@@ -59,7 +59,7 @@ class ValidationFactoryTest {
         validator = modelValidator.isValid(
             IonToAvro.builder()
                 .id("unit")
-                .from(Property.of("unit"))
+                .from(Property.ofValue("unit"))
                 .type(IonToAvro.class.getName())
                 .schema("{{ test }}")
                 .build()

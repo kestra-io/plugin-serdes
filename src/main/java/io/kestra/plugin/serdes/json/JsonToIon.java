@@ -103,7 +103,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
+    private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Builder.Default
     @Schema(
@@ -111,7 +111,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         description = "Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
-    private final Property<Boolean> newLine = Property.of(true);
+    private final Property<Boolean> newLine = Property.ofValue(true);
 
     @Override
     public Output run(RunContext runContext) throws Exception {

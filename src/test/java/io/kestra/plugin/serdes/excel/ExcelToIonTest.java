@@ -44,8 +44,8 @@ public class ExcelToIonTest {
             ExcelToIon reader = ExcelToIon.builder()
                 .id(ExcelToIonTest.class.getSimpleName())
                 .type(ExcelToIon.class.getName())
-                .from(Property.of(source.toString()))
-                .header(Property.of(true))
+                .from(Property.ofValue(source.toString()))
+                .header(Property.ofValue(true))
                 .build();
             ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
@@ -67,15 +67,15 @@ public class ExcelToIonTest {
             ExcelToIon reader = ExcelToIon.builder()
                 .id(ExcelToIonTest.class.getSimpleName())
                 .type(ExcelToIon.class.getName())
-                .from(Property.of(source.toString()))
-                .sheetsTitle(Property.of(
+                .from(Property.ofValue(source.toString()))
+                .sheetsTitle(Property.ofValue(
                     List.of(
                         "Worksheet_1",
                         "Worksheet_2",
                         "Worksheet_3"
                     )
                 ))
-                .header(Property.of(true))
+                .header(Property.ofValue(true))
                 .build();
 
             ExcelToIon.Output ionOutput = reader.run(
@@ -138,8 +138,8 @@ public class ExcelToIonTest {
             ExcelToIon reader = ExcelToIon.builder()
                 .id(ExcelToIonTest.class.getSimpleName())
                 .type(ExcelToIon.class.getName())
-                .from(Property.of(source.toString()))
-                .header(Property.of(true))
+                .from(Property.ofValue(source.toString()))
+                .header(Property.ofValue(true))
                 .build();
             ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 

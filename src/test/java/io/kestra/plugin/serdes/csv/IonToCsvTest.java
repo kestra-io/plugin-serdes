@@ -73,10 +73,10 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToCsvTest.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(Property.of(uri.toString()))
-                .fieldSeparator(Property.of(";".charAt(0)))
-                .alwaysDelimitText(Property.of(false))
-                .header(Property.of(true))
+                .from(Property.ofValue(uri.toString()))
+                .fieldSeparator(Property.ofValue(";".charAt(0)))
+                .alwaysDelimitText(Property.ofValue(false))
+                .header(Property.ofValue(true))
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -118,10 +118,10 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToCsvTest.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(Property.of(uri.toString()))
-                .fieldSeparator(Property.of(";".charAt(0)))
-                .alwaysDelimitText(Property.of(true))
-                .header(Property.of(false))
+                .from(Property.ofValue(uri.toString()))
+                .fieldSeparator(Property.ofValue(";".charAt(0)))
+                .alwaysDelimitText(Property.ofValue(true))
+                .header(Property.ofValue(false))
                 .build();
             IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -159,10 +159,10 @@ class IonToCsvTest {
             IonToCsv writer = IonToCsv.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(Property.of(uri.toString()))
-                .alwaysDelimitText(Property.of(true))
-                .header(Property.of(false))
-                .timeZoneId(Property.of(ZoneId.of("Europe/Lisbon").toString()))
+                .from(Property.ofValue(uri.toString()))
+                .alwaysDelimitText(Property.ofValue(true))
+                .header(Property.ofValue(false))
+                .timeZoneId(Property.ofValue(ZoneId.of("Europe/Lisbon").toString()))
                 .build();
 
             IonToCsv.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));

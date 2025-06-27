@@ -84,37 +84,37 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Schema(
         title = "Specifies if the first line should be the header"
     )
-    private final Property<Boolean> header = Property.of(true);
+    private final Property<Boolean> header = Property.ofValue(true);
 
     @Builder.Default
     @Schema(
         title = "The field separator character"
     )
-    private final Property<Character> fieldSeparator = Property.of(',');
+    private final Property<Character> fieldSeparator = Property.ofValue(',');
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
-    private final Property<Character> textDelimiter = Property.of('"');
+    private final Property<Character> textDelimiter = Property.ofValue('"');
 
     @Builder.Default
     @Schema(
         title = "The character used to separate rows"
     )
-    private final Property<String> lineDelimiter = Property.of("\n");
+    private final Property<String> lineDelimiter = Property.ofValue("\n");
 
     @Builder.Default
     @Schema(
         title = "Whether fields should always be delimited using the textDelimiter option."
     )
-    private final Property<Boolean> alwaysDelimitText = Property.of(false);
+    private final Property<Boolean> alwaysDelimitText = Property.ofValue(false);
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
-    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
+    private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
 
     @Override

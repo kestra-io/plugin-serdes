@@ -41,25 +41,25 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Number of row that will be scanned while inferring. The bigger it is, the more precise the output schema will be.",
         description = "Only use when 'schema' property is empty"
     )
-    private Property<Integer> numberOfRowsToScan = Property.of(100);
+    private Property<Integer> numberOfRowsToScan = Property.ofValue(100);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Values to consider as True"
     )
-    protected final Property<List<String>> trueValues = Property.of(Arrays.asList("t", "true", "enabled", "1", "on", "yes"));
+    protected final Property<List<String>> trueValues = Property.ofValue(Arrays.asList("t", "true", "enabled", "1", "on", "yes"));
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Values to consider as False"
     )
-    protected final Property<List<String>> falseValues = Property.of(Arrays.asList("f", "false", "disabled", "0", "off", "no", ""));
+    protected final Property<List<String>> falseValues = Property.ofValue(Arrays.asList("f", "false", "disabled", "0", "off", "no", ""));
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Values to consider as null"
     )
-    protected final Property<List<String>> nullValues = Property.of(Arrays.asList(
+    protected final Property<List<String>> nullValues = Property.ofValue(Arrays.asList(
         "",
         "#N/A",
         "#N/A N/A",
@@ -105,14 +105,14 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
         description = "Default value is '.'"
     )
-    protected final Property<Character> decimalSeparator = Property.of('.');
+    protected final Property<Character> decimalSeparator = Property.ofValue('.');
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Whether to consider a field present in the data but not declared in the schema as an error",
         description = "Default value is false"
     )
-    protected Property<Boolean> strictSchema = Property.of(Boolean.FALSE);
+    protected Property<Boolean> strictSchema = Property.ofValue(Boolean.FALSE);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
@@ -120,14 +120,14 @@ public abstract class AbstractAvroConverter extends Task {
         description = "If true, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`." +
             "If false, we will infer bool & null only on field declared on schema as `null` and `bool`."
     )
-    protected Property<Boolean> inferAllFields = Property.of(false);
+    protected Property<Boolean> inferAllFields = Property.ofValue(false);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Timezone to use when no timezone can be parsed on the source.",
         description = "If null, the timezone will be `UTC` Default value is system timezone"
     )
-    protected final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
+    protected final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
 
     protected <E extends Exception> Long convert(Reader inputStream, Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext) throws IOException, IllegalVariableEvaluationException {
