@@ -57,6 +57,28 @@ public class ExcelToIonTest {
     }
 
     @Test
+    void ion_without_header() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+
+            File sourceFile = SerdesUtils.resourceToFile("excel/insurance_sample.xlsx");
+            URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+            ExcelToIon reader = ExcelToIon.builder()
+                .id(ExcelToIonTest.class.getSimpleName())
+                .type(ExcelToIon.class.getName())
+                .from(Property.ofValue(source.toString()))
+                .header(Property.ofValue(false))
+                .build();
+            ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Worksheet"))));
+
+            assertThat(out, containsString("\"policyID\",\"statecode\""));
+        }
+    }
+
+    @Test
     void multiSheets() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
@@ -146,6 +168,28 @@ public class ExcelToIonTest {
             String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1"))));
 
             assertThat(out, containsString("abc"));
+        }
+    }
+
+    @Test
+    void ion_with_empty_column() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream unused = new FileOutputStream(tempFile)) {
+
+            File sourceFile = SerdesUtils.resourceToFile("excel/zendesk498.xlsx");
+            URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+            ExcelToIon reader = ExcelToIon.builder()
+                .id(ExcelToIonTest.class.getSimpleName())
+                .type(ExcelToIon.class.getName())
+                .from(Property.ofValue(source.toString()))
+                .header(Property.ofValue(true))
+                .build();
+            ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1"))));
+
+            assertThat(out, containsString("PrizeMasterType:null"));
         }
     }
 }

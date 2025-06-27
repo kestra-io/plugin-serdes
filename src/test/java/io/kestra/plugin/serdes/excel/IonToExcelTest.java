@@ -107,7 +107,7 @@ class IonToExcelTest {
 
         IonToExcel writer = IonToExcel.builder()
             .id(IonToExcel.class.getSimpleName())
-            .type(ExcelToIon.class.getName())
+            .type(IonToExcel.class.getName())
             .from(put.toString())
             .build();
 
@@ -126,7 +126,7 @@ class IonToExcelTest {
         runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
         ExcelToIon.Output outputWriter = reader.run(runContext);
 
-        assertThat(outputWriter.getSize(), is(ROWS_COUNT + 1));
+        assertThat(outputWriter.getSize(), is(ROWS_COUNT));
     }
 
     @Test
@@ -150,7 +150,7 @@ class IonToExcelTest {
 
         IonToExcel writer = IonToExcel.builder()
             .id(IonToExcel.class.getSimpleName())
-            .type(ExcelToIon.class.getName())
+            .type(IonToExcel.class.getName())
             .from(put.toString())
             .styles(Property.ofValue(false))
             .build();
@@ -170,7 +170,7 @@ class IonToExcelTest {
         runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
         ExcelToIon.Output outputWriter = reader.run(runContext);
 
-        assertThat(outputWriter.getSize(), is(ROWS_COUNT + 1));
+        assertThat(outputWriter.getSize(), is(ROWS_COUNT));
     }
 
     @Test

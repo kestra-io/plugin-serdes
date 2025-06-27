@@ -1,7 +1,6 @@
 package io.kestra.plugin.serdes.excel;
 
 import com.github.pjfanning.xlsx.StreamingReader;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -13,7 +12,6 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.ListUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
@@ -133,45 +131,69 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
             runContext.metric(Counter.of("sheets", sheets.size()));
 
-            // read values
             Map<String, URI> uris = new HashMap<>();
             AtomicInteger rowsCount = new AtomicInteger();
 
-            AtomicInteger skipped = new AtomicInteger();
-            var renderedValueRender = runContext.render(this.valueRender).as(ValueRender.class).orElseThrow();
             var renderedSkipEmptyRowsValue = runContext.render(this.skipEmptyRows).as(Boolean.class).orElseThrow();
+            var renderedHeader = runContext.render(this.header).as(Boolean.class).orElseThrow();
+            var renderedValueRender = runContext.render(this.valueRender).as(ValueRender.class).orElseThrow();
             var renderedDateTimeRender = runContext.render(this.dateTimeRender).as(DateTimeRender.class).orElseThrow();
-            for (Sheet sheet : selectedSheets) {
-                List<Object> values = new ArrayList<>();
 
-                sheet.rowIterator().forEachRemaining(row -> {
-                    List<Object> rowValues = new ArrayList<>();
-                    if (this.skipRows > 0 && skipped.get() < this.skipRows) {
-                        skipped.incrementAndGet();
-                        return;
+            for (Sheet sheet : selectedSheets) {
+                var sheetRawData = new ArrayList<>();
+                var rowIterator = sheet.rowIterator();
+
+                var headers = new ArrayList<>();
+                var firstColNum = 0;
+                var lastColNum = -1;
+
+                if (renderedHeader && rowIterator.hasNext()) {
+                    var headerRow = rowIterator.next();
+                    var skippedHeaderRows = new AtomicInteger();
+                    while (skippedHeaderRows.get() < this.skipRows && rowIterator.hasNext()) {
+                        headerRow = rowIterator.next();
+                        skippedHeaderRows.incrementAndGet();
                     }
 
-                    for (int i = row.getFirstCellNum(); i < row.getLastCellNum(); i++) {
-                        Cell cell = row.getCell(i);
-                        if (cell != null) {
-                            if (renderedValueRender.equals(ValueRender.FORMATTED_VALUE)) {
-                                extractValue(rowValues, cell, renderedSkipEmptyRowsValue, renderedDateTimeRender);
-                            } else if (renderedValueRender.equals(ValueRender.FORMULA)) {
-                                switch (cell.getCachedFormulaResultType()) {
-                                    case NUMERIC -> rowValues.add(convertNumeric(cell, renderedDateTimeRender));
-                                    case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
-                                }
+                    if (headerRow != null) {
+                        firstColNum = headerRow.getFirstCellNum();
+                        lastColNum = headerRow.getLastCellNum();
+                        for (int i = firstColNum; i < lastColNum; i++) {
+                            var cell = headerRow.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                            if (cell != null) {
+                                headers.add(extractCellValue(cell, renderedValueRender, renderedDateTimeRender));
                             } else {
-                                extractValue(rowValues, cell, renderedSkipEmptyRowsValue, renderedDateTimeRender);
+                                headers.add("Column" + i);
                             }
                         }
                     }
-                    values.add(rowValues);
-                });
+                }
 
-                rowsCount.addAndGet(values.size());
+                if (lastColNum == -1 && rowIterator.hasNext()) {
+                    var firstDataRow = rowIterator.next();
+                    lastColNum = firstDataRow.getLastCellNum();
+                    if (lastColNum == -1) lastColNum = 0;
+                    sheetRawData.add(processRow(firstDataRow, firstColNum, lastColNum, renderedValueRender, renderedSkipEmptyRowsValue, renderedDateTimeRender));
+                }
 
-                uris.put(sheet.getSheetName(), convertToIon(runContext, values));
+                var skippedDataRows = new AtomicInteger();
+                while (rowIterator.hasNext()) {
+                    var row = rowIterator.next();
+                    if (!renderedHeader && this.skipRows > 0 && skippedDataRows.get() < this.skipRows) {
+                        skippedDataRows.incrementAndGet();
+                        continue;
+                    }
+                    sheetRawData.add(processRow(row, firstColNum, lastColNum, renderedValueRender, renderedSkipEmptyRowsValue, renderedDateTimeRender));
+                }
+
+                rowsCount.addAndGet(sheetRawData.size());
+
+                if (renderedHeader && !headers.isEmpty()) {
+                    var convertedSheet = getConvertedSheet(sheetRawData, headers);
+                    uris.put(sheet.getSheetName(), runContext.storage().putFile(this.store(runContext, convertedSheet)));
+                } else {
+                    uris.put(sheet.getSheetName(), runContext.storage().putFile(this.store(runContext, sheetRawData)));
+                }
             }
 
             return Output.builder()
@@ -181,49 +203,73 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         }
     }
 
-    public void extractValue(List<Object> rowValues, Cell cell, boolean skipEmptyRowsValue, DateTimeRender dateTimeRender) {
-        switch (cell.getCellType()) {
-            case STRING -> rowValues.add(cell.getStringCellValue());
-            case BOOLEAN -> rowValues.add(cell.getBooleanCellValue());
-            case NUMERIC -> rowValues.add(convertNumeric(cell, dateTimeRender));
-            case FORMULA -> {
-                switch (cell.getCachedFormulaResultType()) {
-                    case NUMERIC -> rowValues.add(convertNumeric(cell, dateTimeRender));
-                    case STRING -> rowValues.add(cell.getRichStringCellValue().getString());
-                }
+    private List<Object> getConvertedSheet(ArrayList<Object> sheetRawData, ArrayList<Object> headers) {
+        var convertedSheet = new ArrayList<>();
+        for (Object rowObj : sheetRawData) {
+            List<Object> list = (List<Object>) rowObj;
+            Map<String, Object> rowMap = new LinkedHashMap<>();
+            for (int headerIndex = 0; headerIndex < headers.size(); headerIndex++) {
+                String headerValue = String.valueOf(headers.get(headerIndex));
+                Object cellValue = (headerIndex < list.size() && list.get(headerIndex) != null) ? list.get(headerIndex) : null;
+                rowMap.put(headerValue, cellValue);
             }
-            case BLANK -> {
-                if (!skipEmptyRowsValue) {
-                    rowValues.add(cell.getStringCellValue());
-                }
+            convertedSheet.add(rowMap);
+        }
+        return convertedSheet;
+    }
+
+    private List<Object> processRow(Row row, int firstCol, int lastCol, ValueRender valueRender, boolean skipEmptyRowsValue, DateTimeRender dateTimeRender) {
+        List<Object> rowValues = new ArrayList<>();
+        for (int col = firstCol; col < lastCol; col++) {
+            var cell = row.getCell(col, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+            if (cell == null || (cell.getCellType() == CellType.BLANK && skipEmptyRowsValue)) {
+                rowValues.add(null);
+            } else {
+                rowValues.add(extractCellValue(cell, valueRender, dateTimeRender));
             }
-            default -> {
-            }
+        }
+        return rowValues;
+    }
+
+    private Object extractCellValue(Cell cell, ValueRender valueRender, DateTimeRender dateTimeRender) {
+        if (valueRender.equals(ValueRender.FORMATTED_VALUE)) {
+            return getFormattedValue(cell, dateTimeRender);
+        } else if (valueRender.equals(ValueRender.FORMULA)) {
+            return getFormula(cell, dateTimeRender);
+        } else {
+            return getUnformattedValue(cell, dateTimeRender);
         }
     }
 
-    private URI convertToIon(RunContext runContext, List<Object> values) throws IOException, IllegalVariableEvaluationException {
-        if (runContext.render(header).as(Boolean.class).orElseThrow()) {
-            List<Object> headers = (List<Object>) values.remove(0);
-            List<Object> convertedSheet = new ArrayList<>();
+    private Object getFormula(Cell cell, DateTimeRender dateTimeRender) {
+        return switch (cell.getCachedFormulaResultType()) {
+            case NUMERIC -> convertNumeric(cell, dateTimeRender);
+            case STRING -> cell.getRichStringCellValue().getString();
+            case BOOLEAN -> cell.getBooleanCellValue();
+            default -> null; // including ERROR, BLANK, etc
+        };
+    }
 
-            for (Object value : values) {
-                List<Object> list = (List<Object>) value;
-                Map<String, Object> row = new LinkedHashMap<>();
-
-                for (int j = 0; j < headers.size(); j++) {
-                    String headerValue = String.valueOf(headers.get(j));
-                    Object cellValue = j < list.size() ? list.get(j) : null;
-                    row.put(headerValue, cellValue);
-                }
-
-                convertedSheet.add(row);
-            }
-
-            return runContext.storage().putFile(this.store(runContext, convertedSheet));
+    private Object getFormattedValue(Cell cell, DateTimeRender dateTimeRender) {
+        DataFormatter dataFormatter = new DataFormatter();
+        if (DateUtil.isCellDateFormatted(cell)) {
+            return switch (dateTimeRender) {
+                case SERIAL_NUMBER -> cell.getNumericCellValue();
+                case FORMATTED_STRING -> dataFormatter.formatCellValue(cell);
+                default -> cell.getDateCellValue();
+            };
         }
+        return dataFormatter.formatCellValue(cell);
+    }
 
-        return runContext.storage().putFile(this.store(runContext, values));
+    private Object getUnformattedValue(Cell cell, DateTimeRender dateTimeRender) {
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue();
+            case BOOLEAN -> cell.getBooleanCellValue();
+            case NUMERIC -> convertNumeric(cell, dateTimeRender);
+            case FORMULA -> getFormula(cell, dateTimeRender);
+            default -> null; // including ERROR, BLANK, etc
+        };
     }
 
     private Object convertNumeric(Cell cell, DateTimeRender dateTimeRender) {
