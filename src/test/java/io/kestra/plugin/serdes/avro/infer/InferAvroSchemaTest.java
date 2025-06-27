@@ -66,7 +66,7 @@ public class InferAvroSchemaTest {
             InferAvroSchemaFromIon writer = InferAvroSchemaFromIon.builder()
                 .id(InferAvroSchemaFromIon.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(Property.of(inputIonFileUri.toString()))
+                .from(Property.ofValue(inputIonFileUri.toString()))
                 .build();
             var run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 

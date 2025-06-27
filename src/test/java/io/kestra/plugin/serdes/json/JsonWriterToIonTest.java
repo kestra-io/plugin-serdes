@@ -51,8 +51,8 @@ class JsonWriterToIonTest {
         JsonToIon reader = JsonToIon.builder()
             .id(JsonToIon.class.getSimpleName())
             .type(IonToAvro.class.getName())
-            .from(Property.of(source.toString()))
-            .newLine(Property.of(jsonNl))
+            .from(Property.ofValue(source.toString()))
+            .newLine(Property.ofValue(jsonNl))
             .build();
 
         return reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
@@ -62,8 +62,8 @@ class JsonWriterToIonTest {
         IonToJson writer = IonToJson.builder()
             .id(IonToJson.class.getSimpleName())
             .type(IonToJson.class.getName())
-            .from(Property.of(from.toString()))
-            .newLine(Property.of(jsonNl))
+            .from(Property.ofValue(from.toString()))
+            .newLine(Property.ofValue(jsonNl))
             .build();
 
         return writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
@@ -156,8 +156,8 @@ class JsonWriterToIonTest {
             IonToJson writer = IonToJson.builder()
                 .id(IonToAvro.class.getSimpleName())
                 .type(IonToCsv.class.getName())
-                .from(Property.of(uri.toString()))
-                .timeZoneId(Property.of(ZoneId.of("Europe/Lisbon").toString()))
+                .from(Property.ofValue(uri.toString()))
+                .timeZoneId(Property.ofValue(ZoneId.of("Europe/Lisbon").toString()))
                 .build();
             IonToJson.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 

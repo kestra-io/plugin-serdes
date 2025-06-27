@@ -99,31 +99,31 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "The compression to used"
     )
-    Property<CompressionCodec> compressionCodec = Property.of(CompressionCodec.GZIP);
+    Property<CompressionCodec> compressionCodec = Property.ofValue(CompressionCodec.GZIP);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target row group size"
     )
-    private Property<Version> parquetVersion = Property.of(Version.V2);
+    private Property<Version> parquetVersion = Property.ofValue(Version.V2);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target row group size"
     )
-    private Property<Long> rowGroupSize = Property.of((long) org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE);
+    private Property<Long> rowGroupSize = Property.ofValue((long) org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Target page size"
     )
-    private Property<Integer> pageSize = Property.of(ParquetWriter.DEFAULT_PAGE_SIZE);
+    private Property<Integer> pageSize = Property.ofValue(ParquetWriter.DEFAULT_PAGE_SIZE);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Max dictionary page size"
     )
-    private Property<Integer> dictionaryPageSize = Property.of(ParquetWriter.DEFAULT_PAGE_SIZE);
+    private Property<Integer> dictionaryPageSize = Property.ofValue(ParquetWriter.DEFAULT_PAGE_SIZE);
 
     static {
         ParquetTools.handleLogger();

@@ -77,33 +77,33 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
         title = "The name of a supported character set"
     )
     @Builder.Default
-    private Property<String> charset = Property.of("UTF-8");
+    private Property<String> charset = Property.ofValue("UTF-8");
 
     @Schema(
         title = "Determines how values should be rendered in the output",
         description = "Possible values: FORMATTED_VALUE, UNFORMATTED_VALUE, FORMULA"
     )
     @Builder.Default
-    private Property<ValueRender> valueRender = Property.of(ValueRender.UNFORMATTED_VALUE);
+    private Property<ValueRender> valueRender = Property.ofValue(ValueRender.UNFORMATTED_VALUE);
 
     @Schema(
         title = "How dates, times, and durations should be represented in the output",
         description = "Possible values: SERIAL_NUMBER, FORMATTED_STRING"
     )
     @Builder.Default
-    private Property<DateTimeRender> dateTimeRender = Property.of(DateTimeRender.UNFORMATTED_VALUE);
+    private Property<DateTimeRender> dateTimeRender = Property.ofValue(DateTimeRender.UNFORMATTED_VALUE);
 
     @Schema(
         title = "Whether the first row should be treated as the header"
     )
     @Builder.Default
-    private Property<Boolean> header = Property.of(true);
+    private Property<Boolean> header = Property.ofValue(true);
 
     @Schema(
         title = "Specifies if empty rows should be skipped"
     )
     @Builder.Default
-    private Property<Boolean> skipEmptyRows = Property.of(false);
+    private Property<Boolean> skipEmptyRows = Property.ofValue(false);
 
     @Schema(
         title = "Number of lines to skip at the start of the file. Useful if a table has a title and explanation in the first few rows"

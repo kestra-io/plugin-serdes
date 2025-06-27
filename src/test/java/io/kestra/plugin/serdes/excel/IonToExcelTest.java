@@ -45,9 +45,9 @@ class IonToExcelTest {
         IonToExcel writer = IonToExcel.builder()
             .id(IonToExcelTest.class.getSimpleName())
             .type(IonToExcel.class.getName())
-            .sheetsTitle(Property.of("Worksheet"))
+            .sheetsTitle(Property.ofValue("Worksheet"))
             .from(inputUri.toString())
-            .header(Property.of(header))
+            .header(Property.ofValue(header))
             .build();
         IonToExcel.Output excelOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
@@ -74,9 +74,9 @@ class IonToExcelTest {
         ExcelToIon reader = ExcelToIon.builder()
             .id(ExcelToIonTest.class.getSimpleName())
             .type(ExcelToIon.class.getName())
-            .from(Property.of(source.toString()))
+            .from(Property.ofValue(source.toString()))
             .skipRows(4)
-            .header(Property.of(false))
+            .header(Property.ofValue(false))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
@@ -120,7 +120,7 @@ class IonToExcelTest {
         ExcelToIon reader = ExcelToIon.builder()
             .id(ExcelToIonTest.class.getSimpleName())
             .type(ExcelToIon.class.getName())
-            .from(Property.of(output.getUri().toString()))
+            .from(Property.ofValue(output.getUri().toString()))
             .build();
 
         runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
@@ -152,7 +152,7 @@ class IonToExcelTest {
             .id(IonToExcel.class.getSimpleName())
             .type(ExcelToIon.class.getName())
             .from(put.toString())
-            .styles(Property.of(false))
+            .styles(Property.ofValue(false))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
@@ -164,7 +164,7 @@ class IonToExcelTest {
         ExcelToIon reader = ExcelToIon.builder()
             .id(ExcelToIonTest.class.getSimpleName())
             .type(ExcelToIon.class.getName())
-            .from(Property.of(output.getUri().toString()))
+            .from(Property.ofValue(output.getUri().toString()))
             .build();
 
         runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
@@ -182,7 +182,7 @@ class IonToExcelTest {
         IonToExcel writer = IonToExcel.builder()
             .id(IonToExcelTest.class.getSimpleName())
             .type(IonToExcel.class.getName())
-            .sheetsTitle(Property.of("Worksheet"))
+            .sheetsTitle(Property.ofValue("Worksheet"))
             .from(
                 Map.of(
                     "Worksheet_1", inputUri.toString(),

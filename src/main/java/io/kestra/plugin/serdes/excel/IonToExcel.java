@@ -116,20 +116,20 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         defaultValue = "UTF-8"
     )
     @Builder.Default
-    private Property<String> charset = Property.of("UTF-8");
+    private Property<String> charset = Property.ofValue("UTF-8");
 
     @Schema(
         title = "The sheet title to be used when writing data to an Excel spreadsheet",
         defaultValue = "Sheet"
     )
     @Builder.Default
-    private Property<String> sheetsTitle = Property.of("Sheet");
+    private Property<String> sheetsTitle = Property.ofValue("Sheet");
 
     @Schema(
         title = "Whether header should be written as the first line"
     )
     @Builder.Default
-    private Property<Boolean> header = Property.of(true);
+    private Property<Boolean> header = Property.ofValue(true);
 
     @Schema(
         title = "Whether styles should be applied to format values",
@@ -137,7 +137,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             "removed this options when you have a lots of values."
     )
     @Builder.Default
-    private Property<Boolean> styles = Property.of(true);
+    private Property<Boolean> styles = Property.ofValue(true);
 
     @Override
     public Output run(RunContext runContext) throws Exception {

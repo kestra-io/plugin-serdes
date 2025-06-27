@@ -81,7 +81,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
-    private final Property<String> charset = Property.of(StandardCharsets.UTF_8.name());
+    private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Builder.Default
     @Schema(
@@ -89,13 +89,13 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         description = "Is the file is a json with new line separator\n" +
             "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
     )
-    private final Property<Boolean> newLine = Property.of(true);
+    private final Property<Boolean> newLine = Property.ofValue(true);
 
     @Builder.Default
     @io.swagger.v3.oas.annotations.media.Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
-    private final Property<String> timeZoneId = Property.of(ZoneId.systemDefault().toString());
+    private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     @Override
     public Output run(RunContext runContext) throws Exception {
