@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -280,7 +281,14 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                     DataFormatter dataFormatter = new DataFormatter();
                     yield dataFormatter.formatCellValue(cell);
                 }
-                default -> cell.getDateCellValue();
+                default -> {
+                    var date = cell.getDateCellValue();
+                    if (date != null) {
+                        yield date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+                    } else {
+                        yield null;
+                    }
+                }
             };
         }
         return cell.getNumericCellValue();
