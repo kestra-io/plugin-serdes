@@ -167,7 +167,7 @@ mavenPublishing {
     pom {
         name = "${project.name}"
         description = "${project.group}:${rootProject.name}:${project.version}"
-        url = 'https://github.com/kestra-io/plugin-serdes'
+        url = "https://github.com/kestra-io/${project.name}"
         licenses {
             license {
                 name = 'The Apache License, Version 2.0'
@@ -183,7 +183,7 @@ mavenPublishing {
         }
         scm {
             connection = 'scm:git:'
-            url = 'https://github.com/kestra-io/plugin-serdes'
+            url = "https://github.com/kestra-io/${project.name}"
         }
     }
 }
