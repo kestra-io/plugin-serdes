@@ -68,6 +68,8 @@ dependencies {
         exclude group: 'com.fasterxml.jackson.core'
     }
     api group: 'org.json', name: 'json', version: '20250517'
+
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion:2.17.2'
 }
 
 

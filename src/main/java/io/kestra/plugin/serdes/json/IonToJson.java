@@ -22,8 +22,15 @@ import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import com.fasterxml.jackson.dataformat.ion.IonFactory; // Import IonFactory
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken; // Not strictly needed, but good for understanding parser flow
+import com.fasterxml.jackson.core.JsonGenerator;
+
+
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.Charset; // Import Charset
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -103,44 +110,52 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         File tempFile = runContext.workingDir().createTempFile(suffix).toFile();
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-        var renderedCharset = runContext.render(this.charset).as(String.class).orElseThrow();
+        var renderedCharsetName = runContext.render(this.charset).as(String.class).orElseThrow();
+        Charset outputCharset = Charset.forName(renderedCharsetName); // Get the Charset object
+
+        // Create a standard Jackson ObjectMapper for JSON output
+        ObjectMapper jsonObjectMapper = new ObjectMapper()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .setSerializationInclusion(JsonInclude.Include.ALWAYS)
+            .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow())))
+            .registerModule(new JavaTimeModule())
+            .registerModule(new Jdk8Module());
+
+        // Create an IonFactory for parsing Ion data
+        IonFactory ionFactory = new IonFactory();
+
         try (
-            OutputStream outfile = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE);
-            BufferedReader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), renderedCharset), FileSerde.BUFFER_SIZE);
+            InputStream ionInputStream = runContext.storage().getFile(from);
+            OutputStream fileOutputStream = new FileOutputStream(tempFile);
+            // Use OutputStreamWriter to ensure correct character encoding for the output JSON
+            Writer outputWriter = new OutputStreamWriter(new BufferedOutputStream(fileOutputStream, FileSerde.BUFFER_SIZE), outputCharset);
+            // Create a JSON generator to write to the output file using the Writer
+            JsonGenerator jsonGenerator = jsonObjectMapper.getFactory().createGenerator(outputWriter);
+            // Create an Ion parser to read the input Ion data
+            JsonParser ionParser = ionFactory.createParser(ionInputStream);
         ) {
-            ObjectMapper mapper = new ObjectMapper()
-                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-                .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-                .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow())))
-                .registerModule(new JavaTimeModule())
-                .registerModule(new Jdk8Module());
-            SequenceWriter objectWriter = mapper.writerFor(Object.class).writeValues(outfile);
+            AtomicLong recordCount = new AtomicLong(); // Renamed from lineCount for clarity regarding records
 
-            if (runContext.render(this.newLine).as(Boolean.class).orElseThrow()) {
-                Flux<Object> flowable = FileSerde.readAll(inputStream)
-                    .doOnNext(throwConsumer(o -> {
-                        objectWriter.write(o);
-                        outfile.write("\n".getBytes());
-                    }));
+            // Loop through top-level Ion values
+            while (ionParser.nextToken() != null) {
+                // copyCurrentStructure will read the current Ion value from ionParser
+                // and write its JSON representation directly to jsonGenerator.
+                // This is efficient and handles Ion-to-JSON conversion rules.
+                jsonGenerator.copyCurrentStructure(ionParser);
+                recordCount.incrementAndGet();
 
-                // metrics & finalize
-                Mono<Long> count = flowable.count();
-                Long lineCount = count.block();
-                runContext.metric(Counter.of("records", lineCount));
-
-            } else {
-                AtomicLong lineCount = new AtomicLong();
-
-                List<Object> list = new ArrayList<>();
-                FileSerde.reader(inputStream, throwConsumer(e -> {
-                    list.add(e);
-                    lineCount.incrementAndGet();
-                }));
-                objectWriter.write(list);
-                runContext.metric(Counter.of("records", lineCount.get()));
+                // If newLine is true, add a newline after each top-level object
+                if (runContext.render(this.newLine).as(Boolean.class).orElseThrow()) {
+                    // Flush the current JSON object to ensure it's written before the newline
+                    jsonGenerator.flush();
+                    outputWriter.write("\n");
+                }
             }
 
-            outfile.flush();
+            // The JsonGenerator and Writer will be closed automatically by the try-with-resources.
+            // No need for jsonGenerator.close() or outputWriter.close() here.
+
+            runContext.metric(Counter.of("records", recordCount.get()));
         }
 
         return Output
