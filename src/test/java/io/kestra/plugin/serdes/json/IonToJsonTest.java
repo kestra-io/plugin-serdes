@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.json;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -32,32 +33,45 @@ public class IonToJsonTest {
     private StorageInterface storageInterface;
 
     @Test
-    void test_annotation_conversion() throws Exception {
-        String input = """
+    void should_transform_ion_to_json_without_annotations() throws Exception {
+        var ion = """
             {dn:"cn=tony@orga.com,ou=diffusion_list,dc=orga,dc=com",attributes:{description:["Some description 2",base64::"TGlzdGUgZCfDg8KpY2hhbmdlIHN1ciBsZSBzdWl2aSBkZSBsYSBtYXNzZSBzYWxhcmlhbGUgZGUgbCdJVVQ=","Melusine lover as well"],someOtherAttribute:["perhaps 2","perhapsAgain 2"]}}
             """;
-
-        // Expected result when should_keep_annotations==False | or not specified
-        String expectation_removed_annot = """
+        var expectedJsonWithoutAnnotation = """
             {"dn":"cn=tony@orga.com,ou=diffusion_list,dc=orga,dc=com","attributes":{"description":["Some description 2","TGlzdGUgZCfDg8KpY2hhbmdlIHN1ciBsZSBzdWl2aSBkZSBsYSBtYXNzZSBzYWxhcmlhbGUgZGUgbCdJVVQ=","Melusine lover as well"],"someOtherAttribute":["perhaps 2","perhapsAgain 2"]}}
             """;
 
-        // Expected result when should_keep_annotations==True
-        // String expectation_indicated_annot = """
-        //     {"dn":"cn=tony@orga.com,ou=diffusion_list,dc=orga,dc=com","attributes":{"description":["Some description 2",{"ion_annotations":["base64"], "value":"TGlzdGUgZCfDg8KpY2hhbmdlIHN1ciBsZSBzdWl2aSBkZSBsYSBtYXNzZSBzYWxhcmlhbGUgZGUgbCdJVVQ="},"Melusine lover as well"],"someOtherAttribute":["perhaps 2","perhapsAgain 2"]}}
-        //     """;
-
-        var runContext = getContext(input);
+        var runContext = getRunContext(ion);
         var task = IonToJson.builder()
             .from(Property.ofExpression("{{file}}"))
-            .build(); // TODO: create two executions, with boolean "should_keep_annotations"
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .build();
         var output = task.run(runContext);
 
-        assertEquality(expectation_removed_annot, output.getUri()); // by default, annot shouldn't be kept since it's the default behaviour of the ION cookbook https://amazon-ion.github.io/ion-docs/guides/cookbook.html, see "Down-converting to JSON" section
-        //assertEquality(expectation_indicated_annot, output.getUri()); // TODO: if should_keep_annotations == true
+        assertEquality(expectedJsonWithoutAnnotation, output.getUri());
     }
 
-    private RunContext getContext(String content) {
+    @Test
+    void should_transform_ion_to_json_with_annotations() throws Exception {
+        var ion = """
+            {dn:"cn=tony@orga.com,ou=diffusion_list,dc=orga,dc=com",attributes:{description:["Some description 2",base64::"TGlzdGUgZCfDg8KpY2hhbmdlIHN1ciBsZSBzdWl2aSBkZSBsYSBtYXNzZSBzYWxhcmlhbGUgZGUgbCdJVVQ=","Melusine lover as well"],someOtherAttribute:["perhaps 2","perhapsAgain 2"]}}
+            """;
+
+        String expectedJsonWithAnnotation = """
+            {"dn":"cn=tony@orga.com,ou=diffusion_list,dc=orga,dc=com","attributes":{"description":["Some description 2",{"ion_annotations":["base64"], "value":"TGlzdGUgZCfDg8KpY2hhbmdlIHN1ciBsZSBzdWl2aSBkZSBsYSBtYXNzZSBzYWxhcmlhbGUgZGUgbCdJVVQ="},"Melusine lover as well"],"someOtherAttribute":["perhaps 2","perhapsAgain 2"]}}
+            """;
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(true))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJsonWithAnnotation, output.getUri());
+    }
+
+    private RunContext getRunContext(String ionContent) {
         Map<String, String> kestraPath = new HashMap<>();
         URI filePath;
         try {
@@ -65,7 +79,7 @@ public class IonToJsonTest {
                 MAIN_TENANT,
                 null,
                 URI.create("/" + IdUtils.create() + ".ion"),
-                new ByteArrayInputStream(content.getBytes())
+                new ByteArrayInputStream(ionContent.getBytes())
             );
             kestraPath.put("file", filePath.toString());
         } catch (Exception e) {
@@ -78,11 +92,20 @@ public class IonToJsonTest {
 
     private void assertEquality(String expected, URI file) {
         assertThat("Result file should exist", storageInterface.exists(MAIN_TENANT, null, file), is(true));
+
         try (InputStream streamResult = storageInterface.get(MAIN_TENANT, null, file)) {
             String result = new String(streamResult.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
+
             System.out.println("Got :\n" + result);
             System.out.println("Expecting :\n" + expected);
-            assertThat("Result should match the reference", result.equals(expected));
+
+            var mapper = new ObjectMapper();
+
+            var actualNode = mapper.readTree(result);
+            var expectedNode = mapper.readTree(expected);
+
+            assertThat("Result should match the reference", actualNode.equals(expectedNode));
+
         } catch (Exception e) {
             System.err.println(e.getMessage());
             fail("Unable to load results files.");

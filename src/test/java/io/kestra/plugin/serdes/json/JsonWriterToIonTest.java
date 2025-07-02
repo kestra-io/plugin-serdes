@@ -1,34 +1,35 @@
 package io.kestra.plugin.serdes.json;
 
+import com.amazon.ion.IonType;
+import com.amazon.ion.system.IonSystemBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 import io.kestra.plugin.serdes.avro.IonToAvro;
-import io.kestra.plugin.serdes.csv.IonToCsv;
 import jakarta.inject.Inject;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
-import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
@@ -119,66 +120,110 @@ class JsonWriterToIonTest {
         JsonToIon.Output readerRunOutput = this.reader(sourceFile, false);
         IonToJson.Output writerRunOutput = this.writer(readerRunOutput.getUri(), false);
 
-
-        List<Map> objects = Arrays.asList(mapper.readValue(
+        Map<String, Object> object = mapper.readValue(
             new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri())),
-            Map[].class
-        ));
+            Map.class
+        );
 
-        assertThat(objects.size(), is(1));
-        assertThat(objects.get(0).get("id"), is(4814976));
+        assertThat(object.get("id"), is(4814976));
     }
 
     @Test
     void ion() throws Exception {
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try (OutputStream output = new FileOutputStream(tempFile)) {
-            List.of(
-                    ImmutableMap.builder()
-                        .put("String", "string")
-                        .put("Int", 2)
-                        .put("Float", 3.2F)
-                        .put("Double", 3.2D)
-                        .put("Instant", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant())
-                        .put("ZonedDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00"))
-                        .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime())
-                        .put("OffsetDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime())
-                        .put("LocalDate", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDate())
-                        .put("LocalTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalTime())
-                        .put("OffsetTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime().toOffsetTime())
-                        .put("Date", Date.from(ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant()))
-                        .build()
-                )
-                .forEach(throwConsumer(row -> FileSerde.write(output, row)));
+        var tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        var ionSystem = IonSystemBuilder.standard().build();
 
-            URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+        var sourceDateTime = ZonedDateTime.of(2021, 5, 5, 12, 21, 12, 123_456_000, ZoneOffset.of("+02:00"));
+        var instant = sourceDateTime.toInstant();
+        var zoneId = ZoneId.of("Europe/Lisbon");
+        var zonedDateTime = sourceDateTime.withZoneSameInstant(zoneId);
+        var offset = zoneId.getRules().getOffset(instant);
+        var offsetDateTime = instant.atOffset(offset);
+        var truncatedInstant = instant.truncatedTo(ChronoUnit.MILLIS);
+        var truncatedInstantStr = truncatedInstant.toString();
 
-            IonToJson writer = IonToJson.builder()
-                .id(IonToAvro.class.getSimpleName())
-                .type(IonToCsv.class.getName())
-                .from(Property.ofValue(uri.toString()))
-                .timeZoneId(Property.ofValue(ZoneId.of("Europe/Lisbon").toString()))
-                .build();
-            IonToJson.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+        try (var output = new FileOutputStream(tempFile);
+             var writer = ionSystem.newTextWriter(output)) {
 
-            assertThat(
-                IOUtils.toString(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri()), Charsets.UTF_8),
-                is("{" +
-                    "\"String\":\"string\"," +
-                    "\"Int\":2," +
-                    "\"Float\":3.200000047683716," +
-                    "\"Double\":3.2," +
-                    "\"Instant\":\"2021-05-05T10:21:12.123Z\"," +
-                    "\"ZonedDateTime\":\"2021-05-05T11:21:12.123456+01:00\"," +
-                    "\"LocalDateTime\":\"2021-05-05T12:21:12.123456\"," +
-                    "\"OffsetDateTime\":\"2021-05-05T11:21:12.123456+01:00\"," +
-                    "\"LocalDate\":\"2021-05-05\"," +
-                    "\"LocalTime\":\"12:21:12.123456\"," +
-                    "\"OffsetTime\":\"12:21:12.123456+02:00\"," +
-                    "\"Date\":\"2021-05-05T10:21:12.123Z\"" +
-                    "}\n"
-                )
-            );
+            writer.stepIn(IonType.STRUCT);
+
+            writer.setFieldName("String");
+            writer.writeString("string");
+
+            writer.setFieldName("Int");
+            writer.writeInt(2);
+
+            writer.setFieldName("Float");
+            writer.writeFloat(3.2f);
+
+            writer.setFieldName("Double");
+            writer.writeFloat(3.2d);
+
+            writer.setFieldName("Instant");
+            writer.writeString(truncatedInstantStr);
+
+            writer.setFieldName("ZonedDateTime");
+            writer.writeString(zonedDateTime.toOffsetDateTime().toString());
+
+            writer.setFieldName("LocalDateTime");
+            writer.writeString(sourceDateTime.toLocalDateTime().toString());
+
+            writer.setFieldName("OffsetDateTime");
+            writer.writeString(offsetDateTime.toString());
+
+            writer.setFieldName("LocalDate");
+            writer.writeString(sourceDateTime.toLocalDate().toString());
+
+            writer.setFieldName("LocalTime");
+            writer.writeString(sourceDateTime.toLocalTime().toString());
+
+            writer.setFieldName("OffsetTime");
+            writer.writeString(sourceDateTime.toOffsetDateTime().toOffsetTime().toString());
+
+            writer.setFieldName("Date");
+            writer.writeString(truncatedInstantStr);
+
+            writer.stepOut();
         }
+
+        var uri = storageInterface.put(
+            TenantService.MAIN_TENANT,
+            null,
+            URI.create("/" + IdUtils.create() + ".ion"),
+            new FileInputStream(tempFile)
+        );
+
+        var writer = IonToJson.builder()
+            .id(IonToJson.class.getSimpleName())
+            .type(IonToJson.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .timeZoneId(Property.ofValue(zoneId.toString()))
+            .build();
+
+        var run = writer.run(
+            TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of())
+        );
+
+        var actual = IOUtils.toString(
+            storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri()),
+            Charsets.UTF_8
+        );
+
+        var expected = "{" +
+            "\"String\":\"string\"," +
+            "\"Int\":2," +
+            "\"Float\":3.200000047683716," +
+            "\"Double\":3.2," +
+            "\"Instant\":\"2021-05-05T10:21:12.123Z\"," +
+            "\"ZonedDateTime\":\"2021-05-05T11:21:12.123456+01:00\"," +
+            "\"LocalDateTime\":\"2021-05-05T12:21:12.123456\"," +
+            "\"OffsetDateTime\":\"2021-05-05T11:21:12.123456+01:00\"," +
+            "\"LocalDate\":\"2021-05-05\"," +
+            "\"LocalTime\":\"12:21:12.123456\"," +
+            "\"OffsetTime\":\"12:21:12.123456+02:00\"," +
+            "\"Date\":\"2021-05-05T10:21:12.123Z\"" +
+            "}\n";
+
+        assertThat(actual, is(expected));
     }
 }

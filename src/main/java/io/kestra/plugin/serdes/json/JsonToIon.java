@@ -4,8 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -15,6 +13,7 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.serializers.JacksonMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -84,12 +83,10 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 )
 public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
     private static final int BUFFER_SIZE = 32 * 1024;
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+    private static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofJson().copy()
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
         .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-        .setTimeZone(TimeZone.getDefault())
-        .registerModule(new JavaTimeModule())
-        .registerModule(new Jdk8Module());
+        .setTimeZone(TimeZone.getDefault());
 
     @NotNull
     @Schema(
