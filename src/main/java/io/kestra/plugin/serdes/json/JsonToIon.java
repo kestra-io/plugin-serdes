@@ -38,9 +38,9 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a JSONL file into ION.",
+    title = "Convert a JSON file into ION.",
     description = """
-        Please note that we support JSONL format only, i.e. one JSON dictionary/map per line.
+        We support one JSON dictionary/map per line as well as a JSON file in array format.
 
         Here is how a sample JSON file content might look like:
         ```
@@ -49,7 +49,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
         ```
 
-        We do NOT support an array of JSON objects. A JSON file in the following array format is not supported:
+        Here is how a sample JSON file in array format might look:
         ```
         [
             {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
