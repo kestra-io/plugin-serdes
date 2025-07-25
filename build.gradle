@@ -54,7 +54,7 @@ dependencies {
     compileOnly 'org.slf4j:slf4j-api'
     compileOnly 'ch.qos.logback:logback-classic'
 
-    api 'de.siegmar:fastcsv:4.0.0'
+    api 'de.siegmar:fastcsv:3.7.0'
     api ('org.apache.avro:avro:1.12.0') {
         exclude group: 'com.fasterxml.jackson.core'
     }
