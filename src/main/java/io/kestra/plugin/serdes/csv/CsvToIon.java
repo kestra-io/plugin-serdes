@@ -193,7 +193,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             .ifPresent(builder::skipEmptyLines);
 
         runContext.render(errorOnDifferentFieldCount).as(Boolean.class)
-            .ifPresent(b -> builder.ignoreDifferentFieldCount(!b));
+            .ifPresent(b -> {
+                builder.allowMissingFields(!b);
+                builder.allowExtraFields(!b);
+            });
 
         return builder.ofCsvRecord(reader);
     }
