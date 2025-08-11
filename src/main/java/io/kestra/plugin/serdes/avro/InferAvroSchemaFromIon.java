@@ -19,7 +19,6 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 
-
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
@@ -29,8 +28,7 @@ import java.net.URI;
     title = "Try to infer an Avro schema from a ION file."
 )
 @Plugin(
-    aliases = "io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon",
-    beta = true
+    aliases = "io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon"
 )
 public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAvroSchemaFromIon.Output> {
     @NotNull
