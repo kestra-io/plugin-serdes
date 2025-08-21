@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.csv;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
+import de.siegmar.fastcsv.reader.CsvParseException;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
@@ -14,13 +15,16 @@ import io.kestra.plugin.serdes.SerdesUtils;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 class CsvToIonWriterTest {
@@ -99,4 +103,55 @@ class CsvToIonWriterTest {
         assertThat(records.getValue(), is(2D));
     }
 
+    @Test
+    void exceedsBufferThrows() throws Exception {
+        int n = 50;
+        String csv = "col1\n\"" + "x".repeat(n) + "\"\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/tinybuf.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("exceedsBufferThrows")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .maxBufferSize(Property.ofValue(8))
+            .maxFieldSize(Property.ofValue(1024))
+            .header(Property.ofValue(true))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+
+        Throwable cause = assertThrows(CsvParseException.class, () -> reader.run(runContext));
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+
+        assertThat(cause.getMessage(), containsString("maximum buffer size"));
+    }
+
+
+    @Test
+    void largeQuotedFieldParsesWhenBufferSufficient() throws Exception {
+        String csv = "col1\n\"" + "x".repeat(50) + "\"\n";
+        URI src = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/okbuf.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)));
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("largeQuotedFieldParsesWhenBufferSufficient")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .maxBufferSize(Property.ofValue(128))
+            .maxFieldSize(Property.ofValue(1024))
+            .header(Property.ofValue(true))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        CsvToIon.Output out = reader.run(runContext);
+        assertThat(out.getUri(), is(notNullValue()));
+    }
 }
