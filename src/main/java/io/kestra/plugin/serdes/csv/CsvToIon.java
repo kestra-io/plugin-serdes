@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.csv;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.siegmar.fastcsv.reader.CsvRecord;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -57,6 +58,9 @@ import java.util.concurrent.atomic.AtomicInteger;
     aliases = "io.kestra.plugin.serdes.csv.CsvReader"
 )
 public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
+    private static final int DEFAULT_MAX_BUFFER_SIZE = 16 * 1024 * 1024;
+    private static final int DEFAULT_MAX_FIELD_SIZE = 16 * 1024 * 1024;
+
     @NotNull
     @Schema(
         title = "Source file URI")
@@ -105,6 +109,18 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     )
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
+    @Builder.Default
+    @Schema(title = "Maximum CSV parser buffer size (bytes)")
+    private final Property<Integer> maxBufferSize = Property.ofValue(DEFAULT_MAX_BUFFER_SIZE);
+
+    @Builder.Default
+    @Schema(title = "Allow extra characters after a closing quote")
+    private final Property<Boolean> allowExtraCharsAfterClosingQuote = Property.ofValue(false);
+
+    @Builder.Default
+    @Schema(title = "Maximum field size (characters)")
+    private final Property<Integer> maxFieldSize = Property.ofValue(DEFAULT_MAX_FIELD_SIZE);
+
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader
@@ -149,7 +165,21 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                     if (headerValue) {
                         Map<String, Object> fields = new LinkedHashMap<>();
                         for (Map.Entry<Integer, String> header : headers.entrySet()) {
-                            fields.put(header.getValue(), r.getField(header.getKey()));
+                            int fieldIndex = header.getKey();
+                            String fieldValue;
+
+                            if (fieldIndex < r.getFieldCount()) {
+                                fieldValue = r.getField(fieldIndex);
+                                // Convert IMDB's \N null values to actual nulls
+                                if ("\\N".equals(fieldValue)) {
+                                    fieldValue = null;
+                                }
+                            } else {
+                                // Field doesn't exist in this record, set to null
+                                fieldValue = null;
+                            }
+
+                            fields.put(header.getValue(), fieldValue);
                         }
                         return fields;
                     }
@@ -192,12 +222,24 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         runContext.render(skipEmptyRows).as(Boolean.class)
             .ifPresent(builder::skipEmptyLines);
 
+
         runContext.render(errorOnDifferentFieldCount).as(Boolean.class)
             .ifPresent(b -> {
                 builder.allowMissingFields(!b);
                 builder.allowExtraFields(!b);
             });
 
-        return builder.ofCsvRecord(reader);
+        runContext.render(allowExtraCharsAfterClosingQuote).as(Boolean.class)
+            .ifPresent(builder::allowExtraCharsAfterClosingQuote);
+
+        runContext.render(maxBufferSize).as(Integer.class)
+            .ifPresent(builder::maxBufferSize);
+
+        var handlerBuilder = de.siegmar.fastcsv.reader.CsvRecordHandler.builder();
+        runContext.render(maxFieldSize).as(Integer.class)
+                       .ifPresent(handlerBuilder::maxFieldSize);
+
+        var handler = handlerBuilder.build();
+        return builder.build(handler, reader);
     }
 }
