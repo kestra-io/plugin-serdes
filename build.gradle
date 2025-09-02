@@ -64,7 +64,7 @@ dependencies {
     api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.4.1'
     api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.1.1'
     implementation("com.amazon.ion:ion-java:1.11.10")
-    api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.4.1') {
+    api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.4.2') {
         exclude group: 'org.slf4j'
         exclude group: 'com.fasterxml.jackson.core'
     }
