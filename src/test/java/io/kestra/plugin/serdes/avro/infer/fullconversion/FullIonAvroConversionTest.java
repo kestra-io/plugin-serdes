@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.avro.infer.fullconversion;
 
 import com.amazon.ion.system.IonSystemBuilder;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.tenant.TenantService;
@@ -9,7 +10,6 @@ import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.avro.AvroToIon;
 import io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon;
 import io.kestra.plugin.serdes.avro.IonToAvro;
-import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.io.IOUtils;
 
 import java.io.InputStreamReader;
@@ -55,11 +55,11 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
         // compare original Ion with generated after conversions
         var ion = IonSystemBuilder.standard().build();
         assertThat(
-            IteratorUtils.toList(
+            ImmutableList.copyOf(
                 ion.iterate(IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, avroToIonOutput.getUri()))))
             )
         ).isEqualTo(
-            IteratorUtils.toList(
+            ImmutableList.copyOf(
                 ion.iterate(expectedOutputIon)
             )
         );
