@@ -23,8 +23,12 @@ repositories {
     }
 }
 
-sourceCompatibility = 21
-targetCompatibility = 21
+final targetJavaVersion = JavaVersion.VERSION_21
+
+java {
+    sourceCompatibility = targetJavaVersion
+    targetCompatibility = targetJavaVersion
+}
 
 group "io.kestra.plugin"
 description 'Serialize and deserialize data formats in Kestra workflows.'
