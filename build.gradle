@@ -74,6 +74,8 @@ dependencies {
     api group: 'org.json', name: 'json', version: '20250517'
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
+
+    implementation "org.commonmark:commonmark:0.26.0" // for Markdown
 }
 
 
