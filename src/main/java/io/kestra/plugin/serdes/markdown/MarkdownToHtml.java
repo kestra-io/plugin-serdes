@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.markdown;
 
 import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -58,6 +59,9 @@ import java.nio.charset.StandardCharsets;
                     from: "{{ outputs.write_markdown.uri }}"
                 """
         )
+    },
+    metrics = {
+        @Metric(name = "bytes", description = "Number of bytes generated", type = Counter.TYPE),
     }
 )
 public class MarkdownToHtml extends Task implements RunnableTask<MarkdownToHtml.Output> {

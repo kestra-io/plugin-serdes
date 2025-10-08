@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.ion.IonFactory;
 import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -66,6 +67,9 @@ import java.util.concurrent.atomic.AtomicLong;
                     from: "{{ outputs.convert.uri }}"
                 """
         )
+    },
+    metrics = {
+        @Metric(name = "records", description = "Number of records converted", type = Counter.TYPE),
     },
     aliases = "io.kestra.plugin.serdes.json.JsonWriter"
 )

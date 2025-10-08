@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.parquet;
 
 import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -84,6 +85,9 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
                       }
                 """
         )
+    },
+    metrics = {
+        @Metric(name = "records", description = "Number of records converted", type = Counter.TYPE),
     },
     aliases = "io.kestra.plugin.serdes.parquet.ParquetWriter"
 )
