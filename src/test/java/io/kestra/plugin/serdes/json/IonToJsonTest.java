@@ -71,6 +71,28 @@ public class IonToJsonTest {
         assertEquality(expectedJsonWithAnnotation, output.getUri());
     }
 
+    @Test
+    void should_stream_large_ion_without_memory_issue() throws Exception {
+        var builder = new StringBuilder();
+        builder.append("[");
+        for (int i = 0; i < 200000; i++) {
+            if (i > 0) builder.append(",");
+            builder.append("{\"id\":").append(i).append(",\"name\":\"Item").append(i).append("\"}");
+        }
+        builder.append("]");
+
+        var runContext = getRunContext(builder.toString());
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .newLine(Property.ofValue(false))
+            .build();
+
+        var output = task.run(runContext);
+        assertThat(storageInterface.exists(MAIN_TENANT, null, output.getUri()), is(true));
+    }
+
+
     private RunContext getRunContext(String ionContent) {
         Map<String, String> kestraPath = new HashMap<>();
         URI filePath;
