@@ -4,6 +4,7 @@ import com.amazon.ion.*;
 import com.amazon.ion.system.IonSystemBuilder;
 import com.amazon.ion.system.IonTextWriterBuilder;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -145,34 +146,34 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                             recordCount.incrementAndGet();
                         }
                     } else {
-                        List<JsonNode> jsonNodes = new ArrayList<>();
+                            JsonToken firstToken = ionParser.nextToken();
+                            if (firstToken != null) {
+                                var firstBuffer = new StringWriter();
+                                try (var tempGen = jsonObjectMapper.getFactory().createGenerator(firstBuffer)) {
+                                    tempGen.copyCurrentStructure(ionParser);
+                                    tempGen.flush();
+                                }
+                                recordCount.incrementAndGet();
 
-                        while (ionParser.nextToken() != null) {
-                            JsonNode node = ionParser.readValueAsTree();
-                            if (node != null && !node.isNull()) {
-                                jsonNodes.add(node);
+                                JsonToken nextToken = ionParser.nextToken();
+
+                                // we write as a plain JSON object if there is a single object
+                                if (nextToken == null) {
+                                    outputWriter.write(firstBuffer.toString());
+                                } else {
+                                    jsonGenerator.writeStartArray();
+
+                                    jsonGenerator.writeRawValue(firstBuffer.toString());
+
+                                    do {
+                                        jsonGenerator.copyCurrentStructure(ionParser);
+                                        recordCount.incrementAndGet();
+                                    } while (ionParser.nextToken() != null);
+
+                                    jsonGenerator.writeEndArray();
+                                }
                             }
                         }
-
-                        if (jsonNodes.size() == 1) {
-                            JsonNode single = jsonNodes.getFirst();
-
-                            if (single.isArray()) {
-                                jsonObjectMapper.writeTree(jsonGenerator, single);
-                                recordCount.set(single.size());
-                            } else {
-                                jsonObjectMapper.writeTree(jsonGenerator, single);
-                                recordCount.set(1);
-                            }
-                        } else {
-                            jsonGenerator.writeStartArray();
-                            for (JsonNode node : jsonNodes) {
-                                jsonObjectMapper.writeTree(jsonGenerator, node);
-                            }
-                            jsonGenerator.writeEndArray();
-                            recordCount.set(jsonNodes.size());
-                        }
-                    }
                 }
             } else {
                 var ionSystem = IonSystemBuilder.standard().build();
