@@ -146,22 +146,34 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                             recordCount.incrementAndGet();
                         }
                     } else {
-                        boolean first = true;
-                        JsonToken token;
+                            JsonToken firstToken = ionParser.nextToken();
+                            if (firstToken != null) {
+                                var firstBuffer = new StringWriter();
+                                try (var tempGen = jsonObjectMapper.getFactory().createGenerator(firstBuffer)) {
+                                    tempGen.copyCurrentStructure(ionParser);
+                                    tempGen.flush();
+                                }
+                                recordCount.incrementAndGet();
 
-                        while ((token = ionParser.nextToken()) != null) {
-                            if (first) {
-                                jsonGenerator.writeStartArray();
-                                first = false;
+                                JsonToken nextToken = ionParser.nextToken();
+
+                                // we write as a plain JSON object if there is a single object
+                                if (nextToken == null) {
+                                    outputWriter.write(firstBuffer.toString());
+                                } else {
+                                    jsonGenerator.writeStartArray();
+
+                                    jsonGenerator.writeRawValue(firstBuffer.toString());
+
+                                    do {
+                                        jsonGenerator.copyCurrentStructure(ionParser);
+                                        recordCount.incrementAndGet();
+                                    } while (ionParser.nextToken() != null);
+
+                                    jsonGenerator.writeEndArray();
+                                }
                             }
-                            jsonGenerator.copyCurrentStructure(ionParser);
-                            recordCount.incrementAndGet();
                         }
-
-                        if (!first) {
-                            jsonGenerator.writeEndArray();
-                        }
-                    }
                 }
             } else {
                 var ionSystem = IonSystemBuilder.standard().build();
