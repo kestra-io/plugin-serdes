@@ -4,8 +4,6 @@ import com.amazon.ion.*;
 import com.amazon.ion.system.IonSystemBuilder;
 import com.amazon.ion.system.IonTextWriterBuilder;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.ion.IonFactory;
@@ -24,6 +22,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.net.URI;
@@ -34,7 +34,6 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 @SuperBuilder
 @ToString
@@ -125,76 +124,161 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
             .setTimeZone(TimeZone.getTimeZone(zoneId));
 
-        var ionFactory = new IonFactory(jsonObjectMapper);
+        var rKeepAnnotations = runContext.render(this.shouldKeepAnnotations).as(Boolean.class).orElse(false);
 
         try (
-            var ionInputStream = runContext.storage().getFile(from);
-            var fileOutputStream = new FileOutputStream(tempFile);
-            var outputWriter = new OutputStreamWriter(new BufferedOutputStream(fileOutputStream, FileSerde.BUFFER_SIZE), outputCharset);
-            var jsonGenerator = jsonObjectMapper.getFactory().createGenerator(outputWriter)
+            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            Writer fileWriter = new BufferedWriter(new FileWriter(tempFile, outputCharset), FileSerde.BUFFER_SIZE);
+            JsonGenerator jsonGenerator = jsonObjectMapper.createGenerator(fileWriter)
         ) {
-            var recordCount = new AtomicLong();
-            boolean keepAnnotations = runContext.render(this.shouldKeepAnnotations).as(Boolean.class).orElse(false);
+            Flux<Object> flowable;
 
-            if (!keepAnnotations) {
-                try (var ionParser = ionFactory.createParser(ionInputStream)) {
-                    if (isNewLine) {
-                        while (ionParser.nextToken() != null) {
-                            jsonGenerator.copyCurrentStructure(ionParser);
-                            jsonGenerator.flush();
-                            outputWriter.write("\n");
-                            recordCount.incrementAndGet();
-                        }
-                    } else {
-                            JsonToken firstToken = ionParser.nextToken();
-                            if (firstToken != null) {
-                                var firstBuffer = new StringWriter();
-                                try (var tempGen = jsonObjectMapper.getFactory().createGenerator(firstBuffer)) {
-                                    tempGen.copyCurrentStructure(ionParser);
-                                    tempGen.flush();
-                                }
-                                recordCount.incrementAndGet();
+            if (!rKeepAnnotations) {
+                var ionFactory = new IonFactory(jsonObjectMapper);
+                var ionParser = ionFactory.createParser(inputStream);
 
-                                JsonToken nextToken = ionParser.nextToken();
-
-                                // we write as a plain JSON object if there is a single object
-                                if (nextToken == null) {
-                                    outputWriter.write(firstBuffer.toString());
+                if (isNewLine) {
+                    flowable = Flux.generate(
+                        () -> ionParser,
+                        (parser, sink) -> {
+                            try {
+                                if (parser.nextToken() != null) {
+                                    var row = jsonObjectMapper.readValue(parser, Object.class);
+                                    jsonGenerator.writeObject(row);
+                                    jsonGenerator.flush();
+                                    fileWriter.write("\n");
+                                    sink.next(new Object());
                                 } else {
-                                    jsonGenerator.writeStartArray();
-
-                                    jsonGenerator.writeRawValue(firstBuffer.toString());
-
-                                    do {
-                                        jsonGenerator.copyCurrentStructure(ionParser);
-                                        recordCount.incrementAndGet();
-                                    } while (ionParser.nextToken() != null);
-
-                                    jsonGenerator.writeEndArray();
+                                    parser.close();
+                                    sink.complete();
                                 }
+                            } catch (Exception e) {
+                                sink.error(e);
                             }
+                            return parser;
                         }
+                    );
+                } else {
+                    flowable = Flux.generate(
+                        () -> new Object[]{ionParser, new Object[1], new boolean[]{false}, new boolean[]{false}},
+                        (state, sink) -> {
+                            var parser = (com.fasterxml.jackson.core.JsonParser) state[0];
+                            var firstRow = (Object[]) state[1];
+                            var isFirst = (boolean[]) state[2];
+                            var hasMultiple = (boolean[]) state[3];
+
+                            try {
+                                if (!isFirst[0]) {
+                                    if (parser.nextToken() != null) {
+                                        firstRow[0] = jsonObjectMapper.readValue(parser, Object.class);
+                                        isFirst[0] = true;
+                                        sink.next(new Object());
+                                    } else {
+                                        parser.close();
+                                        sink.complete();
+                                    }
+                                } else if (parser.nextToken() != null) {
+                                    if (!hasMultiple[0]) {
+                                        hasMultiple[0] = true;
+                                        jsonGenerator.writeStartArray();
+                                        jsonGenerator.writeObject(firstRow[0]);
+                                    }
+                                    var row = jsonObjectMapper.readValue(parser, Object.class);
+                                    jsonGenerator.writeObject(row);
+                                    sink.next(new Object());
+                                } else {
+                                    if (!hasMultiple[0]) {
+                                        jsonGenerator.writeObject(firstRow[0]);
+                                    } else {
+                                        jsonGenerator.writeEndArray();
+                                    }
+                                    parser.close();
+                                    sink.complete();
+                                }
+                            } catch (Exception e) {
+                                sink.error(e);
+                            }
+                            return state;
+                        }
+                    );
                 }
             } else {
                 var ionSystem = IonSystemBuilder.standard().build();
-                var datagram = ionSystem.getLoader().load(ionInputStream);
+                var ionReader = ionSystem.newReader(runContext.storage().getFile(from));
 
                 if (isNewLine) {
-                    for (var value : datagram) {
-                        writeIonValueWithAnnotations(jsonObjectMapper, jsonGenerator, value, zoneId, "root");
-                        recordCount.incrementAndGet();
-                        jsonGenerator.flush();
-                        outputWriter.write("\n");
-                    }
+                    flowable = Flux.generate(
+                        () -> ionReader,
+                        (reader, sink) -> {
+                            try {
+                                IonType type = reader.next();
+                                if (type != null) {
+                                    var value = ionSystem.newValue(reader);
+                                    writeIonValueWithAnnotations(jsonObjectMapper, jsonGenerator, value, zoneId, "root");
+                                    jsonGenerator.flush();
+                                    fileWriter.write("\n");
+                                    sink.next(new Object());
+                                } else {
+                                    reader.close();
+                                    sink.complete();
+                                }
+                            } catch (Exception e) {
+                                sink.error(e);
+                            }
+                            return reader;
+                        }
+                    );
                 } else {
-                    if (!datagram.isEmpty()) {
-                        writeIonValueWithAnnotations(jsonObjectMapper, jsonGenerator, datagram.getFirst(), zoneId, "root");
-                        recordCount.incrementAndGet();
-                    }
+                    flowable = Flux.generate(
+                        () -> new Object[]{ionReader, new IonValue[1], new boolean[]{false}, new boolean[]{false}},
+                        (state, sink) -> {
+                            var reader = (IonReader) state[0];
+                            var firstValue = (IonValue[]) state[1];
+                            var isFirst = (boolean[]) state[2];
+                            var hasMultiple = (boolean[]) state[3];
+
+                            try {
+                                if (!isFirst[0]) {
+                                    IonType firstType = reader.next();
+                                    if (firstType != null) {
+                                        firstValue[0] = ionSystem.newValue(reader);
+                                        isFirst[0] = true;
+                                        sink.next(new Object());
+                                    } else {
+                                        reader.close();
+                                        sink.complete();
+                                    }
+                                } else if (reader.next() != null) {
+                                    if (!hasMultiple[0]) {
+                                        hasMultiple[0] = true;
+                                        jsonGenerator.writeStartArray();
+                                        writeIonValueWithAnnotations(jsonObjectMapper, jsonGenerator, firstValue[0], zoneId, "root");
+                                    }
+                                    var value = ionSystem.newValue(reader);
+                                    writeIonValueWithAnnotations(jsonObjectMapper, jsonGenerator, value, zoneId, "root");
+                                    sink.next(new Object());
+                                } else {
+                                    if (!hasMultiple[0]) {
+                                        writeIonValueWithAnnotations(jsonObjectMapper, jsonGenerator, firstValue[0], zoneId, "root");
+                                    } else {
+                                        jsonGenerator.writeEndArray();
+                                    }
+                                    reader.close();
+                                    sink.complete();
+                                }
+                            } catch (Exception e) {
+                                sink.error(e);
+                            }
+                            return state;
+                        }
+                    );
                 }
             }
 
-            runContext.metric(Counter.of("records", recordCount.get()));
+            Mono<Long> count = flowable.count();
+            Long recordCount = count.block();
+
+            runContext.metric(Counter.of("records", recordCount));
         }
 
         return Output
