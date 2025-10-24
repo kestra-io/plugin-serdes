@@ -58,7 +58,7 @@ dependencies {
     compileOnly 'org.slf4j:slf4j-api'
     compileOnly 'ch.qos.logback:logback-classic'
 
-    api 'de.siegmar:fastcsv:4.0.0'
+    api 'de.siegmar:fastcsv:4.1.0'
     api ('org.apache.avro:avro:1.12.0') {
         exclude group: 'com.fasterxml.jackson.core'
     }
@@ -75,7 +75,7 @@ dependencies {
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
 
-    implementation "org.commonmark:commonmark:0.26.0" // for Markdown
+    implementation "org.commonmark:commonmark:0.27.0" // for Markdown
 }
 
 
