@@ -4,8 +4,6 @@ import com.amazon.ion.*;
 import com.amazon.ion.system.IonSystemBuilder;
 import com.amazon.ion.system.IonTextWriterBuilder;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.StreamReadConstraints;
-import com.fasterxml.jackson.core.StreamWriteConstraints;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.ion.IonFactory;
@@ -126,7 +124,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
             .setTimeZone(TimeZone.getTimeZone(zoneId));
 
-        boolean keepAnnotations = runContext.render(this.shouldKeepAnnotations).as(Boolean.class).orElse(false);
+        var rKeepAnnotations = runContext.render(this.shouldKeepAnnotations).as(Boolean.class).orElse(false);
 
         try (
             Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
@@ -135,7 +133,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         ) {
             Flux<Object> flowable;
 
-            if (!keepAnnotations) {
+            if (!rKeepAnnotations) {
                 var ionFactory = new IonFactory(jsonObjectMapper);
                 var ionParser = ionFactory.createParser(inputStream);
 
