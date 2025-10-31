@@ -20,14 +20,11 @@ import org.apache.poi.xssf.streaming.SXSSFCell;
 import org.apache.poi.xssf.streaming.SXSSFRow;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -183,24 +180,21 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
     }
 
     private Long writeQuery(RunContext runContext, String title, String from, File tempFile, SXSSFWorkbook workbook) throws Exception {
-        URI fromUri = new URI(from);
         Long lineCount;
 
-        try (
-            Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(fromUri), Charset.forName(runContext.render(this.charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
-            OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
-        ) {
+        try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)) {
             var renderedHeaderValue = runContext.render(this.header).as(Boolean.class).orElseThrow();
             var renderedStyles = runContext.render(this.styles).as(Boolean.class).orElseThrow();
             var renderedTimeZoneId = runContext.render(this.getTimeZoneId()).as(String.class).orElse(null);
 
             SXSSFSheet sheet = workbook.createSheet(title);
-            Flux<Object> flowable = FileSerde.readAll(reader)
-                .doOnNext(new Consumer<>() {
+
+            lineCount = Data.from(from)
+                .read(runContext)
+                .doOnNext(new Consumer<Object>() {
                     private boolean first = false;
                     private int rowAt = 0;
 
-                    @SuppressWarnings("rawtypes")
                     @Override
                     public void accept(Object row) {
                         if (row instanceof List casted) {
@@ -236,18 +230,17 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                             }
                         }
                     }
-                });
-
-            // metrics & finalize
-            Mono<Long> count = flowable.count();
-            lineCount = count.block();
-            runContext.metric(Counter.of("records", lineCount));
+                })
+                .count()
+                .block();
 
             workbook.write(outputStream);
+            runContext.metric(Counter.of("records", lineCount));
         }
 
         return lineCount;
     }
+
 
     private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber, boolean styles, String renderedTimeZoneId) {
         SXSSFCell cell = xssfRow.createCell(rowNumber);
