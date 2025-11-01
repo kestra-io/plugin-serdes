@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.csv;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvRecord;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -27,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import io.kestra.plugin.serdes.OnBadLines;
 
 @SuperBuilder
 @ToString
@@ -98,8 +100,15 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Builder.Default
     @Schema(
         title = "Specifies if an exception should be thrown, if CSV data contains different field count"
-    )
+        )
+    @Deprecated
     private final Property<Boolean> errorOnDifferentFieldCount = Property.ofValue(false);
+
+    @Builder.Default
+    @Schema(
+        title = "How to handle bad lines (e.g., a line with too many fields)."
+    )
+    private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
     @Builder.Default
     @Schema(
@@ -149,8 +158,20 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             var headerValue = runContext.render(header).as(Boolean.class).orElseThrow();
             var skipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
             Map<Integer, String> headers = new TreeMap<>();
+            OnBadLines onBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
+
             Flux<Object> flowable = Flux
                 .fromIterable(csvReader)
+                .onErrorResume(CsvParseException.class, e -> {
+                    if (onBadLinesValue == OnBadLines.ERROR) {
+                        return Flux.error(e);
+                    } else if (onBadLinesValue == OnBadLines.WARN) {
+                        runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
+                    } else if (onBadLinesValue == OnBadLines.SKIP) {
+                        // silently skip
+                    }
+                    return Flux.empty();
+                })
                 .filter(csvRecord -> {
                     if (headerValue && csvRecord.getStartingLineNumber() == 1) {
                         for (int i = 0; i < csvRecord.getFieldCount(); i++) {
@@ -162,35 +183,78 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         skipped.incrementAndGet();
                         return false;
                     }
-
                     return true;
                 })
-                .map(r -> {
-                    if (headerValue) {
-                        Map<String, Object> fields = new LinkedHashMap<>();
-                        for (Map.Entry<Integer, String> header : headers.entrySet()) {
-                            int fieldIndex = header.getKey();
-                            String fieldValue;
 
-                            if (fieldIndex < r.getFieldCount()) {
-                                fieldValue = r.getField(fieldIndex);
-                                // Convert IMDB's \N null values to actual nulls
-                                if ("\\N".equals(fieldValue)) {
-                                    fieldValue = null;
-                                }
-                            } else {
-                                // Field doesn't exist in this record, set to null
+                .flatMap(r -> {
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    if (headerValue) {
+                        if (r.getStartingLineNumber() == 1) {
+                            for (int i = 0; i < r.getFieldCount(); i++) {
+                                headers.put(i, r.getField(i));
+                            }
+                            return Mono.empty();
+                        }
+                        if (r.getFieldCount() != headers.size()) {
+                            String message = "Bad line encountered (field count mismatch): Expected "
+                                + headers.size() + ", got " + r.getFieldCount() + " fields.";
+                            if (onBadLinesValue == OnBadLines.ERROR) {
+                                return Mono.error(new RuntimeException(message));
+                            } else if (onBadLinesValue == OnBadLines.WARN) {
+                                runContext.logger().warn(message);
+                            }
+                            return Mono.empty();
+                        }
+                        for (Map.Entry<Integer, String> header : headers.entrySet()) {
+                            int i = header.getKey();
+                            String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
+                            if ("\\N".equals(fieldValue)) {
                                 fieldValue = null;
                             }
-
                             fields.put(header.getValue(), fieldValue);
                         }
-                        return fields;
+                    } else {
+                        // No-header: Use positional column names
+                        for (int i = 0; i < r.getFieldCount(); i++) {
+                            String fieldValue = r.getField(i);
+                            if ("\\N".equals(fieldValue)) {
+                                fieldValue = null;
+                            }
+                            fields.put("col" + i, fieldValue);
+                        }
                     }
-                    return r.getFields();
+                    return Mono.just(fields);
                 });
 
-            Mono<Long> count = FileSerde.writeAll(output, flowable);
+                /*
+                .flatMap(r -> {
+                    if (headerValue && r.getFieldCount() != headers.size()) {
+                        String message = "Bad line encountered (field count mismatch): Expected "
+                            + headers.size() + ", got " + r.getFieldCount() + " fields.";
+
+                        if (onBadLinesValue == OnBadLines.ERROR) {
+                            return Mono.error(new RuntimeException(message));
+                        } else if (onBadLinesValue == OnBadLines.WARN) {
+                            runContext.logger().warn(message);
+                        }
+                        // SKIP or WARN → emit nothing
+                        return Mono.empty();
+                    }
+
+                    // Normal row conversion
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    for (Map.Entry<Integer, String> header : headers.entrySet()) {
+                        int i = header.getKey();
+                        String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
+                        if ("\\N".equals(fieldValue)) {
+                            fieldValue = null;
+                        }
+                        fields.put(header.getValue(), fieldValue);
+                    }
+                    return Mono.just(fields);
+                })*/
+
+           Mono<Long> count = FileSerde.writeAll(output, flowable);
 
             // metrics & finalize
             Long lineCount = count.block();
@@ -226,12 +290,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         runContext.render(skipEmptyRows).as(Boolean.class)
             .ifPresent(builder::skipEmptyLines);
 
+        builder.allowMissingFields(true);
+        builder.allowExtraFields(true);
 
-        runContext.render(errorOnDifferentFieldCount).as(Boolean.class)
-            .ifPresent(b -> {
-                builder.allowMissingFields(!b);
-                builder.allowExtraFields(!b);
-            });
+
 
         runContext.render(allowExtraCharsAfterClosingQuote).as(Boolean.class)
             .ifPresent(builder::allowExtraCharsAfterClosingQuote);

@@ -18,6 +18,12 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
+import io.kestra.plugin.serdes.OnBadLines;
+import org.apache.avro.SchemaParseException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import java.util.HashSet;
+import java.util.Set;
 
 import java.io.*;
 import java.net.URI;
@@ -104,13 +110,23 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
+    @Builder.Default
+    @PluginProperty
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
+        description = "Can be one of: `FAIL`, `WARN` or `SKIP`."
+    )
+    private final OnBadLines onBadLines = OnBadLines.ERROR;
+
     @Override
     public Output run(RunContext runContext) throws Exception {
-        // temp file
-        File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
-
         // reader
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+
+        OnBadLines onBadLinesValue = this.onBadLines;
+
+        // temp file
+        File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
 
         // avro writer
         var schemaParser = new Schema.Parser();
@@ -121,11 +137,17 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             new InferAvroSchema().inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
             schema = schemaParser.parse(schemaOutputStream.toString());
         } else {
-            schema = schemaParser.parse(runContext.render(this.schema));
+            try {
+                schema = schemaParser.parse(runContext.render(this.schema));
+            }
+            catch (SchemaParseException e) {
+                Set<ConstraintViolation<?>> violations = new HashSet<>(); // Simulate
+                // Add violation for 'schema' property
+                throw new ConstraintViolationException("Invalid Avro schema: " + e.getMessage(), violations);
+            }
         }
 
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
-
 
         try (
             Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
@@ -133,7 +155,19 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
-            Long lineCount = this.convert(inputStream, schema, dataFileWriter::append, runContext);
+            Long lineCount = this.convert(inputStream, schema, record -> {
+                try {
+                    dataFileWriter.append(record);
+                } catch (Exception e) {
+                    if (onBadLinesValue == OnBadLines.ERROR) {
+                        throw e;
+                    } else if (onBadLinesValue == OnBadLines.WARN) {
+                        runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", e.getMessage());
+                        return;
+                    }
+                    // OnBadLines.SKIP or others: silently skip
+                }
+            }, runContext);
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));
