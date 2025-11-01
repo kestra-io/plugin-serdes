@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.csv;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvRecord;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -98,6 +99,13 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     @Builder.Default
     @Schema(
+        title = "Specifies if an exception should be thrown, if CSV data contains different field count"
+        )
+    @Deprecated
+    private final Property<Boolean> errorOnDifferentFieldCount = Property.ofValue(false);
+
+    @Builder.Default
+    @Schema(
         title = "How to handle bad lines (e.g., a line with too many fields)."
     )
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
@@ -154,7 +162,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
             Flux<Object> flowable = Flux
                 .fromIterable(csvReader)
-                .onErrorResume(de.siegmar.fastcsv.reader.CsvParseException.class, e -> {
+                .onErrorResume(CsvParseException.class, e -> {
                     if (onBadLinesValue == OnBadLines.ERROR) {
                         return Flux.error(e);
                     } else if (onBadLinesValue == OnBadLines.WARN) {
@@ -177,6 +185,48 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                     }
                     return true;
                 })
+
+                .flatMap(r -> {
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    if (headerValue) {
+                        if (r.getStartingLineNumber() == 1) {
+                            for (int i = 0; i < r.getFieldCount(); i++) {
+                                headers.put(i, r.getField(i));
+                            }
+                            return Mono.empty();
+                        }
+                        if (r.getFieldCount() != headers.size()) {
+                            String message = "Bad line encountered (field count mismatch): Expected "
+                                + headers.size() + ", got " + r.getFieldCount() + " fields.";
+                            if (onBadLinesValue == OnBadLines.ERROR) {
+                                return Mono.error(new RuntimeException(message));
+                            } else if (onBadLinesValue == OnBadLines.WARN) {
+                                runContext.logger().warn(message);
+                            }
+                            return Mono.empty();
+                        }
+                        for (Map.Entry<Integer, String> header : headers.entrySet()) {
+                            int i = header.getKey();
+                            String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
+                            if ("\\N".equals(fieldValue)) {
+                                fieldValue = null;
+                            }
+                            fields.put(header.getValue(), fieldValue);
+                        }
+                    } else {
+                        // No-header: Use positional column names
+                        for (int i = 0; i < r.getFieldCount(); i++) {
+                            String fieldValue = r.getField(i);
+                            if ("\\N".equals(fieldValue)) {
+                                fieldValue = null;
+                            }
+                            fields.put("col" + i, fieldValue);
+                        }
+                    }
+                    return Mono.just(fields);
+                });
+
+                /*
                 .flatMap(r -> {
                     if (headerValue && r.getFieldCount() != headers.size()) {
                         String message = "Bad line encountered (field count mismatch): Expected "
@@ -202,7 +252,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         fields.put(header.getValue(), fieldValue);
                     }
                     return Mono.just(fields);
-                });
+                })*/
 
            Mono<Long> count = FileSerde.writeAll(output, flowable);
 

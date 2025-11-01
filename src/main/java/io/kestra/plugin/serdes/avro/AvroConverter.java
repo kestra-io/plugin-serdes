@@ -11,6 +11,7 @@ import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.data.TimeConversions;
 import org.apache.avro.generic.GenericData;
+import io.kestra.plugin.serdes.OnBadLines;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.lang3.StringUtils;
 
@@ -82,6 +83,9 @@ public class AvroConverter {
     @Builder.Default
     protected final String timeZoneId = ZoneId.systemDefault().toString();
 
+    @Builder.Default
+    protected final OnBadLines onBadLines = OnBadLines.ERROR;
+
     private static final GenericData GENERIC_DATA = new GenericData();
 
     static {
@@ -113,15 +117,42 @@ public class AvroConverter {
             .findFirst()
             .orElse(null);
     }
+    public GenericData.Record fromMap(Schema schema, Map<String, Object> data)
+            throws IllegalRowConvertion, IllegalStrictRowConversion {
+        return fromMap(schema, data, OnBadLines.ERROR, null);
+    }
 
-    public GenericData.Record fromMap(Schema schema, Map<String, Object> data) throws IllegalRowConvertion, IllegalStrictRowConversion {
+    public GenericData.Record fromMap(Schema schema, Map<String, Object> data, OnBadLines onBadLines) throws IllegalRowConvertion, IllegalStrictRowConversion {
+        return fromMap(schema, data, onBadLines, null);
+    }
+
+    public GenericData.Record fromMap(Schema schema, Map<String, Object> data, OnBadLines onBadLines, String parentFieldName) throws IllegalRowConvertion, IllegalStrictRowConversion {
         GenericData.Record record = new GenericData.Record(schema);
 
         for (Schema.Field field : schema.getFields()) {
+            String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
             try {
-                record.put(field.name(), convert(field.schema(), getValueFromNameOrAliases(field, data)));
+                record.put(field.name(), convert(field.schema(), getValueFromNameOrAliases(field, data), onBadLines, currentFieldName));
             } catch (IllegalCellConversion e) {
-                throw new IllegalRowConvertion(data, e, field);
+                if (onBadLines == OnBadLines.ERROR) {
+                    throw new IllegalRowConvertion(data, e, field);
+                } else if (onBadLines == OnBadLines.WARN) {
+                    // Log warning and continue (set to null if schema allows)
+                    System.err.println("WARN: " + e.getMessage()); // Replace with runContext.logger().warn if available
+                    record.put(field.name(), null);
+                } else if (onBadLines == OnBadLines.SKIP) {
+                    record.put(field.name(), null);
+                }
+            } catch (Exception e) {
+                // Generic catch for other exceptions during field processing
+                if (onBadLines == OnBadLines.ERROR) {
+                    throw new IllegalRowConvertion(data, e, field);
+                } else if (onBadLines == OnBadLines.WARN) {
+                    System.err.println("WARN: Conversion error for field '" + field.name() + "': " + e.getMessage());
+                    record.put(field.name(), null);
+                } else {
+                    record.put(field.name(), null);
+                }
             }
         }
 
@@ -132,7 +163,7 @@ public class AvroConverter {
         return record;
     }
 
-    public GenericData.Record fromArray(Schema schema, List<String> data) throws IllegalRowConvertion, IllegalStrictRowConversion {
+    public GenericData.Record fromArray(Schema schema, List<String> data, OnBadLines onBadLines) throws IllegalRowConvertion, IllegalStrictRowConversion {
         HashMap<String, Object> map = new HashMap<>();
         int index = 0;
         for (Schema.Field field : schema.getFields()) {
@@ -141,14 +172,30 @@ public class AvroConverter {
         }
 
         if (this.getStrictSchema() && schema.getFields().size() < data.size()) {
-            throw new IllegalStrictRowConversion(schema, map.keySet(), data);
+            String message = "Data contains more fields than schema: expected " + schema.getFields().size() + ", got " + data.size();
+            if (onBadLines == OnBadLines.ERROR) {
+                throw new IllegalStrictRowConversion(schema, map.keySet(), data);
+            } else if (onBadLines == OnBadLines.WARN) {
+                System.err.println("WARN: Data contains more fields than schema");
+                return null;
+            } else if (onBadLines == OnBadLines.SKIP) {
+                return null;
+            }
         }
 
-        return this.fromMap(schema, map);
+        return this.fromMap(schema, map, onBadLines, null); // Pass null as top-level parentFieldName
     }
 
     @SuppressWarnings("unchecked")
-    protected Object convert(Schema schema, Object data) throws IllegalCellConversion {
+    protected Object convert(Schema schema, Object data, OnBadLines onBadLines, String fieldName) throws IllegalCellConversion {
+
+
+        /*if (data == null) {
+            if (schema.getType() != Schema.Type.NULL && !(schema.getType() == Schema.Type.UNION && schema.getTypes().stream().anyMatch(s -> s.getType() == Schema.Type.NULL))) {
+                throw new IllegalCellConversion(schema, null, new IllegalArgumentException("Null value for non-nullable field '" + fieldName + "'"));
+            }
+            return null;
+        }*/
         try {
             if (this.getInferAllFields()) {
                 if (data instanceof String && this.contains(this.getNullValues(), (String) data)) {
@@ -179,13 +226,13 @@ public class AvroConverter {
             } else if (schema.getLogicalType() != null && schema.getLogicalType().getName().equals("local-timestamp-micros")) {
                 return this.logicalTimestampMicros(data).atZone(zoneId()).toLocalDateTime();
             } else if (schema.getType() == Schema.Type.RECORD) { // complex
-                return fromMap(schema, (Map<String, Object>) data);
+                return fromMap(schema, (Map<String, Object>) data, onBadLines);
             } else if (schema.getType() == Schema.Type.ARRAY) {
-                return this.complexArray(schema, data);
+                return this.complexArray(schema, data, onBadLines, fieldName);
             } else if (schema.getType() == Schema.Type.MAP) {
-                return this.complexMap(schema, data);
+                return this.complexMap(schema, data, onBadLines, fieldName);
             } else if (schema.getType() == Schema.Type.UNION) {
-                return this.complexUnion(schema, data);
+                return this.complexUnion(schema, data, onBadLines, fieldName);
             } else if (schema.getType() == Schema.Type.FIXED) {
                 return this.complexFixed(schema, data);
             } else if (schema.getType() == Schema.Type.ENUM) {
@@ -372,23 +419,26 @@ public class AvroConverter {
     }
 
     @SuppressWarnings("unchecked")
-    protected List<Object> complexArray(Schema schema, Object data) throws IllegalCellConversion {
+    protected List<Object> complexArray(Schema schema, Object data, OnBadLines onBadLines, String fieldName) throws IllegalCellConversion {
         Schema elementType = schema.getElementType();
 
         Collection<Object> list = (Collection<Object>) data;
         List<Object> result = new ArrayList<>();
 
+        int index = 0;
         for (Object current : list) {
-            result.add(this.convert(elementType, current));
+            String currentFieldName = fieldName + "[" + index + "]";
+            result.add(this.convert(elementType, current, onBadLines, currentFieldName));
+            index++;
         }
 
         return result;
     }
 
-    protected Object complexUnion(Schema schema, Object data) {
+    protected Object complexUnion(Schema schema, Object data, OnBadLines onBadLines, String fieldName) {
         for (Schema current : schema.getTypes()) {
             try {
-                return this.convert(current, data);
+                return this.convert(current, data, onBadLines, fieldName);
             } catch (Exception ignored) {
             }
         }
@@ -411,16 +461,17 @@ public class AvroConverter {
     }
 
     @SuppressWarnings("unchecked")
-    protected Map<Utf8, Object> complexMap(Schema schema, Object data) throws IllegalCellConversion {
+    protected Map<Utf8, Object> complexMap(Schema schema, Object data, OnBadLines onBadLines, String fieldName) throws IllegalCellConversion {
         Schema valueType = schema.getValueType();
 
         Map<Object, Object> list = (Map<Object, Object>) data;
         Map<Utf8, Object> result = new HashMap<>();
 
         for (Map.Entry<Object, Object> current : list.entrySet()) {
+            String currentFieldName = fieldName + "[" + current.getKey() + "]";
             result.put(
                 new Utf8(this.primitiveString(current.getKey()).getBytes()),
-                this.convert(valueType, current.getValue())
+                this.convert(valueType, current.getValue(), onBadLines, currentFieldName)
             );
         }
 

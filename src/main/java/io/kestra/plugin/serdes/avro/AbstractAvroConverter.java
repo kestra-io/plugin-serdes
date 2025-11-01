@@ -8,6 +8,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.Rethrow;
 import io.kestra.core.validations.DateFormat;
+import io.kestra.plugin.serdes.OnBadLines;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -129,6 +130,13 @@ public abstract class AbstractAvroConverter extends Task {
     )
     protected final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
+    @Builder.Default
+    @io.swagger.v3.oas.annotations.media.Schema(
+        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
+        description = "Can be one of: `FAIL`, `WARN` or `SKIP`."
+    )
+    protected final OnBadLines onBadLines = OnBadLines.ERROR;
+
 
     protected <E extends Exception> Long convert(Reader inputStream, Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext) throws IOException, IllegalVariableEvaluationException {
         AvroConverter converter = AvroConverter.builder()
@@ -142,11 +150,12 @@ public abstract class AbstractAvroConverter extends Task {
             .decimalSeparator(runContext.render(this.decimalSeparator).as(Character.class).orElseThrow())
             .strictSchema(runContext.render(this.strictSchema).as(Boolean.class).orElseThrow())
             .inferAllFields(runContext.render(this.inferAllFields).as(Boolean.class).orElseThrow())
-            .timeZoneId(runContext.render(this.timeZoneId).as(String.class).orElseThrow())
+            .timeZoneId(runContext.render(this.timeZoneId).as(String.class).orElse(ZoneId.systemDefault().toString()))
+            .onBadLines(this.onBadLines)
             .build();
 
         Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
-            .map(this.convertToAvro(schema, converter))
+            .map(this.convertToAvro(schema, converter, this.onBadLines))
             .doOnNext(datum -> {
                 try {
                     consumer.accept(datum);
@@ -171,17 +180,17 @@ public abstract class AbstractAvroConverter extends Task {
     }
 
     @SuppressWarnings("unchecked")
-    protected Function<Object, GenericData.Record> convertToAvro(Schema schema, AvroConverter converter) {
+    protected Function<Object, GenericData.Record> convertToAvro(Schema schema, AvroConverter converter, OnBadLines onBadLines) {
         return row -> {
             try {
                 if (row instanceof List) {
                     List<String> casted = (List<String>) row;
 
-                    return converter.fromArray(schema, casted);
+                    return converter.fromArray(schema, casted, onBadLines);
                 } else if (row instanceof Map) {
                     Map<String, Object> casted = (Map<String, Object>) row;
 
-                    return converter.fromMap(schema, casted);
+                    return converter.fromMap(schema, casted, onBadLines);
                 }
 
                 throw new IllegalArgumentException("Unable to convert row of type: " + row.getClass());
