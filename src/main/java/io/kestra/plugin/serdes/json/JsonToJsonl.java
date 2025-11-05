@@ -60,15 +60,6 @@ import java.util.Iterator;
                     inputs:
                       json: "{{ json(read(taskrun.items)) }}"
                 """
-        ),
-        @Example(
-            title = "Convert JSON file with custom charset.",
-            code = """
-                id: json_to_jsonl
-                type: io.kestra.plugin.serdes.json.JsonToJsonl
-                from: "{{ outputs.extract.uri }}"
-                charset: ISO-8859-1
-                """
         )
     }
 )
