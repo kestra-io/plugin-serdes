@@ -26,14 +26,14 @@ import java.util.Iterator;
 @ToString
 @EqualsAndHashCode
 @Schema(
-        title = "Convert a Json file into JsonL"
+    title = "Convert a Json file into JsonL"
 )
 @Plugin(
-        examples = {
-                @Example(
-                        title = "Convert a JSON array from an API to JSONL format for iteration.",
-                        full = true,
-                        code = """
+    examples = {
+        @Example(
+            title = "Convert a JSON array from an API to JSONL format for iteration.",
+            full = true,
+            code = """
                 id: json_to_jsonl_example
                 namespace: company.team
 
@@ -60,29 +60,29 @@ import java.util.Iterator;
                     inputs:
                       json: "{{ json(read(taskrun.items)) }}"
                 """
-                ),
-                @Example(
-                        title = "Convert JSON file with custom charset.",
-                        code = """
+        ),
+        @Example(
+            title = "Convert JSON file with custom charset.",
+            code = """
                 id: json_to_jsonl
                 type: io.kestra.plugin.serdes.json.JsonToJsonl
                 from: "{{ outputs.extract.uri }}"
                 charset: ISO-8859-1
                 """
-                )
-        }
+        )
+    }
 )
 public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output> {
 
     @Builder.Default
     @Schema(
-            title = "The name of a supported charset",
-            description = "The character set to use for reading and writing the file."
+        title = "The name of a supported charset",
+        description = "The character set to use for reading and writing the file."
     )
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
     @NotNull
     @Schema(
-            title = "Source file URI"
+        title = "Source file URI"
     )
     @PluginProperty(internalStorageURI = true)
     private Property<String> from;
@@ -99,18 +99,18 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
         long count = 0;
 
         try (
-                BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(
-                                runContext.storage().getFile(URI.create(String.valueOf(rFrom))),
-                                rCharset
-                        )
-                );
-                BufferedWriter writer = new BufferedWriter(
-                        new OutputStreamWriter(
-                                new FileOutputStream(tempFile),
-                                rCharset
-                        )
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(
+                    runContext.storage().getFile(URI.create(String.valueOf(rFrom))),
+                    rCharset
                 )
+            );
+            BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(
+                    new FileOutputStream(tempFile),
+                    rCharset
+                )
+            )
         ) {
             ObjectMapper mapper = new ObjectMapper();
 
@@ -120,8 +120,8 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
                 runContext.metric(Counter.of("records", 0));
                 URI outputUri = runContext.storage().putFile(tempFile);
                 return Output.builder()
-                        .uri(outputUri)
-                        .build();
+                    .uri(outputUri)
+                    .build();
             }
 
             // Check if it's a JSON array or single object
@@ -220,8 +220,8 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
                 }
             } else {
                 throw new IllegalArgumentException(
-                        "Invalid JSON format. Expected JSON array starting with '[' or JSON object starting with '{', " +
-                                "but found: " + trimmedFirst.substring(0, Math.min(50, trimmedFirst.length()))
+                    "Invalid JSON format. Expected JSON array starting with '[' or JSON object starting with '{', " +
+                        "but found: " + trimmedFirst.substring(0, Math.min(50, trimmedFirst.length()))
 
                 );
             }
@@ -232,8 +232,8 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
         runContext.metric(Counter.of("records", count));
 
         return Output.builder()
-                .uri(outputUri)
-                .build();
+            .uri(outputUri)
+            .build();
     }
 
     /**
@@ -273,7 +273,7 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
     @Builder
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-                title = "URI of the generated JSONL file in Kestra's internal storage"
+            title = "URI of the generated JSONL file in Kestra's internal storage"
         )
         private final URI uri;
     }
