@@ -1,5 +1,7 @@
 package io.kestra.plugin.serdes.json;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
@@ -10,6 +12,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -18,8 +21,8 @@ import lombok.experimental.SuperBuilder;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
 
 @SuperBuilder
 @NoArgsConstructor
@@ -84,187 +87,81 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-
         URI rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
-
         var rCharset = runContext.render(charset).as(String.class).orElseThrow();
 
         File tempFile = runContext.workingDir().createTempFile(".jsonl").toFile();
 
-        long count = 0;
-
         try (
+            InputStream inputStream = runContext.storage().getFile(URI.create(String.valueOf(rFrom)));
             BufferedReader reader = new BufferedReader(
-                new InputStreamReader(
-                    runContext.storage().getFile(URI.create(String.valueOf(rFrom))),
-                    rCharset
-                )
+                new InputStreamReader(inputStream, rCharset),
+                FileSerde.BUFFER_SIZE
             );
             BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(
-                    new FileOutputStream(tempFile),
-                    rCharset
-                )
+                new FileWriter(tempFile, Charset.forName(rCharset)),
+                FileSerde.BUFFER_SIZE
             )
         ) {
             ObjectMapper mapper = JacksonMapper.ofJson();
 
-            String firstLine = reader.readLine();
-            if (firstLine == null || firstLine.trim().isEmpty()) {
-                // Empty file
-                runContext.metric(Counter.of("records", 0));
-                URI outputUri = runContext.storage().putFile(tempFile);
-                return Output.builder()
-                    .uri(outputUri)
-                    .build();
+            // Use streaming parser to avoid loading entire file into memory
+            JsonParser jsonParser = mapper.getFactory().createParser(reader);
+
+            long[] count = {0};
+
+            try {
+                JsonToken token = jsonParser.nextToken();
+
+                if (token == null) {
+                    // Empty file - do nothing
+                } else if (token == JsonToken.START_ARRAY) {
+                    // JSON array - stream each element
+                    while (jsonParser.nextToken() != JsonToken.END_ARRAY) {
+                        JsonNode node = mapper.readTree(jsonParser);
+                        writer.write(mapper.writeValueAsString(node));
+                        writer.newLine();
+                        count[0]++;
+                    }
+                } else if (token == JsonToken.START_OBJECT) {
+                    // Could be a single object or JSONL format
+                    // Read the first object
+                    JsonNode firstNode = mapper.readTree(jsonParser);
+                    writer.write(mapper.writeValueAsString(firstNode));
+                    writer.newLine();
+                    count[0]++;
+
+                    // Try to read more objects (JSONL format)
+                    JsonToken nextToken;
+                    while ((nextToken = jsonParser.nextToken()) != null) {
+                        if (nextToken == JsonToken.START_OBJECT) {
+                            JsonNode node = mapper.readTree(jsonParser);
+                            writer.write(mapper.writeValueAsString(node));
+                            writer.newLine();
+                            count[0]++;
+                        }
+                    }
+                } else {
+                    throw new IllegalArgumentException(
+                        "Invalid JSON format. Expected JSON array or object, but found: " + token
+                    );
+                }
+            } catch (com.fasterxml.jackson.core.JsonParseException e) {
+                throw new IllegalArgumentException("Invalid JSON format: " + e.getMessage(), e);
+            } finally {
+                jsonParser.close();
             }
 
-            // Check if it's a JSON array or single object
-            String trimmedFirst = firstLine.trim();
-
-            if (trimmedFirst.startsWith("[")) {
-               count = processJsonArray(reader, writer, mapper, trimmedFirst);
-            } else if (trimmedFirst.startsWith("{")) {
-               count = processJsonLines(reader, writer, mapper, trimmedFirst);
-            } else {
-                throw new IllegalArgumentException(
-                    "Invalid JSON format. Expected JSON array starting with '[' or JSON object starting with '{', " +
-                        "but found: " + trimmedFirst.substring(0, Math.min(50, trimmedFirst.length()))
-
-                );
-            }
+            runContext.metric(Counter.of("records", count[0]));
         }
 
         URI outputUri = runContext.storage().putFile(tempFile);
-
-        runContext.metric(Counter.of("records", count));
 
         return Output.builder()
             .uri(outputUri)
             .build();
     }
 
-    private long processJsonArray(BufferedReader reader, BufferedWriter writer,
-                                  ObjectMapper mapper, String firstLine) throws IOException {
-        long count = 0;
-        StringBuilder objBuilder = new StringBuilder();
-        int braceDepth = 0;
-        boolean inString = false;
-
-        // Start after '['
-        String content = firstLine.substring(1);
-
-        String allContent = content + readRemainingLines(reader);
-
-        int i = 0;
-        while (i < allContent.length()) {
-            char c = allContent.charAt(i);
-
-            if (c == '"' && (i == 0 || allContent.charAt(i-1) != '\\')) {
-                inString = !inString;
-            }
-
-            if (!inString) {
-                if (c == '{') {
-                    braceDepth++;
-                    objBuilder.append(c);
-                } else if (c == '}') {
-                    objBuilder.append(c);
-                    braceDepth--;
-
-                    if (braceDepth == 0 && !objBuilder.isEmpty()) {
-                        // Complete object
-                        String jsonObj = objBuilder.toString().trim();
-                        if (!jsonObj.isEmpty()) {
-                            JsonNode node = mapper.readTree(jsonObj);
-                            writer.write(mapper.writeValueAsString(node));
-                            writer.newLine();
-                            count++;
-                        }
-                        objBuilder = new StringBuilder();
-                    }
-                } else if (c == ']' && braceDepth == 0) {
-                    break;
-                } else if (braceDepth > 0) {
-                    objBuilder.append(c);
-                }
-            } else {
-                objBuilder.append(c);
-            }
-            i++;
-        }
-
-        return count;
-    }
-
-
-    private String readRemainingLines(BufferedReader reader) throws IOException{
-        StringBuilder sb = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            sb.append(line);
-        }
-        return sb.toString();
-    }
-
-    private long processJsonLines(BufferedReader reader, BufferedWriter writer, ObjectMapper mapper, String firstLine) throws IOException {
-        long count = 0;
-
-        if (!firstLine.isEmpty()) {
-            JsonNode node = mapper.readTree(firstLine);
-            writer.write(mapper.writeValueAsString(node));
-            writer.newLine();
-            count++;
-        }
-
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String trimmed = line.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-
-            JsonNode node = mapper.readTree(trimmed);
-            writer.write(mapper.writeValueAsString(node));
-            writer.newLine();
-            count++;
-        }
-
-        return count;
-    }
-
-    /**
-     * Count the net braces in a line (opening - closing)
-     * Returns 0 when braces are balanced
-     */
-    private int countBraces(String line) {
-        int count = 0;
-        boolean inString = false;
-        boolean escaped = false;
-
-        for (char c : line.toCharArray()) {
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (c == '\\') {
-                escaped = true;
-                continue;
-            }
-            if (c == '"') {
-                inString = !inString;
-                continue;
-            }
-            if (!inString) {
-                if (c == '{') {
-                    count++;
-                } else if (c == '}') {
-                    count--;
-                }
-            }
-        }
-        return count;
-    }
 
     @Getter
     @Builder
