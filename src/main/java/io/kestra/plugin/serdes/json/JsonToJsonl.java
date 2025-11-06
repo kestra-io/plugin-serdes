@@ -10,6 +10,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -34,8 +35,9 @@ import java.util.Iterator;
             title = "Convert a JSON array from an API to JSONL format for iteration.",
             full = true,
             code = """
-                id: json_to_jsonl_example
+                id: parent_json_processing
                 namespace: company.team
+                description: Parent flow that distributes work to subflows
 
                 tasks:
                   - id: download
@@ -43,6 +45,8 @@ import java.util.Iterator;
                     uri: "https://api.restful-api.dev/objects"
                     contentType: application/json
                     method: GET
+                    failOnEmptyResponse: true
+                    timeout: PT15S
 
                   - id: json_to_jsonl
                     type: io.kestra.plugin.serdes.json.JsonToJsonl
@@ -54,11 +58,11 @@ import java.util.Iterator;
                     batch:
                       rows: 1
                     namespace: company.team
-                    flowId: process_item
+                    flowId: child_process_item
                     wait: true
                     transmitFailed: true
                     inputs:
-                      json: "{{ json(read(taskrun.items)) }}"
+                      item_data: "{{ taskrun.items }}"
                 """
         )
     }
@@ -103,7 +107,7 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
                 )
             )
         ) {
-            ObjectMapper mapper = new ObjectMapper();
+            ObjectMapper mapper = JacksonMapper.ofJson();
 
             String firstLine = reader.readLine();
             if (firstLine == null || firstLine.trim().isEmpty()) {
@@ -119,96 +123,9 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
             String trimmedFirst = firstLine.trim();
 
             if (trimmedFirst.startsWith("[")) {
-                // If it's a JSON array - read the entire content
-                StringBuilder jsonContent = new StringBuilder(firstLine);
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    jsonContent.append(line);
-                }
-
-                // Parse an array
-                JsonNode rootNode = mapper.readTree(jsonContent.toString());
-
-                if (rootNode.isArray()) {
-                    // Iterate through the array elements
-                    Iterator<JsonNode> elements = rootNode.elements();
-                    while (elements.hasNext()) {
-                        JsonNode element = elements.next();
-                        writer.write(mapper.writeValueAsString(element));
-                        writer.newLine();
-                        count++;
-                    }
-                } else {
-                    // Single object wrapped in parsing
-                    writer.write(mapper.writeValueAsString(rootNode));
-                    writer.newLine();
-                    count++;
-                }
+               count = processJsonArray(reader, writer, mapper, trimmedFirst);
             } else if (trimmedFirst.startsWith("{")) {
-                // Could be either a single JSON object or already JSONL format
-                // Try to parse as a complete JSON object first
-                try {
-                    StringBuilder jsonContent = new StringBuilder(firstLine);
-                    String line;
-
-                    // Read until we have a complet JSON object
-                    int braceCount = countBraces(firstLine);
-
-                    if (braceCount == 0) {
-                        // Complete object on first line - likely JSON format
-                        writer.write(trimmedFirst);
-                        writer.newLine();
-                        count++;
-
-                        // Process remaining lines as JSONL
-                        while ((line = reader.readLine()) != null) {
-                            String trimmedLine = line.trim();
-                            if (!trimmedLine.isEmpty()) {
-                                writer.write(trimmedLine);
-                                writer.newLine();
-                                count++;
-                            }
-                        }
-                    } else {
-                        // Multiline JSON object - read until complete
-                        while (braceCount != 0 && (line = reader.readLine()) != null) {
-                            jsonContent.append(line);
-                            braceCount += countBraces(line);
-                        }
-
-                        // Parse and write the single object
-                        JsonNode node = mapper.readTree(jsonContent.toString());
-                        writer.write(mapper.writeValueAsString(node));
-                        writer.newLine();
-                        count++;
-
-                        // Check if there are more objects
-                        while ((line = reader.readLine()) != null) {
-                            String trimmerLine = line.trim();
-                            if (!trimmerLine.isEmpty()) {
-                                JsonNode additionalNode = mapper.readTree(trimmerLine);
-                                writer.write(mapper.writeValueAsString(additionalNode));
-                                writer.newLine();
-                                count++;
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-
-                    writer.write(trimmedFirst);
-                    writer.newLine();
-                    count++;
-
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        String trimmedLine = line.trim();
-                        if (!trimmedLine.isEmpty()) {
-                            writer.write(trimmedLine);
-                            writer.newLine();
-                            count++;
-                        }
-                    }
-                }
+               count = processJsonLines(reader, writer, mapper, trimmedFirst);
             } else {
                 throw new IllegalArgumentException(
                     "Invalid JSON format. Expected JSON array starting with '[' or JSON object starting with '{', " +
@@ -225,6 +142,95 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
         return Output.builder()
             .uri(outputUri)
             .build();
+    }
+
+    private long processJsonArray(BufferedReader reader, BufferedWriter writer,
+                                  ObjectMapper mapper, String firstLine) throws IOException {
+        long count = 0;
+        StringBuilder objBuilder = new StringBuilder();
+        int braceDepth = 0;
+        boolean inString = false;
+
+        // Start after '['
+        String content = firstLine.substring(1);
+
+        String allContent = content + readRemainingLines(reader);
+
+        int i = 0;
+        while (i < allContent.length()) {
+            char c = allContent.charAt(i);
+
+            if (c == '"' && (i == 0 || allContent.charAt(i-1) != '\\')) {
+                inString = !inString;
+            }
+
+            if (!inString) {
+                if (c == '{') {
+                    braceDepth++;
+                    objBuilder.append(c);
+                } else if (c == '}') {
+                    objBuilder.append(c);
+                    braceDepth--;
+
+                    if (braceDepth == 0 && !objBuilder.isEmpty()) {
+                        // Complete object
+                        String jsonObj = objBuilder.toString().trim();
+                        if (!jsonObj.isEmpty()) {
+                            JsonNode node = mapper.readTree(jsonObj);
+                            writer.write(mapper.writeValueAsString(node));
+                            writer.newLine();
+                            count++;
+                        }
+                        objBuilder = new StringBuilder();
+                    }
+                } else if (c == ']' && braceDepth == 0) {
+                    break;
+                } else if (braceDepth > 0) {
+                    objBuilder.append(c);
+                }
+            } else {
+                objBuilder.append(c);
+            }
+            i++;
+        }
+
+        return count;
+    }
+
+
+    private String readRemainingLines(BufferedReader reader) throws IOException{
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            sb.append(line);
+        }
+        return sb.toString();
+    }
+
+    private long processJsonLines(BufferedReader reader, BufferedWriter writer, ObjectMapper mapper, String firstLine) throws IOException {
+        long count = 0;
+
+        if (!firstLine.isEmpty()) {
+            JsonNode node = mapper.readTree(firstLine);
+            writer.write(mapper.writeValueAsString(node));
+            writer.newLine();
+            count++;
+        }
+
+        String line;
+        while ((line = reader.readLine()) != null) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+
+            JsonNode node = mapper.readTree(trimmed);
+            writer.write(mapper.writeValueAsString(node));
+            writer.newLine();
+            count++;
+        }
+
+        return count;
     }
 
     /**
