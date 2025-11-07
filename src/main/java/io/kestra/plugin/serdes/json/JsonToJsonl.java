@@ -78,13 +78,13 @@ import java.nio.charset.StandardCharsets;
    }
 )
 public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output> {
-
     @Builder.Default
     @Schema(
         title = "The name of a supported charset",
         description = "The character set to use for reading and writing the file."
     )
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
+    
     @NotNull
     @Schema(
         title = "Source file URI"
@@ -95,7 +95,7 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
     @Override
     public Output run(RunContext runContext) throws Exception {
         URI rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
-        var rCharset = runContext.render(charset).as(String.class).orElseThrow();
+        var rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
 
         File tempFile = runContext.workingDir().createTempFile(".jsonl").toFile();
 
