@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -68,7 +69,13 @@ import java.nio.charset.StandardCharsets;
                       item_data: "{{ taskrun.items }}"
                 """
         )
-    }
+    },
+   metrics = {
+       @Metric(
+           name = "records",
+           type = Counter.TYPE
+       )
+   }
 )
 public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output> {
 
