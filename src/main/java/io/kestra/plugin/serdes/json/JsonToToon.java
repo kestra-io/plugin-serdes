@@ -1,6 +1,8 @@
 package io.kestra.plugin.serdes.json;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.kestra.core.models.annotations.Example;
@@ -23,8 +25,8 @@ import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.TimeZone;
 
 @SuperBuilder
@@ -110,25 +112,51 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        var rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        var rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
+        var rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
         var tempFile = runContext.workingDir().createTempFile(".toon").toFile();
-        var rCharset = runContext.render(this.charset).as(String.class).orElseThrow();
+        var mapper = JacksonMapper.ofJson();
+        var factory = mapper.getFactory();
+        long count = 0;
 
         try (
-            var input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom), rCharset), FileSerde.BUFFER_SIZE);
-            var writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(rCharset)), FileSerde.BUFFER_SIZE)
+            var inputStream = runContext.storage().getFile(rFrom);
+            var reader = new BufferedReader(
+                new InputStreamReader(inputStream, rCharset),
+                FileSerde.BUFFER_SIZE
+            );
+            var writer = new BufferedWriter(
+                new FileWriter(tempFile, Charset.forName(rCharset)),
+                FileSerde.BUFFER_SIZE
+            );
+            var parser = factory.createParser(reader)
         ) {
-            var reader = OBJECT_MAPPER.readerFor(Object.class);
-            var json = reader.readValue(input);
-
+            var token = parser.nextToken();
             var encoder = new ToonEncoder(writer);
-            long count = encoder.encode(json);
-            runContext.metric(Counter.of("records", count));
+
+            if (token == JsonToken.START_ARRAY) {
+                while (parser.nextToken() != JsonToken.END_ARRAY) {
+                    JsonNode node = mapper.readTree(parser);
+                    encoder.writeNode(node);
+                    count++;
+                }
+            } else if (token == JsonToken.START_OBJECT) {
+                JsonNode node = mapper.readTree(parser);
+                encoder.writeNode(node);
+                count++;
+            } else {
+                throw new IllegalArgumentException(
+                    "Invalid JSON: expected an array or object at root, found " + token
+                );
+            }
+
+            writer.flush();
         }
 
-        return Output.builder()
-            .uri(runContext.storage().putFile(tempFile))
-            .build();
+        runContext.metric(Counter.of("records", count));
+
+        URI outputUri = runContext.storage().putFile(tempFile);
+        return Output.builder().uri(outputUri).build();
     }
 
     @Builder
@@ -144,125 +172,153 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         private static final int INDENT_SIZE = 2;
         private static final String INDENT_UNIT = " ".repeat(INDENT_SIZE);
 
-        private long count = 0;
-
         ToonEncoder(Writer writer) {
             this.writer = writer;
         }
 
-        public long encode(Object json) throws IOException {
-            if (json == null) return 0;
-            writeValue(json);
-            writer.flush();
-            return count;
-        }
-
-        private void writeValue(Object value) throws IOException {
-            if (value instanceof Map<?, ?> map) {
-                writeObject(map, 0);
-            } else if (value instanceof List<?> list) {
-                writeArray(list, 0, "root");
+        void writeNode(JsonNode node) throws IOException {
+            if (node.isObject()) {
+                writeObject(node, 0);
+            } else if (node.isArray()) {
+                writeArray(node, 0, "root");
             } else {
-                writer.write(quoteIfNeeded(value));
+                indent(0);
+                writer.write(quoteIfNeeded(node.asText()));
                 writer.write("\n");
             }
         }
 
-        private void writeObject(Map<?, ?> map, int indent) throws IOException {
-            for (var entry : map.entrySet()) {
-                var key = formatKey(entry.getKey().toString());
-                var val = entry.getValue();
+        private void writeObject(JsonNode node, int indent) throws IOException {
+            for (var entry : node.properties()) {
+                var key = formatKey(entry.getKey());
+                var value = entry.getValue();
 
-                if (val instanceof Map<?, ?> subMap) {
+                if (value.isObject()) {
                     indent(indent);
                     writer.write(key + ":\n");
-                    writeObject(subMap, indent + 1);
-                } else if (val instanceof List<?> list) {
-                    writeArray(list, indent, key);
+                    writeObject(value, indent + 1);
+                } else if (value.isArray()) {
+                    writeArray(value, indent, key);
                 } else {
                     indent(indent);
-                    writer.write(key + ": " + quoteIfNeeded(val) + "\n");
+                    writer.write(key + ": " + quoteIfNeeded(value.asText()) + "\n");
                 }
             }
         }
 
-        private void writeArray(List<?> list, int indent, String key) throws IOException {
-            count += list.size();
-
-            var allPrimitive = list.stream().allMatch(e ->
-                !(e instanceof Map) && !(e instanceof List)
-            );
-
-            var uniformObject = !list.isEmpty() && list.stream().allMatch(e -> e instanceof Map);
-
-            if (allPrimitive) {
-                // Inline primitive array
+        private void writeArray(JsonNode array, int indent, String key) throws IOException {
+            if (!array.isArray()) {
                 indent(indent);
-                writer.write(key + "[" + list.size() + "]:");
-                if (!list.isEmpty()) {
-                    writer.write(" ");
-                    writer.write(String.join(",", list.stream()
-                        .map(this::quoteIfNeeded)
-                        .toList()));
+                writer.write(key + ": " + quoteIfNeeded(array.asText()) + "\n");
+                return;
+            }
+
+            if (array.isEmpty()) {
+                indent(indent);
+                writer.write(key + "[0]:\n");
+                return;
+            }
+
+            boolean allPrimitive = true;
+            boolean allObjects = true;
+
+            for (JsonNode item : array) {
+                if (item.isObject() || item.isArray()) allPrimitive = false;
+                if (!item.isObject()) allObjects = false;
+            }
+
+            // Inline primitive arrays
+            if (allPrimitive) {
+                indent(indent);
+                writer.write(key + "[" + array.size() + "]: ");
+                for (int i = 0; i < array.size(); i++) {
+                    if (i > 0) writer.write(",");
+                    writer.write(quoteIfNeeded(array.get(i).asText()));
                 }
                 writer.write("\n");
-            } else if (uniformObject) {
-                // Tabular array
-                @SuppressWarnings("unchecked")
-                var firstRow = (Map<String, Object>) list.get(0);
-                var fields = firstRow.keySet();
-                indent(indent);
-                writer.write(key + "[" + list.size() + "]{" + String.join(",", fields) + "}:\n");
-                for (var row : list) {
-                    indent(indent + 1);
-                    @SuppressWarnings("unchecked")
-                    var map = (Map<String, Object>) row;
-                    var values = fields.stream().map(map::get).map(this::quoteIfNeeded).toList();
-                    writer.write(String.join(",", values));
-                    writer.write("\n");
+                return;
+            }
+
+            // Uniform object arrays (tabular)
+            if (allObjects && !array.isEmpty()) {
+                Set<String> fields = new LinkedHashSet<>();
+                array.get(0).properties().forEach(entry -> fields.add(entry.getKey()));
+
+                boolean uniform = true;
+                for (JsonNode item : array) {
+                    Set<String> keys = new LinkedHashSet<>();
+                    item.properties().forEach(entry -> keys.add(entry.getKey()));
+                    if (!keys.equals(fields)) {
+                        uniform = false;
+                        break;
+                    }
                 }
-            } else {
-                // Heterogeneous list
-                indent(indent);
-                writer.write(key + "[" + list.size() + "]:\n");
-                for (var item : list) {
-                    indent(indent + 1);
-                    writer.write("- ");
-                    if (item instanceof Map<?, ?> obj) {
-                        if (obj.size() == 1 && obj.values().stream().noneMatch(v -> v instanceof Map || v instanceof List)) {
-                            var entry = obj.entrySet().iterator().next();
-                            writer.write(formatKey(entry.getKey().toString()) + ": " + quoteIfNeeded(entry.getValue()) + "\n");
-                        } else {
-                            writer.write("\n");
-                            writeObject(obj, indent + 2);
+
+                if (uniform) {
+                    indent(indent);
+                    writer.write(key + "[" + array.size() + "]{" + String.join(",", fields) + "}:\n");
+                    for (JsonNode row : array) {
+                        indent(indent + 1);
+                        boolean first = true;
+                        for (String field : fields) {
+                            if (!first) writer.write(",");
+                            JsonNode cell = row.get(field);
+                            writer.write(quoteIfNeeded(cell != null ? cell.asText() : "null"));
+                            first = false;
                         }
-                    } else {
-                        writer.write(quoteIfNeeded(item));
                         writer.write("\n");
                     }
+                    return;
+                }
+            }
+
+            // Heterogeneous or mixed arrays
+            indent(indent);
+            writer.write(key + "[" + array.size() + "]:\n");
+            for (JsonNode item : array) {
+                indent(indent + 1);
+                writer.write("- ");
+                if (item.isObject()) {
+                    if (item.size() == 1 && item.properties().iterator().next().getValue().isValueNode()) {
+                        var entry = item.properties().iterator().next();
+                        writer.write(formatKey(entry.getKey()) + ": " + quoteIfNeeded(entry.getValue().asText()) + "\n");
+                    } else {
+                        writer.write("\n");
+                        writeObject(item, indent + 2);
+                    }
+                } else {
+                    writer.write(quoteIfNeeded(item.asText()) + "\n");
                 }
             }
         }
 
-        private String quoteIfNeeded(Object value) {
+        private void indent(int level) throws IOException {
+            writer.write(INDENT_UNIT.repeat(level));
+        }
+
+        private String quoteIfNeeded(String value) {
             if (value == null) return "null";
+            String s = value.trim();
 
-            var s = value.toString().trim();
+            // Null literal must stay unquoted
+            if (s.equals("null")) {
+                return "null";
+            }
 
-            // Numeric or boolean: no quotes
-            if (s.matches("^-?\\d+(\\.\\d+)?$") || s.equals("true") || s.equals("false"))
+            // Numeric or boolean values: no quotes
+            if (s.matches("^-?\\d+(\\.\\d+)?$") || s.equals("true") || s.equals("false")) {
                 return s;
+            }
 
-            // Must be quoted?
+            // Must be quoted if it contains structural/special characters
             if (s.isEmpty()
-                || s.matches("^(null)$")
                 || s.contains(":")
                 || s.contains("\"")
                 || s.contains(",")
-                || s.contains("[")
-                || s.contains("]")
                 || s.contains("{")
                 || s.contains("}")
+                || s.contains("[")
+                || s.contains("]")
                 || s.startsWith("-")
                 || s.startsWith(" ")
                 || s.endsWith(" ")
@@ -284,10 +340,6 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         private String formatKey(String key) {
             if (key.matches("^[A-Za-z_][A-Za-z0-9_.]*$")) return key;
             return "\"" + escape(key) + "\"";
-        }
-
-        private void indent(int level) throws IOException {
-            writer.write(INDENT_UNIT.repeat(level));
         }
     }
 }
