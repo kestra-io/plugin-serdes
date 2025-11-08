@@ -44,7 +44,7 @@ import java.util.TimeZone;
     examples = {
         @Example(
             full = true,
-            title = "Convert a JSON file to TOON format.",
+            title = "Convert a JSON file to TOON format and summarize it with AI.",
             code = """
                 id: json_to_toon
                 namespace: company.team
@@ -69,13 +69,16 @@ import java.util.TimeZone;
                     type: io.kestra.plugin.serdes.json.JsonToToon
                     from: "{{ outputs.create_json.uri }}"
 
-                  - id: summarize
-                    type: io.kestra.plugin.openai.chatcompletion
-                    model: gpt-4o-mini
+                  - id: chat_completion
+                    type: io.kestra.plugin.ai.completion.ChatCompletion
+                    provider:
+                      type: io.kestra.plugin.ai.provider.GoogleGemini
+                      apiKey: "{{ kv('GOOGLE_API_KEY') }}"
+                      modelName: gemini-2.5-flash
                     messages:
-                      - role: system
-                        content: "You are an assistant that summarizes data."
-                      - role: user
+                      - type: SYSTEM
+                        content: You are an assistant that summarizes data.
+                      - type: USER
                         content: |
                           Here is a TOON representation of product data:
                           {{ outputs.to_toon.uri }}
