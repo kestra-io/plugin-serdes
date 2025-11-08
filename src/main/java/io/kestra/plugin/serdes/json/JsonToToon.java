@@ -115,6 +115,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         var rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
         var rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
         var tempFile = runContext.workingDir().createTempFile(".toon").toFile();
+
         var mapper = JacksonMapper.ofJson();
         var factory = mapper.getFactory();
         long count = 0;

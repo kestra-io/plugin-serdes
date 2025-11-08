@@ -1,7 +1,10 @@
 package io.kestra.plugin.serdes.json;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.NullNode;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -87,20 +90,21 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        var from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        var rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        var rCharset = runContext.render(this.charset).as(String.class).orElseThrow();
         var tempFile = runContext.workingDir().createTempFile(".json").toFile();
-        var renderedCharset = runContext.render(this.charset).as(String.class).orElseThrow();
 
-        Object result;
         long count;
         try (
-            var reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), Charset.forName(renderedCharset)), FileSerde.BUFFER_SIZE);
-            var writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(renderedCharset)), FileSerde.BUFFER_SIZE)
+            var reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom), Charset.forName(rCharset)), FileSerde.BUFFER_SIZE);
+            var writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(rCharset)), FileSerde.BUFFER_SIZE)
         ) {
             var parser = new ToonParser(reader);
-            result = parser.parse();
+            var result = parser.parse();
             count = parser.getCount();
-            MAPPER.writeValue(writer, result);
+
+            var node = toJsonNode(result);
+            MAPPER.writerWithDefaultPrettyPrinter().writeValue(writer, node);
         }
 
         runContext.metric(Counter.of("records", count));
@@ -108,6 +112,35 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
         return Output.builder()
             .uri(runContext.storage().putFile(tempFile))
             .build();
+    }
+
+    private static JsonNode toJsonNode(Object value) {
+        var f = JsonNodeFactory.instance;
+
+        switch (value) {
+            case null -> {
+                return NullNode.instance;
+            }
+            case Map<?, ?> map -> {
+                var obj = f.objectNode();
+                for (var e : map.entrySet()) {
+                    String k = String.valueOf(e.getKey());
+                    obj.set(k, toJsonNode(e.getValue()));
+                }
+                return obj;
+            }
+            case Iterable<?> it -> {
+                var arr = f.arrayNode();
+                for (Object v : it) {
+                    arr.add(toJsonNode(v));
+                }
+                return arr;
+            }
+            default -> {
+            }
+        }
+
+        return MAPPER.valueToTree(value);
     }
 
     @Builder
@@ -149,10 +182,6 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
                 var currentIndent = countIndent(line);
                 if (currentIndent < indent) break;
-                if (currentIndent > indent) {
-                    index++;
-                    continue;
-                }
 
                 if (line.isBlank()) {
                     index++;
@@ -278,12 +307,14 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             if (s.matches("^-?\\d+$")) {
                 try {
                     return Long.parseLong(s);
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException ignored) {
+                }
             }
             if (s.matches("^-?\\d*\\.\\d+$")) {
                 try {
                     return Double.parseDouble(s);
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException ignored) {
+                }
             }
             return s;
         }
