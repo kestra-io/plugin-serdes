@@ -34,7 +34,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
-class JsonWriterToIonTest {
+class JsonToIonTest {
     private static ObjectMapper mapper = new ObjectMapper();
 
     @Inject
