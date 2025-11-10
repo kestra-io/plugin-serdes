@@ -116,14 +116,14 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
         description = "Can be one of: `FAIL`, `WARN` or `SKIP`."
     )
-    private final OnBadLines onBadLines = OnBadLines.ERROR;
+    private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader
-        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-        OnBadLines onBadLinesValue = this.onBadLines;
+        OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
 
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
@@ -132,7 +132,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         var schemaParser = new Schema.Parser();
         Schema schema = null;
         if (this.schema == null) {
-            var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from));
+            var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(rFrom));
             var schemaOutputStream = new ByteArrayOutputStream();
             new InferAvroSchema().inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
             schema = schemaParser.parse(schemaOutputStream.toString());
@@ -150,7 +150,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
 
         try (
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom)), FileSerde.BUFFER_SIZE);
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE);
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
@@ -159,9 +159,9 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
                 try {
                     dataFileWriter.append(record);
                 } catch (Exception e) {
-                    if (onBadLinesValue == OnBadLines.ERROR) {
+                    if (rOnBadLinesValue == OnBadLines.ERROR) {
                         throw e;
-                    } else if (onBadLinesValue == OnBadLines.WARN) {
+                    } else if (rOnBadLinesValue == OnBadLines.WARN) {
                         runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", e.getMessage());
                         return;
                     }

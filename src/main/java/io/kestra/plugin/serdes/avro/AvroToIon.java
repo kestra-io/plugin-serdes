@@ -78,14 +78,14 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
-        OnBadLines onBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
+        URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
 
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
 
         try (
-            InputStream in = runContext.storage().getFile(from);
+            InputStream in = runContext.storage().getFile(rFrom);
             DataFileStream<GenericRecord> dataFileStream = new DataFileStream<>(in, datumReader);
             BufferedWriter output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
         ) {
@@ -94,14 +94,14 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
            Flux<GenericRecord> flowable = Flux
     .create(
         throwConsumer((FluxSink<GenericRecord> s) ->
-            nextRow(dataFileStream, avroSchema, onBadLinesValue, runContext, s)
+            nextRow(dataFileStream, avroSchema, rOnBadLinesValue, runContext, s)
         ),
         FluxSink.OverflowStrategy.BUFFER
     )
     .onErrorResume(Exception.class, e -> {
-        if (onBadLinesValue == OnBadLines.ERROR) {
+        if (rOnBadLinesValue == OnBadLines.ERROR) {
             return Flux.error(new IllegalCellConversion("Bad Avro record encountered: " + e.getMessage(), e));
-        } else if (onBadLinesValue == OnBadLines.WARN) {
+        } else if (rOnBadLinesValue == OnBadLines.WARN) {
             runContext.logger().warn("Bad Avro record encountered (skipped): {}", e.getMessage());
         }
         return Flux.<GenericRecord>empty();
@@ -111,9 +111,9 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
                 try {
                     return AvroDeserializer.recordDeserializer(record);
                 } catch (Exception e) {
-                    if (onBadLinesValue == OnBadLines.ERROR) {
+                    if (rOnBadLinesValue == OnBadLines.ERROR) {
                         throw new IllegalCellConversion("Deserialization error for record: " + e.getMessage(), e);
-                    } else if (onBadLinesValue == OnBadLines.WARN) {
+                    } else if (rOnBadLinesValue == OnBadLines.WARN) {
                         runContext.logger().warn("Deserialization error (skipped): {}", e.getMessage());
                     }
                     return null;
@@ -178,9 +178,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         }
         sink.complete();
     }
-
     private void validateFieldType(Object value, org.apache.avro.Schema fieldSchema, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
-        //if (value == null && fieldSchema.isNullable()) return;
         if (value == null) {
             if (isNullable(fieldSchema)) {
                 return; // safe
@@ -193,169 +191,212 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
                 throw new IllegalCellConversion("Null value for non-nullable field '" + fieldName + "'");
             }
         }
+
         org.apache.avro.Schema.Type type = fieldSchema.getType();
         switch (type) {
             case INT:
-                if (value instanceof String) {
-                    try {
-                        Integer.parseInt((String) value);
-                    } catch (NumberFormatException e) {
-                        throw new IllegalCellConversion("Invalid INT value for field '" + fieldName + "': " + value);
-                    }
-                } else if (!(value instanceof Integer)) {
-                    throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected INT, got " + value.getClass().getSimpleName());
-                }
+                validateInt(value, fieldName, onBadLinesValue, runContext);
                 break;
             case LONG:
-                if (value instanceof String) {
-                    try {
-                        Long.parseLong((String) value);
-                    } catch (NumberFormatException e) {
-                        throw new IllegalCellConversion("Invalid LONG value for field '" + fieldName + "': " + value);
-                    }
-                } else if (!(value instanceof Long)) {
-                    throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected LONG, got " + value.getClass().getSimpleName());
-                }
+                validateLong(value, fieldName, onBadLinesValue, runContext);
                 break;
             case FLOAT:
-                if (value instanceof String) {
-                    try {
-                        Float.parseFloat((String) value);
-                    } catch (NumberFormatException e) {
-                        throw new IllegalCellConversion("Invalid FLOAT value for field '" + fieldName + "': " + value);
-                    }
-                } else if (!(value instanceof Float)) {
-                    throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected FLOAT, got " + value.getClass().getSimpleName());
-                }
+                validateFloat(value, fieldName, onBadLinesValue, runContext);
                 break;
             case DOUBLE:
-                if (value instanceof String) {
-                    try {
-                        Double.parseDouble((String) value);
-                    } catch (NumberFormatException e) {
-                        throw new IllegalCellConversion("Invalid DOUBLE value for field '" + fieldName + "': " + value);
-                    }
-                } else if (!(value instanceof Double)) {
-                    throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected DOUBLE, got " + value.getClass().getSimpleName());
-                }
+                validateDouble(value, fieldName, onBadLinesValue, runContext);
                 break;
             case STRING:
-                if (value instanceof String || value instanceof org.apache.avro.util.Utf8) {
-                    // Convert Utf8 to String for consistency
-                    if (value instanceof org.apache.avro.util.Utf8) {
-                        value = value.toString();
-                    }
-                } else {
-                    String message = "Invalid type for field '" + fieldName + "': expected STRING, got " + (value != null ? value.getClass().getSimpleName() : "null");
-                    if (onBadLinesValue == OnBadLines.ERROR) {
-                        throw new IllegalCellConversion(message);
-                    } else if (onBadLinesValue == OnBadLines.WARN) {
-                        runContext.logger().warn(message);
-                    }
-                    return; // SKIP or WARN: continue
-                }
+                validateString(value, fieldName, onBadLinesValue, runContext);
                 break;
             case BOOLEAN:
-                if (value instanceof String) {
-                    try {
-                        Boolean.parseBoolean((String) value);
-                    } catch (Exception e) {
-                        throw new IllegalCellConversion("Invalid BOOLEAN value for field '" + fieldName + "': " + value);
-                    }
-                } else if (!(value instanceof Boolean)) {
-                    throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected BOOLEAN, got " + value.getClass().getSimpleName());
-                }
+                validateBoolean(value, fieldName, onBadLinesValue, runContext);
                 break;
             case UNION:
-                boolean valid = false;
-                for (org.apache.avro.Schema unionType : fieldSchema.getTypes()) {
-                    try {
-                        validateFieldType(value, unionType, fieldName, onBadLinesValue, runContext);
-                        valid = true;
-                        break;
-                    } catch (IllegalCellConversion ignored) {
-                    }
-                }
-                if (!valid) {
-                    throw new IllegalCellConversion("No matching union type for field '" + fieldName + "': value " + value);
-                }
+                validateUnion(value, fieldSchema, fieldName, onBadLinesValue, runContext);
                 break;
             case ARRAY:
-                if (!(value instanceof Collection)) {
-                    String message = "Invalid type for field '" + fieldName + "': expected ARRAY, got " + value.getClass().getSimpleName();
-                    if (onBadLinesValue == OnBadLines.ERROR) {
-                        throw new IllegalCellConversion(message);
-                    } else if (onBadLinesValue == OnBadLines.WARN) {
-                        runContext.logger().warn(message);
-                    }
-                    return;  // Skip validation for this field
-                }
-                Collection<?> arrayValue = (Collection<?>) value;
-                org.apache.avro.Schema elementSchema = fieldSchema.getElementType();
-                int index = 0;
-                for (Object item : arrayValue) {
-                    validateFieldType(item, elementSchema, fieldName + "[" + index + "]", onBadLinesValue, runContext);
-                    index++;
-                }
+                validateArray(value, fieldSchema, fieldName, onBadLinesValue, runContext);
                 break;
-
             case MAP:
-                if (!(value instanceof Map)) {
-                    String message = "Invalid type for field '" + fieldName + "': expected MAP, got " + value.getClass().getSimpleName();
-                    if (onBadLinesValue == OnBadLines.ERROR) {
-                        throw new IllegalCellConversion(message);
-                    } else if (onBadLinesValue == OnBadLines.WARN) {
-                        runContext.logger().warn(message);
-                    }
-                    return;
-                }
-                @SuppressWarnings("unchecked")
-                Map<Object, Object> mapValue = (Map<Object, Object>) value;
-                org.apache.avro.Schema valueSchema = fieldSchema.getValueType();
-                for (Map.Entry<Object, Object> entry : mapValue.entrySet()) {
-                    if (!(entry.getKey() instanceof CharSequence)) {
-                        String message = "Invalid key type for map field '" + fieldName + "': expected STRING, got " + entry.getKey().getClass().getSimpleName();
-                        if (onBadLinesValue == OnBadLines.ERROR) {
-                            throw new IllegalCellConversion(message);
-                        } else if (onBadLinesValue == OnBadLines.WARN) {
-                            runContext.logger().warn(message);
-                        }
-                        return;
-                    }
-                    validateFieldType(entry.getValue(), valueSchema, fieldName + "[" + entry.getKey() + "]", onBadLinesValue, runContext);
-                }
+                validateMap(value, fieldSchema, fieldName, onBadLinesValue, runContext);
                 break;
-
             case RECORD:
-                if (!(value instanceof GenericRecord)) {
-                    String message = "Invalid type for field '" + fieldName + "': expected RECORD, got " + value.getClass().getSimpleName();
-                    if (onBadLinesValue == OnBadLines.ERROR) {
-                        throw new IllegalCellConversion(message);
-                    } else if (onBadLinesValue == OnBadLines.WARN) {
-                        runContext.logger().warn(message);
-                    }
-                    return;
-                }
-                GenericRecord recordValue = (GenericRecord) value;
-                for (org.apache.avro.Schema.Field subField : fieldSchema.getFields()) {
-                    Object subValue = recordValue.get(subField.name());
-                    validateFieldType(subValue, subField.schema(), fieldName + "." + subField.name(), onBadLinesValue, runContext);
-                }
+                validateRecord(value, fieldSchema, fieldName, onBadLinesValue, runContext);
                 break;
             case NULL:
-                if (value != null) {
-                    String message = "Non-null value for null-typed field '" + fieldName + "': " + value.getClass().getSimpleName();
-                    if (onBadLinesValue == OnBadLines.ERROR) {
-                        throw new IllegalCellConversion(message);
-                    } else if (onBadLinesValue == OnBadLines.WARN) {
-                        runContext.logger().warn(message);
-                    }
-                    // For SKIP or WARN, continue (effectively ignore the invalid value)
-                }
+                validateNull(value, fieldName, onBadLinesValue, runContext);
                 break;
-                //throw new UnsupportedOperationException("Complex type validation not implemented: " + type);
             default:
                 throw new IllegalCellConversion("Unsupported Avro type for field '" + fieldName + "': " + type);
+        }
+    }
+
+    private void validateInt(Object value, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (value instanceof String) {
+            try {
+                Integer.parseInt((String) value);
+            } catch (NumberFormatException e) {
+                throw new IllegalCellConversion("Invalid INT value for field '" + fieldName + "': " + value);
+            }
+        } else if (!(value instanceof Integer)) {
+            throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected INT, got " + value.getClass().getSimpleName());
+        }
+    }
+
+    private void validateLong(Object value, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (value instanceof String) {
+            try {
+                Long.parseLong((String) value);
+            } catch (NumberFormatException e) {
+                throw new IllegalCellConversion("Invalid LONG value for field '" + fieldName + "': " + value);
+            }
+        } else if (!(value instanceof Long)) {
+            throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected LONG, got " + value.getClass().getSimpleName());
+        }
+    }
+
+    private void validateFloat(Object value, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (value instanceof String) {
+            try {
+                Float.parseFloat((String) value);
+            } catch (NumberFormatException e) {
+                throw new IllegalCellConversion("Invalid FLOAT value for field '" + fieldName + "': " + value);
+            }
+        } else if (!(value instanceof Float)) {
+            throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected FLOAT, got " + value.getClass().getSimpleName());
+        }
+    }
+
+    private void validateDouble(Object value, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (value instanceof String) {
+            try {
+                Double.parseDouble((String) value);
+            } catch (NumberFormatException e) {
+                throw new IllegalCellConversion("Invalid DOUBLE value for field '" + fieldName + "': " + value);
+            }
+        } else if (!(value instanceof Double)) {
+            throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected DOUBLE, got " + value.getClass().getSimpleName());
+        }
+    }
+
+    private void validateString(Object value, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (value instanceof String || value instanceof org.apache.avro.util.Utf8) {
+            // Convert Utf8 to String for consistency
+            if (value instanceof org.apache.avro.util.Utf8) {
+                value = value.toString();
+            }
+        } else {
+            String message = "Invalid type for field '" + fieldName + "': expected STRING, got " + (value != null ? value.getClass().getSimpleName() : "null");
+            if (onBadLinesValue == OnBadLines.ERROR) {
+                throw new IllegalCellConversion(message);
+            } else if (onBadLinesValue == OnBadLines.WARN) {
+                runContext.logger().warn(message);
+            }
+            return; // SKIP or WARN: continue
+        }
+    }
+
+    private void validateBoolean(Object value, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (value instanceof String) {
+            try {
+                Boolean.parseBoolean((String) value);
+            } catch (Exception e) {
+                throw new IllegalCellConversion("Invalid BOOLEAN value for field '" + fieldName + "': " + value);
+            }
+        } else if (!(value instanceof Boolean)) {
+            throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected BOOLEAN, got " + value.getClass().getSimpleName());
+        }
+    }
+
+    private void validateUnion(Object value, org.apache.avro.Schema fieldSchema, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        boolean valid = false;
+        for (org.apache.avro.Schema unionType : fieldSchema.getTypes()) {
+            try {
+                validateFieldType(value, unionType, fieldName, onBadLinesValue, runContext);
+                valid = true;
+                break;
+            } catch (IllegalCellConversion ignored) {
+                // Continue to next union type
+            }
+        }
+        if (!valid) {
+            throw new IllegalCellConversion("No matching union type for field '" + fieldName + "': value " + value);
+        }
+    }
+
+    private void validateArray(Object value, org.apache.avro.Schema fieldSchema, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (!(value instanceof Collection)) {
+            String message = "Invalid type for field '" + fieldName + "': expected ARRAY, got " + value.getClass().getSimpleName();
+            if (onBadLinesValue == OnBadLines.ERROR) {
+                throw new IllegalCellConversion(message);
+            } else if (onBadLinesValue == OnBadLines.WARN) {
+                runContext.logger().warn(message);
+            }
+            return; // Skip validation for this field
+        }
+        Collection<?> arrayValue = (Collection<?>) value;
+        org.apache.avro.Schema elementSchema = fieldSchema.getElementType();
+        int index = 0;
+        for (Object item : arrayValue) {
+            validateFieldType(item, elementSchema, fieldName + "[" + index + "]", onBadLinesValue, runContext);
+            index++;
+        }
+    }
+
+    private void validateMap(Object value, org.apache.avro.Schema fieldSchema, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (!(value instanceof Map)) {
+            String message = "Invalid type for field '" + fieldName + "': expected MAP, got " + value.getClass().getSimpleName();
+            if (onBadLinesValue == OnBadLines.ERROR) {
+                throw new IllegalCellConversion(message);
+            } else if (onBadLinesValue == OnBadLines.WARN) {
+                runContext.logger().warn(message);
+            }
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> mapValue = (Map<Object, Object>) value;
+        org.apache.avro.Schema valueSchema = fieldSchema.getValueType();
+        for (Map.Entry<Object, Object> entry : mapValue.entrySet()) {
+            if (!(entry.getKey() instanceof CharSequence)) {
+                String message = "Invalid key type for map field '" + fieldName + "': expected STRING, got " + entry.getKey().getClass().getSimpleName();
+                if (onBadLinesValue == OnBadLines.ERROR) {
+                    throw new IllegalCellConversion(message);
+                } else if (onBadLinesValue == OnBadLines.WARN) {
+                    runContext.logger().warn(message);
+                }
+                return;
+            }
+            validateFieldType(entry.getValue(), valueSchema, fieldName + "[" + entry.getKey() + "]", onBadLinesValue, runContext);
+        }
+    }
+
+    private void validateRecord(Object value, org.apache.avro.Schema fieldSchema, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (!(value instanceof GenericRecord)) {
+            String message = "Invalid type for field '" + fieldName + "': expected RECORD, got " + value.getClass().getSimpleName();
+            if (onBadLinesValue == OnBadLines.ERROR) {
+                throw new IllegalCellConversion(message);
+            } else if (onBadLinesValue == OnBadLines.WARN) {
+                runContext.logger().warn(message);
+            }
+            return;
+        }
+        GenericRecord recordValue = (GenericRecord) value;
+        for (org.apache.avro.Schema.Field subField : fieldSchema.getFields()) {
+            Object subValue = recordValue.get(subField.name());
+            validateFieldType(subValue, subField.schema(), fieldName + "." + subField.name(), onBadLinesValue, runContext);
+        }
+    }
+
+    private void validateNull(Object value, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
+        if (value != null) {
+            String message = "Non-null value for null-typed field '" + fieldName + "': " + value.getClass().getSimpleName();
+            if (onBadLinesValue == OnBadLines.ERROR) {
+                throw new IllegalCellConversion(message);
+            } else if (onBadLinesValue == OnBadLines.WARN) {
+                runContext.logger().warn(message);
+            }
+            // For SKIP or WARN, continue (effectively ignore the invalid value)
         }
     }
 

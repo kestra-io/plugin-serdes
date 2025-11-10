@@ -127,47 +127,51 @@ public class AvroConverter {
     }
 
     public GenericData.Record fromMap(Schema schema, Map<String, Object> data, OnBadLines onBadLines, String parentFieldName) throws IllegalRowConvertion, IllegalStrictRowConversion {
-        GenericData.Record record = new GenericData.Record(schema);
 
-        for (Schema.Field field : schema.getFields()) {
-            String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
-            try {
-                record.put(field.name(), convert(field.schema(), getValueFromNameOrAliases(field, data), onBadLines, currentFieldName));
-            } catch (IllegalCellConversion e) {
-                if (onBadLines == OnBadLines.ERROR) {
-                    throw new IllegalRowConvertion(data, e, field);
-                } else if (onBadLines == OnBadLines.WARN) {
-                    // Log warning and continue (set to null if schema allows)
-                    System.err.println("WARN: " + e.getMessage()); // Replace with runContext.logger().warn if available
-                    record.put(field.name(), null);
-                } else if (onBadLines == OnBadLines.SKIP) {
-                    record.put(field.name(), null);
-                }
-            } catch (Exception e) {
-                // Generic catch for other exceptions during field processing
-                if (onBadLines == OnBadLines.ERROR) {
-                    throw new IllegalRowConvertion(data, e, field);
-                } else if (onBadLines == OnBadLines.WARN) {
-                    System.err.println("WARN: Conversion error for field '" + field.name() + "': " + e.getMessage());
-                    record.put(field.name(), null);
-                } else {
-                    record.put(field.name(), null);
-                }
+    GenericData.Record record = new GenericData.Record(schema);
+
+    for (Schema.Field field : schema.getFields()) {
+        String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
+        try {
+            record.put(field.name(), convert(field.schema(), getValueFromNameOrAliases(field, data), onBadLines, currentFieldName));
+        } catch (IllegalCellConversion e) {
+            if (onBadLines == OnBadLines.ERROR) {
+                throw new IllegalRowConvertion(data, e, field);
+            } else if (onBadLines == OnBadLines.WARN) {
+                System.err.println("WARN: " + e.getMessage());
+                record.put(field.name(), null);
+            } else if (onBadLines == OnBadLines.SKIP) {
+                record.put(field.name(), null);
+            }
+        } catch (Exception e) {
+            if (onBadLines == OnBadLines.ERROR) {
+                throw new IllegalRowConvertion(data, e, field);
+            } else if (onBadLines == OnBadLines.WARN) {
+                System.err.println("WARN: Conversion error for field '" + field.name() + "': " + e.getMessage());
+                record.put(field.name(), null);
+            } else {
+                record.put(field.name(), null);
             }
         }
-
-        if (this.getStrictSchema() && schema.getFields().size() < data.size()) {
-            throw new IllegalStrictRowConversion(schema, schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList()), data.values());
-        }
-
-        return record;
     }
 
-    public GenericData.Record fromArray(Schema schema, List<String> data, OnBadLines onBadLines) throws IllegalRowConvertion, IllegalStrictRowConversion {
+    if (this.getStrictSchema() && schema.getFields().size() < data.size()) {
+        String message = "Data contains more fields than schema: expected " + schema.getFields().size() + ", got " + data.size();
+        if (onBadLines == OnBadLines.ERROR) {
+            throw new IllegalStrictRowConversion(schema, schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList()), data.values());
+        } else if (onBadLines == OnBadLines.WARN) {
+            System.err.println("WARN: " + message);
+        }
+    }
+
+    return record;
+    }
+    public GenericData.Record fromArray(Schema schema, List<? extends Object> data, OnBadLines onBadLines) throws IllegalRowConvertion, IllegalStrictRowConversion {
         HashMap<String, Object> map = new HashMap<>();
         int index = 0;
         for (Schema.Field field : schema.getFields()) {
-            map.put(field.name(), data.size() > index ? data.get(index) : null);
+            Object value = (data.size() > index) ? data.get(index) : null;
+            map.put(field.name(), value);
             index++;
         }
 
@@ -176,26 +180,16 @@ public class AvroConverter {
             if (onBadLines == OnBadLines.ERROR) {
                 throw new IllegalStrictRowConversion(schema, map.keySet(), data);
             } else if (onBadLines == OnBadLines.WARN) {
-                System.err.println("WARN: Data contains more fields than schema");
-                return null;
-            } else if (onBadLines == OnBadLines.SKIP) {
-                return null;
+                System.err.println("WARN: " + message);
             }
         }
 
-        return this.fromMap(schema, map, onBadLines, null); // Pass null as top-level parentFieldName
+        return this.fromMap(schema, map, onBadLines, null);
     }
 
     @SuppressWarnings("unchecked")
     protected Object convert(Schema schema, Object data, OnBadLines onBadLines, String fieldName) throws IllegalCellConversion {
 
-
-        /*if (data == null) {
-            if (schema.getType() != Schema.Type.NULL && !(schema.getType() == Schema.Type.UNION && schema.getTypes().stream().anyMatch(s -> s.getType() == Schema.Type.NULL))) {
-                throw new IllegalCellConversion(schema, null, new IllegalArgumentException("Null value for non-nullable field '" + fieldName + "'"));
-            }
-            return null;
-        }*/
         try {
             if (this.getInferAllFields()) {
                 if (data instanceof String && this.contains(this.getNullValues(), (String) data)) {
