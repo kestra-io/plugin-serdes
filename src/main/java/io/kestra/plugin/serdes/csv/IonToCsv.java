@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.csv;
 
+import de.siegmar.fastcsv.writer.CsvWriter;
 import de.siegmar.fastcsv.writer.LineDelimiter;
 import de.siegmar.fastcsv.writer.QuoteStrategies;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
@@ -127,18 +128,18 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         File tempFile = runContext.workingDir().createTempFile(".csv").toFile();
 
         // reader
-        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // formatter
         this.init(runContext);
 
         try (
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom)), FileSerde.BUFFER_SIZE);
             Writer fileWriter = new BufferedWriter(new FileWriter(tempFile, Charset.forName(runContext.render(this.charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
-            de.siegmar.fastcsv.writer.CsvWriter csvWriter = this.csvWriter(fileWriter, runContext)
+            CsvWriter csvWriter = this.csvWriter(fileWriter, runContext)
         ) {
 
-            var headerValue = runContext.render(header).as(Boolean.class).orElseThrow();
+            var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
             Flux<Object> flowable = FileSerde.readAll(inputStream)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
@@ -149,7 +150,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
                         if (row instanceof List) {
                             List<Object> casted = (List<Object>) row;
 
-                            if (headerValue) {
+                            if (rHeaderValue) {
                                 throw new IllegalArgumentException("Invalid data of type List with header");
                             }
 
@@ -160,7 +161,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
 
                             if (!first) {
                                 this.first = true;
-                                if (headerValue) {
+                                if (rHeaderValue) {
                                     var record = casted.keySet().stream().map(field -> convert(field)).toList();
                                     csvWriter.writeRecord(record);
                                 }
@@ -193,8 +194,8 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         private URI uri;
     }
 
-    private de.siegmar.fastcsv.writer.CsvWriter csvWriter(Writer writer, RunContext runContext) throws IllegalVariableEvaluationException {
-        var builder = de.siegmar.fastcsv.writer.CsvWriter.builder();
+    private CsvWriter csvWriter(Writer writer, RunContext runContext) throws IllegalVariableEvaluationException {
+        var builder = CsvWriter.builder();
 
         runContext.render(this.textDelimiter).as(Character.class)
             .ifPresent(builder::quoteCharacter);
