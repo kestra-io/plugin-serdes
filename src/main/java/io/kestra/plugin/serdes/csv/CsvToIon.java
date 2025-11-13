@@ -1,6 +1,8 @@
 package io.kestra.plugin.serdes.csv;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.siegmar.fastcsv.reader.CsvParseException;
+import de.siegmar.fastcsv.reader.CsvReader;
 import de.siegmar.fastcsv.reader.CsvRecord;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -27,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import io.kestra.plugin.serdes.OnBadLines;
 
 @SuperBuilder
 @ToString
@@ -98,8 +101,15 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Builder.Default
     @Schema(
         title = "Specifies if an exception should be thrown, if CSV data contains different field count"
-    )
+        )
+    @Deprecated
     private final Property<Boolean> errorOnDifferentFieldCount = Property.ofValue(false);
+
+    @Builder.Default
+    @Schema(
+        title = "How to handle bad lines (e.g., a line with too many fields)."
+    )
+    private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
     @Builder.Default
     @Schema(
@@ -128,7 +138,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader
-        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
@@ -139,58 +149,85 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         try (
             Reader reader = new BufferedReader(
                 new InputStreamReader(
-                    runContext.storage().getFile(from),
+                    runContext.storage().getFile(rFrom),
                     runContext.render(charset).as(String.class).orElseThrow()
                 ),
                 FileSerde.BUFFER_SIZE);
-            de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader = this.csvReader(reader, runContext);
+            CsvReader<CsvRecord> csvReader = this.csvReader(reader, runContext);
             Writer output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
         ) {
-            var headerValue = runContext.render(header).as(Boolean.class).orElseThrow();
-            var skipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
+            var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
+            var rSkipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
             Map<Integer, String> headers = new TreeMap<>();
+            OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
+
             Flux<Object> flowable = Flux
                 .fromIterable(csvReader)
+                .onErrorResume(CsvParseException.class, e -> {
+                    if (rOnBadLinesValue == OnBadLines.ERROR) {
+                        return Flux.error(e);
+                    } else if (rOnBadLinesValue == OnBadLines.WARN) {
+                        runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
+                    } else if (rOnBadLinesValue == OnBadLines.SKIP) {
+                        // silently skip
+                    }
+                    return Flux.empty();
+                })
                 .filter(csvRecord -> {
-                    if (headerValue && csvRecord.getStartingLineNumber() == 1) {
+                    if (rHeaderValue && csvRecord.getStartingLineNumber() == 1) {
                         for (int i = 0; i < csvRecord.getFieldCount(); i++) {
                             headers.put(i, csvRecord.getField(i));
                         }
                         return false;
                     }
-                    if (skipRowsValue > 0 && skipped.get() < skipRowsValue) {
+                    if (rSkipRowsValue > 0 && skipped.get() < rSkipRowsValue) {
                         skipped.incrementAndGet();
                         return false;
                     }
-
                     return true;
                 })
-                .map(r -> {
-                    if (headerValue) {
-                        Map<String, Object> fields = new LinkedHashMap<>();
-                        for (Map.Entry<Integer, String> header : headers.entrySet()) {
-                            int fieldIndex = header.getKey();
-                            String fieldValue;
 
-                            if (fieldIndex < r.getFieldCount()) {
-                                fieldValue = r.getField(fieldIndex);
-                                // Convert IMDB's \N null values to actual nulls
-                                if ("\\N".equals(fieldValue)) {
-                                    fieldValue = null;
-                                }
-                            } else {
-                                // Field doesn't exist in this record, set to null
+                .flatMap(r -> {
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    if (rHeaderValue) {
+                        if (r.getStartingLineNumber() == 1) {
+                            for (int i = 0; i < r.getFieldCount(); i++) {
+                                headers.put(i, r.getField(i));
+                            }
+                            return Mono.empty();
+                        }
+                        if (r.getFieldCount() != headers.size()) {
+                            String message = "Bad line encountered (field count mismatch): Expected "
+                                + headers.size() + ", got " + r.getFieldCount() + " fields.";
+                            if (rOnBadLinesValue == OnBadLines.ERROR) {
+                                return Mono.error(new RuntimeException(message));
+                            } else if (rOnBadLinesValue == OnBadLines.WARN) {
+                                runContext.logger().warn(message);
+                            }
+                            return Mono.empty();
+                        }
+                        for (Map.Entry<Integer, String> header : headers.entrySet()) {
+                            int i = header.getKey();
+                            String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
+                            if ("\\N".equals(fieldValue)) {
                                 fieldValue = null;
                             }
-
                             fields.put(header.getValue(), fieldValue);
                         }
-                        return fields;
+                    } else {
+                        // No-header: Use positional column names
+                        for (int i = 0; i < r.getFieldCount(); i++) {
+                            String fieldValue = r.getField(i);
+                            if ("\\N".equals(fieldValue)) {
+                                fieldValue = null;
+                            }
+                            fields.put("col" + i, fieldValue);
+                        }
                     }
-                    return r.getFields();
+                    return Mono.just(fields);
                 });
 
-            Mono<Long> count = FileSerde.writeAll(output, flowable);
+           Mono<Long> count = FileSerde.writeAll(output, flowable);
 
             // metrics & finalize
             Long lineCount = count.block();
@@ -214,8 +251,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         private URI uri;
     }
 
-    private de.siegmar.fastcsv.reader.CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {
-        var builder = de.siegmar.fastcsv.reader.CsvReader.builder();
+    private CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {
+        var builder = CsvReader.builder();
 
         runContext.render(textDelimiter).as(Character.class)
             .ifPresent(builder::quoteCharacter);
@@ -226,12 +263,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         runContext.render(skipEmptyRows).as(Boolean.class)
             .ifPresent(builder::skipEmptyLines);
 
+        builder.allowMissingFields(true);
+        builder.allowExtraFields(true);
 
-        runContext.render(errorOnDifferentFieldCount).as(Boolean.class)
-            .ifPresent(b -> {
-                builder.allowMissingFields(!b);
-                builder.allowExtraFields(!b);
-            });
+
 
         runContext.render(allowExtraCharsAfterClosingQuote).as(Boolean.class)
             .ifPresent(builder::allowExtraCharsAfterClosingQuote);
