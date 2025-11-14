@@ -1,0 +1,48 @@
+id: kestra-protobuf-pipeline
+namespace: sanitychecks.plugin-serdes
+
+tasks:
+  - id: create_descriptor
+    type: io.kestra.plugin.scripts.shell.Script
+    containerImage: jaegertracing/protobuf:latest
+    inputFiles:
+      tutorial.proto: |
+        syntax = "proto3";
+
+        package tutorial;
+
+        message Greeting {
+          string message = 1;
+          int32 id = 2;
+        }
+    outputFiles:
+      - tutorial.descriptor.pb
+      - tutorial_pb2.py
+    script: |
+      set -e
+      protoc --descriptor_set_out=tutorial.descriptor.pb  -I. tutorial.proto
+      protoc --python_out=. -I. tutorial.proto
+
+  - id: create_message
+    type: io.kestra.plugin.scripts.python.Script
+    dependencies:
+      - protobuf==3.19.6
+    inputFiles:
+      tutorial_pb2.py: "{{ outputs.create_descriptor.outputFiles['tutorial_pb2.py'] }}"
+    outputFiles:
+      - greeting.bin
+    script: |
+      import tutorial_pb2
+
+      greeting = tutorial_pb2.Greeting()
+      greeting.message = "Hello from Kestra!"
+      greeting.id = 42
+
+      with open("greeting.bin", "wb") as f:
+          f.write(greeting.SerializeToString())
+
+  - id: convert_to_ion
+    type: io.kestra.plugin.serdes.protobuf.ProtobufToIon
+    from: "{{ outputs.create_message.outputFiles['greeting.bin'] }}"
+    descriptorFile: "{{ outputs.create_descriptor.outputFiles['tutorial.descriptor.pb'] }}"
+    typeName: tutorial.Greeting

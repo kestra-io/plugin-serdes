@@ -58,6 +58,10 @@ dependencies {
     compileOnly 'org.slf4j:slf4j-api'
     compileOnly 'ch.qos.logback:logback-classic'
 
+    // Protobuf
+    implementation "com.google.protobuf:protobuf-java:3.25.3"
+    implementation "com.google.protobuf:protobuf-java-util:3.25.3"
+
     api 'de.siegmar:fastcsv:4.1.0'
     api ('org.apache.avro:avro:1.12.1') {
         exclude group: 'com.fasterxml.jackson.core'
