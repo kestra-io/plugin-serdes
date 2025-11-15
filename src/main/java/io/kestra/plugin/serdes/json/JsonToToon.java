@@ -1,7 +1,7 @@
 package io.kestra.plugin.serdes.json;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -22,6 +22,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -39,7 +40,7 @@ import java.util.TimeZone;
     description = """
         Converts JSON data to the TOON (Token-Oriented Object Notation) format, a deterministic, indentation-based text format that encodes the JSON data model with explicit structure and minimal quoting.
         TOON is efficient for uniform arrays of objects and supports tabular encoding.
-        See https://github.com/toon-format/spec for the full specification (1.4).
+        See https://github.com/toon-format/spec for the full specification (2.0).
         """
 )
 @Plugin(
@@ -98,6 +99,9 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         .setSerializationInclusion(JsonInclude.Include.ALWAYS)
         .setTimeZone(TimeZone.getDefault());
 
+    // Document delimiter is always comma in this implementation (valid TOON 2.0).
+    private static final char DOCUMENT_DELIMITER = ',';
+
     @NotNull
     @Schema(title = "Source file URI")
     @PluginProperty(internalStorageURI = true)
@@ -116,9 +120,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         var rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
         var tempFile = runContext.workingDir().createTempFile(".toon").toFile();
 
-        var mapper = JacksonMapper.ofJson();
-        var factory = mapper.getFactory();
-        long count = 0;
+        long count;
 
         try (
             var inputStream = runContext.storage().getFile(rFrom);
@@ -130,25 +132,26 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
                 new FileWriter(tempFile, Charset.forName(rCharset)),
                 FileSerde.BUFFER_SIZE
             );
-            var parser = factory.createParser(reader)
+            JsonParser parser = OBJECT_MAPPER.getFactory().createParser(reader)
         ) {
-            var token = parser.nextToken();
-            var encoder = new ToonEncoder(writer);
+            // Read full JSON root node (object, array, or primitive).
+            JsonNode root = OBJECT_MAPPER.readTree(parser);
+            if (root == null) {
+                throw new IllegalArgumentException("Invalid JSON: empty input");
+            }
 
-            if (token == JsonToken.START_ARRAY) {
-                while (parser.nextToken() != JsonToken.END_ARRAY) {
-                    JsonNode node = mapper.readTree(parser);
-                    encoder.writeNode(node);
-                    count++;
-                }
-            } else if (token == JsonToken.START_OBJECT) {
-                JsonNode node = mapper.readTree(parser);
-                encoder.writeNode(node);
-                count++;
+            ToonEncoder encoder = new ToonEncoder(writer);
+
+            if (root.isArray()) {
+                encoder.writeRootArray(root);
+                count = root.size();
+            } else if (root.isObject()) {
+                encoder.writeRootObject(root);
+                count = 1;
             } else {
-                throw new IllegalArgumentException(
-                    "Invalid JSON: expected an array or object at root, found " + token
-                );
+                // Primitive root (number, boolean, string, null)
+                encoder.writeRootPrimitive(root);
+                count = 1;
             }
 
             writer.flush();
@@ -168,55 +171,88 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         private final URI uri;
     }
 
+    /**
+     * TOON 2.0 compliant encoder for a JSON data model.
+     *
+     * - Root arrays use headers: [N]: ... or [N]{fields}: ...
+     * - Root objects use regular key: value lines.
+     * - Root primitives use a single primitive line.
+     * - Numbers are emitted in canonical decimal form without exponent.
+     * - Strings follow TOON 2.0 quoting rules.
+     * - Arrays of uniform objects are rendered in tabular form when applicable.
+     * - Mixed arrays are rendered as list arrays with "- " items.
+     * - No trailing newline is written at the end of the document.
+     */
     private static class ToonEncoder {
-        private final Writer writer;
         private static final int INDENT_SIZE = 2;
         private static final String INDENT_UNIT = " ".repeat(INDENT_SIZE);
+
+        private final Writer writer;
+        // Tracks whether we are writing the very first line to avoid trailing newline at EOF.
+        private boolean firstLine = true;
 
         ToonEncoder(Writer writer) {
             this.writer = writer;
         }
 
-        void writeNode(JsonNode node) throws IOException {
-            if (node.isObject()) {
-                writeObject(node, 0);
-            } else if (node.isArray()) {
-                writeArray(node, 0, "root");
-            } else {
-                indent(0);
-                writer.write(quoteIfNeeded(node.asText()));
-                writer.write("\n");
+        /* ---------- Root entry points ---------- */
+
+        void writeRootObject(JsonNode node) throws IOException {
+            if (node.isEmpty()) {
+                // Empty root object => empty document (no lines).
+                return;
             }
+            writeObject(node, 0);
         }
 
+        void writeRootArray(JsonNode array) throws IOException {
+            writeArray(array, 0, null);
+        }
+
+        void writeRootPrimitive(JsonNode node) throws IOException {
+            String value = formatPrimitive(node);
+            writeLine(0, value);
+        }
+
+        /* ---------- Core writing helpers ---------- */
+
         private void writeObject(JsonNode node, int indent) throws IOException {
+            // Object fields are emitted in encounter order.
             for (var entry : node.properties()) {
-                var key = formatKey(entry.getKey());
-                var value = entry.getValue();
+                String key = formatKey(entry.getKey());
+                JsonNode value = entry.getValue();
 
                 if (value.isObject()) {
-                    indent(indent);
-                    writer.write(key + ":\n");
-                    writeObject(value, indent + 1);
+                    // Nested or empty object: "key:" on its own line.
+                    writeLine(indent, key + ":");
+                    if (!value.isEmpty()) {
+                        writeObject(value, indent + 1);
+                    }
                 } else if (value.isArray()) {
+                    // Array field: render as array header + content.
                     writeArray(value, indent, key);
                 } else {
-                    indent(indent);
-                    writer.write(key + ": " + quoteIfNeeded(value.asText()) + "\n");
+                    // Primitive field: "key: value"
+                    String v = formatPrimitive(value);
+                    writeLine(indent, key + ": " + v);
                 }
             }
         }
 
+        /**
+         * Encode an array according to TOON 2.0 rules.
+         *
+         * @param array  the array node
+         * @param indent indentation level
+         * @param key    object key or null for root arrays
+         */
         private void writeArray(JsonNode array, int indent, String key) throws IOException {
-            if (!array.isArray()) {
-                indent(indent);
-                writer.write(key + ": " + quoteIfNeeded(array.asText()) + "\n");
-                return;
-            }
+            int size = array.size();
 
-            if (array.isEmpty()) {
-                indent(indent);
-                writer.write(key + "[0]:\n");
+            // Empty array: key[0]: or [0]:
+            if (size == 0) {
+                String header = headerPrefix(key) + "[" + size + "]:";
+                writeLine(indent, header);
                 return;
             }
 
@@ -224,123 +260,446 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
             boolean allObjects = true;
 
             for (JsonNode item : array) {
-                if (item.isObject() || item.isArray()) allPrimitive = false;
-                if (!item.isObject()) allObjects = false;
+                if (item.isObject() || item.isArray()) {
+                    allPrimitive = false;
+                }
+                if (!item.isObject()) {
+                    allObjects = false;
+                }
             }
 
-            // Inline primitive arrays
+            // Inline primitive arrays (9.1)
             if (allPrimitive) {
-                indent(indent);
-                writer.write(key + "[" + array.size() + "]: ");
-                for (int i = 0; i < array.size(); i++) {
-                    if (i > 0) writer.write(",");
-                    writer.write(quoteIfNeeded(array.get(i).asText()));
-                }
-                writer.write("\n");
+                writePrimitiveArray(array, indent, key);
                 return;
             }
 
-            // Uniform object arrays (tabular)
-            if (allObjects && !array.isEmpty()) {
-                Set<String> fields = new LinkedHashSet<>();
-                array.get(0).properties().forEach(entry -> fields.add(entry.getKey()));
+            // Uniform object arrays (tabular form, 9.3)
+            if (allObjects && isUniformPrimitiveObjectArray(array)) {
+                writeTabularArray(array, indent, key);
+                return;
+            }
 
-                boolean uniform = true;
-                for (JsonNode item : array) {
-                    Set<String> keys = new LinkedHashSet<>();
-                    item.properties().forEach(entry -> keys.add(entry.getKey()));
-                    if (!keys.equals(fields)) {
-                        uniform = false;
-                        break;
-                    }
-                }
+            // Mixed / non-uniform arrays (9.4)
+            writeListArray(array, indent, key);
+        }
 
-                if (uniform) {
-                    indent(indent);
-                    writer.write(key + "[" + array.size() + "]{" + String.join(",", fields) + "}:\n");
-                    for (JsonNode row : array) {
-                        indent(indent + 1);
-                        boolean first = true;
-                        for (String field : fields) {
-                            if (!first) writer.write(",");
-                            JsonNode cell = row.get(field);
-                            writer.write(quoteIfNeeded(cell != null ? cell.asText() : "null"));
-                            first = false;
-                        }
-                        writer.write("\n");
+        private void writePrimitiveArray(JsonNode array, int indent, String key) throws IOException {
+            int size = array.size();
+            StringBuilder line = new StringBuilder();
+            line.append(headerPrefix(key))
+                .append("[")
+                .append(size)
+                .append("]:");
+
+            if (size > 0) {
+                line.append(' ');
+                for (int i = 0; i < size; i++) {
+                    if (i > 0) {
+                        line.append(DOCUMENT_DELIMITER);
                     }
-                    return;
+                    line.append(formatPrimitive(array.get(i)));
                 }
             }
 
-            // Heterogeneous or mixed arrays
-            indent(indent);
-            writer.write(key + "[" + array.size() + "]:\n");
+            writeLine(indent, line.toString());
+        }
+
+        private boolean isUniformPrimitiveObjectArray(JsonNode array) {
+            if (array.size() == 0) {
+                return false;
+            }
+
+            Set<String> fields = new LinkedHashSet<>();
+            array.get(0).properties().forEach(entry -> fields.add(entry.getKey()));
+
+            if (fields.isEmpty()) {
+                return false;
+            }
+
             for (JsonNode item : array) {
-                indent(indent + 1);
-                writer.write("- ");
-                if (item.isObject()) {
-                    if (item.size() == 1 && item.properties().iterator().next().getValue().isValueNode()) {
-                        var entry = item.properties().iterator().next();
-                        writer.write(formatKey(entry.getKey()) + ": " + quoteIfNeeded(entry.getValue().asText()) + "\n");
-                    } else {
-                        writer.write("\n");
-                        writeObject(item, indent + 2);
+                Set<String> keys = new LinkedHashSet<>();
+                item.properties().forEach(entry -> keys.add(entry.getKey()));
+                if (!keys.equals(fields)) {
+                    return false;
+                }
+                // All values must be primitives
+                for (var entry : item.properties()) {
+                    if (entry.getValue().isObject() || entry.getValue().isArray()) {
+                        return false;
                     }
+                }
+            }
+
+            return true;
+        }
+
+        private void writeTabularArray(JsonNode array, int indent, String key) throws IOException {
+            int size = array.size();
+
+            // Collect ordered field names from first object
+            Set<String> fields = new LinkedHashSet<>();
+            array.get(0).properties().forEach(entry -> fields.add(entry.getKey()));
+
+            StringBuilder header = new StringBuilder();
+            header.append(headerPrefix(key))
+                .append("[")
+                .append(size)
+                .append("]{");
+
+            boolean first = true;
+            for (String field : fields) {
+                if (!first) {
+                    header.append(DOCUMENT_DELIMITER);
+                }
+                header.append(formatKey(field));
+                first = false;
+            }
+            header.append("}:");
+
+            writeLine(indent, header.toString());
+
+            // Rows at depth +1
+            for (JsonNode row : array) {
+                StringBuilder rowLine = new StringBuilder();
+                boolean firstCell = true;
+                for (String field : fields) {
+                    if (!firstCell) {
+                        rowLine.append(DOCUMENT_DELIMITER);
+                    }
+                    JsonNode cell = row.get(field);
+                    rowLine.append(formatPrimitive(cell == null ? nullNode() : cell));
+                    firstCell = false;
+                }
+                writeLine(indent + 1, rowLine.toString());
+            }
+        }
+
+        private void writeListArray(JsonNode array, int indent, String key) throws IOException {
+            int size = array.size();
+
+            // Header: key[N]: or [N]:
+            String header = headerPrefix(key) + "[" + size + "]:";
+            writeLine(indent, header);
+
+            // Each element rendered as a list item (9.4, 10)
+            for (JsonNode item : array) {
+                if (item.isObject()) {
+                    writeListObjectItem(item, indent);
+                } else if (item.isArray()) {
+                    writeListArrayItem(item, indent);
                 } else {
-                    writer.write(quoteIfNeeded(item.asText()) + "\n");
+                    // Primitive item: "- value"
+                    String v = formatPrimitive(item);
+                    writeLine(indent + 1, "- " + v);
                 }
             }
         }
 
-        private void indent(int level) throws IOException {
-            writer.write(INDENT_UNIT.repeat(level));
+        /**
+         * Encode an object as a list item ("- ...") according to §10.
+         */
+        private void writeListObjectItem(JsonNode obj, int indent) throws IOException {
+            var fieldsIter = obj.properties().iterator();
+
+            if (!fieldsIter.hasNext()) {
+                // Empty object list item: a single "-" at list-item depth.
+                writeLine(indent + 1, "-");
+                return;
+            }
+
+            var first = fieldsIter.next();
+            String firstKey = formatKey(first.getKey());
+            JsonNode firstValue = first.getValue();
+
+            if (firstValue.isObject()) {
+                // Nested object as first field: "- key:" then nested fields at depth +2.
+                writeLine(indent + 1, "- " + firstKey + ":");
+                if (!firstValue.isEmpty()) {
+                    writeObject(firstValue, indent + 2);
+                }
+            } else if (firstValue.isArray()) {
+                // First field is an array: "- key[N]: ..." or "- key[N]:\n  - ..."
+                writeListArrayFirstField(firstKey, firstValue, indent + 1);
+            } else {
+                // Primitive first field: "- key: value"
+                String v = formatPrimitive(firstValue);
+                writeLine(indent + 1, "- " + firstKey + ": " + v);
+            }
+
+            // Remaining fields of the same object at depth +2
+            while (fieldsIter.hasNext()) {
+                var entry = fieldsIter.next();
+                String key = formatKey(entry.getKey());
+                JsonNode value = entry.getValue();
+
+                if (value.isObject()) {
+                    writeLine(indent + 2, key + ":");
+                    if (!value.isEmpty()) {
+                        writeObject(value, indent + 3);
+                    }
+                } else if (value.isArray()) {
+                    writeFieldArray(key, value, indent + 2);
+                } else {
+                    String v = formatPrimitive(value);
+                    writeLine(indent + 2, key + ": " + v);
+                }
+            }
         }
 
-        private String quoteIfNeeded(String value) {
-            if (value == null) return "null";
-            String s = value.trim();
+        /**
+         * Encode an array field that is the first field on a list-item hyphen line.
+         */
+        private void writeListArrayFirstField(String key, JsonNode array, int hyphenIndent) throws IOException {
+            int size = array.size();
 
-            // Null literal must stay unquoted
-            if (s.equals("null")) {
+            boolean allPrimitive = true;
+            for (JsonNode item : array) {
+                if (item.isObject() || item.isArray()) {
+                    allPrimitive = false;
+                    break;
+                }
+            }
+
+            if (allPrimitive) {
+                // "- key[N]: v1,v2,..."
+                StringBuilder line = new StringBuilder();
+                line.append("- ")
+                    .append(key)
+                    .append("[")
+                    .append(size)
+                    .append("]:");
+
+                if (size > 0) {
+                    line.append(' ');
+                    for (int i = 0; i < size; i++) {
+                        if (i > 0) {
+                            line.append(DOCUMENT_DELIMITER);
+                        }
+                        line.append(formatPrimitive(array.get(i)));
+                    }
+                }
+
+                writeLine(hyphenIndent, line.toString());
+            } else {
+                // "- key[N]:", then nested list items at depth +1 relative to header
+                String header = "- " + key + "[" + size + "]:";
+                writeLine(hyphenIndent, header);
+                writeListArray(array, hyphenIndent + 1, null);
+            }
+        }
+
+        /**
+         * Encode an array field inside an object (non-list context).
+         */
+        private void writeFieldArray(String key, JsonNode array, int indent) throws IOException {
+            writeArray(array, indent, key);
+        }
+
+        /**
+         * Encode an array as a list item content (for array elements inside a list array).
+         */
+        private void writeListArrayItem(JsonNode arrayNode, int indent) throws IOException {
+            int size = arrayNode.size();
+
+            boolean allPrimitive = true;
+            for (JsonNode item : arrayNode) {
+                if (item.isObject() || item.isArray()) {
+                    allPrimitive = false;
+                    break;
+                }
+            }
+
+            if (allPrimitive) {
+                // Arrays of primitives as items: "- [M]: v1,v2,..."
+                StringBuilder line = new StringBuilder();
+                line.append("- [")
+                    .append(size)
+                    .append("]:");
+
+                if (size > 0) {
+                    line.append(' ');
+                    for (int i = 0; i < size; i++) {
+                        if (i > 0) {
+                            line.append(DOCUMENT_DELIMITER);
+                        }
+                        line.append(formatPrimitive(arrayNode.get(i)));
+                    }
+                }
+
+                writeLine(indent + 1, line.toString());
+            } else {
+                // Complex nested array: "- [M]:", then nested list items at depth +2
+                String header = "- [" + size + "]:";
+                writeLine(indent + 1, header);
+
+                // Render nested array items as list items under this header
+                for (JsonNode item : arrayNode) {
+                    if (item.isObject()) {
+                        writeListObjectItem(item, indent + 1);
+                    } else if (item.isArray()) {
+                        writeListArrayItem(item, indent + 1);
+                    } else {
+                        String v = formatPrimitive(item);
+                        writeLine(indent + 2, "- " + v);
+                    }
+                }
+            }
+        }
+
+        /* ---------- Formatting helpers ---------- */
+
+        private String headerPrefix(String key) {
+            return key == null ? "" : key;
+        }
+
+        private JsonNode nullNode() {
+            return OBJECT_MAPPER.nullNode();
+        }
+
+        /**
+         * Format a JSON value as a TOON primitive token according to §2, §4, §7.
+         */
+        private String formatPrimitive(JsonNode node) {
+            if (node == null || node.isNull()) {
                 return "null";
             }
 
-            // Numeric or boolean values: no quotes
-            if (s.matches("^-?\\d+(\\.\\d+)?$") || s.equals("true") || s.equals("false")) {
-                return s;
+            if (node.isNumber()) {
+                return formatNumber(node);
             }
 
-            // Must be quoted if it contains structural/special characters
-            if (s.isEmpty()
-                || s.contains(":")
-                || s.contains("\"")
-                || s.contains(",")
-                || s.contains("{")
-                || s.contains("}")
-                || s.contains("[")
-                || s.contains("]")
-                || s.startsWith("-")
-                || s.startsWith(" ")
-                || s.endsWith(" ")
-            ) {
-                return "\"" + escape(s) + "\"";
+            if (node.isBoolean()) {
+                return node.booleanValue() ? "true" : "false";
+            }
+
+            // Strings (including original JSON strings like "true", "1e6", etc.)
+            String raw = node.textValue();
+            return quoteStringIfNeeded(raw, DOCUMENT_DELIMITER);
+        }
+
+        /**
+         * Canonical number formatting:
+         * - no exponent
+         * - no unnecessary trailing zeros
+         * - -0 normalized to 0
+         */
+        private String formatNumber(JsonNode node) {
+            BigDecimal dec = node.decimalValue();
+
+            if (dec.compareTo(BigDecimal.ZERO) == 0) {
+                return "0";
+            }
+
+            dec = dec.stripTrailingZeros();
+            String s = dec.toPlainString();
+
+            // Ensure "-0" variants are normalized to "0"
+            if (s.equals("-0")) {
+                return "0";
             }
 
             return s;
         }
 
+        /**
+         * Apply TOON 2.0 quoting rules to a string value.
+         */
+        private String quoteStringIfNeeded(String value, char delimiter) {
+            if (value == null) {
+                return "null";
+            }
+
+            String s = value;
+
+            // Empty string
+            if (s.isEmpty()) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            // Leading or trailing whitespace
+            if (!s.equals(s.trim())) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            // Reserved literals: true, false, null (as strings, not booleans/null)
+            if (s.equals("true") || s.equals("false") || s.equals("null")) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            // Numeric-like tokens (including exponent) or leading-zero decimals
+            if (s.matches("^-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$") || s.matches("^0\\d+$")) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            // Structural / special characters
+            if (s.indexOf(':') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\\') >= 0) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            if (s.indexOf('[') >= 0 || s.indexOf(']') >= 0 || s.indexOf('{') >= 0 || s.indexOf('}') >= 0) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            // Control characters
+            if (s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('\t') >= 0) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            // Relevant delimiter (document delimiter or active delimiter)
+            if (s.indexOf(delimiter) >= 0) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            // Strings equal "-" or starting with "-"
+            if (s.equals("-") || s.startsWith("-")) {
+                return "\"" + escape(s) + "\"";
+            }
+
+            // Safe to emit without quotes
+            return s;
+        }
+
         private String escape(String s) {
-            return s.replace("\\", "\\\\")
+            return s
+                .replace("\\", "\\\\")
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
         }
 
+        /**
+         * Keys and field names: unquoted only if they match ^[A-Za-z_][A-Za-z0-9_.]*$
+         */
         private String formatKey(String key) {
-            if (key.matches("^[A-Za-z_][A-Za-z0-9_.]*$")) return key;
+            if (key.matches("^[A-Za-z_][A-Za-z0-9_.]*$")) {
+                return key;
+            }
             return "\"" + escape(key) + "\"";
+        }
+
+        /* ---------- Line / indentation helpers ---------- */
+
+        /**
+         * Write a full logical line with indentation and ensure:
+         * - LF line ending between lines
+         * - no trailing newline at end of document
+         */
+        private void writeLine(int indentLevel, String content) throws IOException {
+            if (!firstLine) {
+                writer.write("\n");
+            }
+            indent(indentLevel);
+            writer.write(content);
+            firstLine = false;
+        }
+
+        private void indent(int level) throws IOException {
+            if (level <= 0) {
+                return;
+            }
+            writer.write(INDENT_UNIT.repeat(level));
         }
     }
 }
