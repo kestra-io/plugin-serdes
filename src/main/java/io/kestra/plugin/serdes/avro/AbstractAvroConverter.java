@@ -8,10 +8,11 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.Rethrow;
 import io.kestra.core.validations.DateFormat;
+import io.kestra.plugin.serdes.OnBadLines;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -21,6 +22,7 @@ import java.io.Reader;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @SuperBuilder
 @ToString
@@ -28,7 +30,7 @@ import java.util.function.Function;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractAvroConverter extends Task {
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "The avro schema associated to the data",
         description = "If empty the task will try to infer the schema from current data, you can use 'numberOfRowsToScan' property if needed"
     )
@@ -37,14 +39,14 @@ public abstract class AbstractAvroConverter extends Task {
     protected String schema;
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Number of row that will be scanned while inferring. The bigger it is, the more precise the output schema will be.",
         description = "Only use when 'schema' property is empty"
     )
     private Property<Integer> numberOfRowsToScan = Property.ofValue(100);
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Values to consider as True"
     )
     protected final Property<List<String>> trueValues = Property.ofValue(Arrays.asList("t", "true", "enabled", "1", "on", "yes"));
@@ -56,7 +58,7 @@ public abstract class AbstractAvroConverter extends Task {
     protected final Property<List<String>> falseValues = Property.ofValue(Arrays.asList("f", "false", "disabled", "0", "off", "no", ""));
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Values to consider as null"
     )
     protected final Property<List<String>> nullValues = Property.ofValue(Arrays.asList(
@@ -76,7 +78,7 @@ public abstract class AbstractAvroConverter extends Task {
     ));
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Format to use when parsing date"
     )
     @PluginProperty(dynamic = true)
@@ -84,7 +86,7 @@ public abstract class AbstractAvroConverter extends Task {
     protected final String dateFormat = "yyyy-MM-dd[XXX]";
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Format to use when parsing time"
     )
     @PluginProperty(dynamic = true)
@@ -92,7 +94,7 @@ public abstract class AbstractAvroConverter extends Task {
     protected final String timeFormat = "HH:mm[:ss][.SSSSSS][XXX]";
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Format to use when parsing datetime",
         description = "Default value is yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]"
     )
@@ -101,21 +103,21 @@ public abstract class AbstractAvroConverter extends Task {
     protected final String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]";
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
         description = "Default value is '.'"
     )
     protected final Property<Character> decimalSeparator = Property.ofValue('.');
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Whether to consider a field present in the data but not declared in the schema as an error",
         description = "Default value is false"
     )
     protected Property<Boolean> strictSchema = Property.ofValue(Boolean.FALSE);
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Try to infer all fields",
         description = "If true, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`." +
             "If false, we will infer bool & null only on field declared on schema as `null` and `bool`."
@@ -123,14 +125,22 @@ public abstract class AbstractAvroConverter extends Task {
     protected Property<Boolean> inferAllFields = Property.ofValue(false);
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Timezone to use when no timezone can be parsed on the source.",
         description = "If null, the timezone will be `UTC` Default value is system timezone"
     )
     protected final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
+    @Builder.Default
+    @Schema(
+        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
+        description = "Can be one of: `FAIL`, `WARN` or `SKIP`."
+    )
+    protected final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
-    protected <E extends Exception> Long convert(Reader inputStream, Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext) throws IOException, IllegalVariableEvaluationException {
+
+    protected <E extends Exception> Long convert(Reader inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext) throws IOException, IllegalVariableEvaluationException {
+        OnBadLines rOnBadLines = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
         AvroConverter converter = AvroConverter.builder()
             .schema(runContext.render(this.schema))
             .nullValues(runContext.render(this.nullValues).asList(String.class))
@@ -142,11 +152,12 @@ public abstract class AbstractAvroConverter extends Task {
             .decimalSeparator(runContext.render(this.decimalSeparator).as(Character.class).orElseThrow())
             .strictSchema(runContext.render(this.strictSchema).as(Boolean.class).orElseThrow())
             .inferAllFields(runContext.render(this.inferAllFields).as(Boolean.class).orElseThrow())
-            .timeZoneId(runContext.render(this.timeZoneId).as(String.class).orElseThrow())
+            .timeZoneId(runContext.render(this.timeZoneId).as(String.class).orElse(ZoneId.systemDefault().toString()))
+            .onBadLines(rOnBadLines)
             .build();
 
         Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
-            .map(this.convertToAvro(schema, converter))
+            .map(this.convertToAvro(schema, converter, rOnBadLines))
             .doOnNext(datum -> {
                 try {
                     consumer.accept(datum);
@@ -169,27 +180,51 @@ public abstract class AbstractAvroConverter extends Task {
         Mono<Long> count = flowable.count();
         return count.block();
     }
-
     @SuppressWarnings("unchecked")
-    protected Function<Object, GenericData.Record> convertToAvro(Schema schema, AvroConverter converter) {
+    protected Function<Object, GenericData.Record> convertToAvro( org.apache.avro.Schema schema, AvroConverter converter, OnBadLines onBadLines) {
         return row -> {
             try {
                 if (row instanceof List) {
-                    List<String> casted = (List<String>) row;
-
-                    return converter.fromArray(schema, casted);
+                    List<?> casted = (List<?>) row;  // Allow Object for flexibility
+                    return converter.fromArray(schema, casted, onBadLines);
                 } else if (row instanceof Map) {
-                    Map<String, Object> casted = (Map<String, Object>) row;
-
-                    return converter.fromMap(schema, casted);
+                    Map<String, Object> mapRow = (Map<String, Object>) row;
+                    // Detect positional colN keys (e.g., from CsvToIon with header=false)
+                    Set<String> keys = mapRow.keySet();
+                    boolean isPositional = keys.stream()
+                        .allMatch(k -> k.startsWith("col") && k.length() > 3 && k.substring(3).matches("\\d+"));
+                    if (isPositional) {
+                        int dataFieldCount = keys.size();
+                        int schemaFieldCount = schema.getFields().size();
+                        boolean strict = converter.getStrictSchema();
+                        if (strict && dataFieldCount > schemaFieldCount) {
+                            // Strict violation: Extra fields detected
+                            List<String> fieldNames = new ArrayList<>(keys);
+                            List<Object> values = new ArrayList<>(mapRow.values());
+                            throw new AvroConverter.IllegalStrictRowConversion(schema, fieldNames, values);
+                        }
+                        List<Integer> indices = keys.stream()
+                            .map(k -> Integer.parseInt(k.substring(3)))
+                            .sorted()
+                            .collect(Collectors.toList());
+                        List<Object> positional = new ArrayList<>();
+                        for (int i = 0; i < schemaFieldCount; i++) {
+                            int finalI = i;
+                            Optional<Object> valueOpt = indices.stream()
+                                .filter(idx -> idx == finalI)
+                                .map(idx -> mapRow.get("col" + idx))
+                                .findFirst();
+                            positional.add(valueOpt.orElse(null));
+                        }
+                        return converter.fromArray(schema, positional, onBadLines);
+                    } else {
+                        Map<String, Object> casted = mapRow;
+                        return converter.fromMap(schema, casted, onBadLines, null);
+                    }
                 }
-
                 throw new IllegalArgumentException("Unable to convert row of type: " + row.getClass());
             } catch (Throwable e) {
-                var avroException = new AvroConverter.IllegalRow(
-                    row,
-                    e
-                );
+                var avroException = new AvroConverter.IllegalRow(row, e);
                 throw new RuntimeException(avroException);
             }
         };

@@ -6,7 +6,6 @@ import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
-import io.kestra.core.models.executions.metrics.Timer;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
@@ -16,7 +15,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.XML;
@@ -39,7 +37,6 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Schema(
     title = "Convert an XML file into ION."
 )
-@Slf4j
 @Plugin(
     examples = {
         @Example(
@@ -142,11 +139,12 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
 
     private Object result(JSONObject jsonObject, RunContext runContext) throws IllegalVariableEvaluationException {
         var renderedQuery = runContext.render(this.query).as(String.class);
+        var logger = runContext.logger();
         if (renderedQuery.isPresent()) {
             try {
                 return jsonObject.query(renderedQuery.get());
             } catch (Exception e) {
-                log.debug("JsonObject query failed, Object maybe null or empty.");
+                logger.debug("JsonObject query failed, Object maybe null or empty.");
                 return null;
             }
         } else {
