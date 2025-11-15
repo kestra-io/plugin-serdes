@@ -173,7 +173,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
 
     /**
      * TOON 2.0 compliant encoder for a JSON data model.
-     *
+     * <p>
      * - Root arrays use headers: [N]: ... or [N]{fields}: ...
      * - Root objects use regular key: value lines.
      * - Root primitives use a single primitive line.
@@ -306,7 +306,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         }
 
         private boolean isUniformPrimitiveObjectArray(JsonNode array) {
-            if (array.size() == 0) {
+            if (array.isEmpty()) {
                 return false;
             }
 
@@ -575,7 +575,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
 
             // Strings (including original JSON strings like "true", "1e6", etc.)
             String raw = node.textValue();
-            return quoteStringIfNeeded(raw, DOCUMENT_DELIMITER);
+            return quoteStringIfNeeded(raw);
         }
 
         /**
@@ -591,8 +591,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
                 return "0";
             }
 
-            dec = dec.stripTrailingZeros();
-            String s = dec.toPlainString();
+            String s = dec.stripTrailingZeros().toPlainString();
 
             // Ensure "-0" variants are normalized to "0"
             if (s.equals("-0")) {
@@ -605,59 +604,57 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         /**
          * Apply TOON 2.0 quoting rules to a string value.
          */
-        private String quoteStringIfNeeded(String value, char delimiter) {
+        private String quoteStringIfNeeded(String value) {
             if (value == null) {
                 return "null";
             }
 
-            String s = value;
-
             // Empty string
-            if (s.isEmpty()) {
-                return "\"" + escape(s) + "\"";
+            if (value.isEmpty()) {
+                return "\"" + escape(value) + "\"";
             }
 
             // Leading or trailing whitespace
-            if (!s.equals(s.trim())) {
-                return "\"" + escape(s) + "\"";
+            if (!value.equals(value.trim())) {
+                return "\"" + escape(value) + "\"";
             }
 
             // Reserved literals: true, false, null (as strings, not booleans/null)
-            if (s.equals("true") || s.equals("false") || s.equals("null")) {
-                return "\"" + escape(s) + "\"";
+            if (value.equals("true") || value.equals("false") || value.equals("null")) {
+                return "\"" + escape(value) + "\"";
             }
 
             // Numeric-like tokens (including exponent) or leading-zero decimals
-            if (s.matches("^-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$") || s.matches("^0\\d+$")) {
-                return "\"" + escape(s) + "\"";
+            if (value.matches("^-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$") || value.matches("^0\\d+$")) {
+                return "\"" + escape(value) + "\"";
             }
 
             // Structural / special characters
-            if (s.indexOf(':') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\\') >= 0) {
-                return "\"" + escape(s) + "\"";
+            if (value.indexOf(':') >= 0 || value.indexOf('"') >= 0 || value.indexOf('\\') >= 0) {
+                return "\"" + escape(value) + "\"";
             }
 
-            if (s.indexOf('[') >= 0 || s.indexOf(']') >= 0 || s.indexOf('{') >= 0 || s.indexOf('}') >= 0) {
-                return "\"" + escape(s) + "\"";
+            if (value.indexOf('[') >= 0 || value.indexOf(']') >= 0 || value.indexOf('{') >= 0 || value.indexOf('}') >= 0) {
+                return "\"" + escape(value) + "\"";
             }
 
             // Control characters
-            if (s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0 || s.indexOf('\t') >= 0) {
-                return "\"" + escape(s) + "\"";
+            if (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0 || value.indexOf('\t') >= 0) {
+                return "\"" + escape(value) + "\"";
             }
 
             // Relevant delimiter (document delimiter or active delimiter)
-            if (s.indexOf(delimiter) >= 0) {
-                return "\"" + escape(s) + "\"";
+            if (value.indexOf(JsonToToon.DOCUMENT_DELIMITER) >= 0) {
+                return "\"" + escape(value) + "\"";
             }
 
             // Strings equal "-" or starting with "-"
-            if (s.equals("-") || s.startsWith("-")) {
-                return "\"" + escape(s) + "\"";
+            if (value.equals("-") || value.startsWith("-")) {
+                return "\"" + escape(value) + "\"";
             }
 
             // Safe to emit without quotes
-            return s;
+            return value;
         }
 
         private String escape(String s) {
