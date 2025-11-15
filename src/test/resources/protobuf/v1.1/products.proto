@@ -1,0 +1,11 @@
+// protoc --proto_path=. --descriptor_set_out=./products.desc ./products.proto
+
+syntax = "proto3";
+package com.example;
+
+message Product {
+  string product_id = 1;
+  string product_name = 2;
+  string brand = 3;
+  string description = 4;
+}
