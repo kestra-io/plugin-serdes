@@ -13,9 +13,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.Writer;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
@@ -241,5 +239,46 @@ class JsonToToonTest {
             """;
 
         assertThat(result.trim(), is(expected.trim()));
+    }
+
+    @Test
+    void hugeJson() throws Exception {
+        // Generate a huge JSON array of 1M objects
+        int count = 1_000_000;
+        File temp = File.createTempFile("huge_", ".json");
+
+        try (Writer w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write("{\"items\": [\n");
+            for (int i = 0; i < count; i++) {
+                w.write("{\"id\": " + i + ", \"name\": \"User" + i + "\", \"active\": true}");
+                if (i < count - 1) {
+                    w.write(",\n");
+                }
+            }
+            w.write("\n]}");
+        }
+
+        JsonToToon.Output output = convert(temp);
+
+        // read as streaming to avoid using too much memory
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri());
+             BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+
+            // The first line must be a tabular header
+            String firstLine = br.readLine();
+            assertThat(firstLine, is("items[" + count + "]{id,name,active}:"));
+
+            // Skip forward but track last non-null line
+            String line, lastNonEmpty = null;
+            while ((line = br.readLine()) != null) {
+                if (!line.isBlank()) {
+                    lastNonEmpty = line;
+                }
+            }
+
+            // Last row of the tabular should be (count-1),User(count-1),true
+            String expectedLast = "  " + (count - 1) + ",User" + (count - 1) + ",true";
+            assertThat(lastNonEmpty, is(expectedLast));
+        }
     }
 }
