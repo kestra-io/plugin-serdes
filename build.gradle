@@ -59,16 +59,16 @@ dependencies {
     compileOnly 'ch.qos.logback:logback-classic'
 
     // Protobuf
-    implementation "com.google.protobuf:protobuf-java:3.25.3"
-    implementation "com.google.protobuf:protobuf-java-util:3.25.3"
+    implementation "com.google.protobuf:protobuf-java:4.33.1"
+    implementation "com.google.protobuf:protobuf-java-util:4.33.1"
 
     api 'de.siegmar:fastcsv:4.1.0'
     api ('org.apache.avro:avro:1.12.1') {
         exclude group: 'com.fasterxml.jackson.core'
     }
     api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.15.2'
-    api group: 'org.apache.poi', name: 'poi', version: '5.4.1'
-    api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.4.1'
+    api group: 'org.apache.poi', name: 'poi', version: '5.5.0'
+    api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.0'
     api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.1.2'
     implementation("com.amazon.ion:ion-java:1.11.11")
     api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.4.2') {
