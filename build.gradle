@@ -1,5 +1,5 @@
 plugins {
-    id "com.vanniktech.maven.publish" version "0.34.0"
+    id "com.vanniktech.maven.publish" version "0.35.0"
     id "io.kestra.gradle.inject-bom-versions" version "1.0.0"
     id 'java-library'
     id "idea"
@@ -59,8 +59,8 @@ dependencies {
     compileOnly 'ch.qos.logback:logback-classic'
 
     // Protobuf
-    implementation "com.google.protobuf:protobuf-java:3.25.3"
-    implementation "com.google.protobuf:protobuf-java-util:3.25.3"
+    implementation "com.google.protobuf:protobuf-java:4.33.1"
+    implementation "com.google.protobuf:protobuf-java-util:4.33.1"
 
     api 'de.siegmar:fastcsv:4.1.0'
     api ('org.apache.avro:avro:1.12.1') {
