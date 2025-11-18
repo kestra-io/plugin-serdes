@@ -1,14 +1,11 @@
 package io.kestra.plugin.serdes.json;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
@@ -23,7 +20,6 @@ import java.io.FileWriter;
 import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.TimeZone;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -31,10 +27,7 @@ import static org.hamcrest.Matchers.is;
 @KestraTest
 class ToonToJsonTest {
 
-    private static final ObjectMapper MAPPER = JacksonMapper.ofJson().copy()
-        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-        .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-        .setTimeZone(TimeZone.getDefault());
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Inject
     RunContextFactory runContextFactory;

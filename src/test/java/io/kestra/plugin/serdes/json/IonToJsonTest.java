@@ -1,13 +1,11 @@
 package io.kestra.plugin.serdes.json;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 import jakarta.inject.Inject;
@@ -19,7 +17,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TimeZone;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -124,10 +121,7 @@ public class IonToJsonTest {
             System.out.println("Got :\n" + result);
             System.out.println("Expecting :\n" + expected);
 
-            var mapper = JacksonMapper.ofJson().copy()
-                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-                .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-                .setTimeZone(TimeZone.getDefault());
+            var mapper = new ObjectMapper();
 
             var actualNode = mapper.readTree(result);
             var expectedNode = mapper.readTree(expected);

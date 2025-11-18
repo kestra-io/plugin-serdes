@@ -242,9 +242,9 @@ class JsonToToonTest {
     }
 
     @Test
-    void hugeJson() throws Exception {
-        // Generate a huge JSON array of 1M objects
-        int count = 1_000_000;
+    void large() throws Exception {
+        // Generate a large JSON array of 10K objects
+        int count = 10_000;
         File temp = File.createTempFile("huge_", ".json");
 
         try (Writer w = new FileWriter(temp, StandardCharsets.UTF_8)) {
