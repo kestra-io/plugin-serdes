@@ -1,8 +1,12 @@
 package io.kestra.plugin.serdes.avro;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.validations.DateFormat;
+import io.kestra.plugin.serdes.OnBadLines;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -11,7 +15,6 @@ import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.data.TimeConversions;
 import org.apache.avro.generic.GenericData;
-import io.kestra.plugin.serdes.OnBadLines;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.lang3.StringUtils;
 
@@ -117,8 +120,9 @@ public class AvroConverter {
             .findFirst()
             .orElse(null);
     }
+
     public GenericData.Record fromMap(Schema schema, Map<String, Object> data)
-            throws IllegalRowConvertion, IllegalStrictRowConversion {
+        throws IllegalRowConvertion, IllegalStrictRowConversion {
         return fromMap(schema, data, OnBadLines.ERROR, null);
     }
 
@@ -128,44 +132,45 @@ public class AvroConverter {
 
     public GenericData.Record fromMap(Schema schema, Map<String, Object> data, OnBadLines onBadLines, String parentFieldName) throws IllegalRowConvertion, IllegalStrictRowConversion {
 
-    GenericData.Record record = new GenericData.Record(schema);
+        GenericData.Record record = new GenericData.Record(schema);
 
-    for (Schema.Field field : schema.getFields()) {
-        String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
-        try {
-            record.put(field.name(), convert(field.schema(), getValueFromNameOrAliases(field, data), onBadLines, currentFieldName));
-        } catch (IllegalCellConversion e) {
-            if (onBadLines == OnBadLines.ERROR) {
-                throw new IllegalRowConvertion(data, e, field);
-            } else if (onBadLines == OnBadLines.WARN) {
-                System.err.println("WARN: " + e.getMessage());
-                record.put(field.name(), null);
-            } else if (onBadLines == OnBadLines.SKIP) {
-                record.put(field.name(), null);
-            }
-        } catch (Exception e) {
-            if (onBadLines == OnBadLines.ERROR) {
-                throw new IllegalRowConvertion(data, e, field);
-            } else if (onBadLines == OnBadLines.WARN) {
-                System.err.println("WARN: Conversion error for field '" + field.name() + "': " + e.getMessage());
-                record.put(field.name(), null);
-            } else {
-                record.put(field.name(), null);
+        for (Schema.Field field : schema.getFields()) {
+            String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
+            try {
+                record.put(field.name(), convert(field.schema(), getValueFromNameOrAliases(field, data), onBadLines, currentFieldName));
+            } catch (IllegalCellConversion e) {
+                if (onBadLines == OnBadLines.ERROR) {
+                    throw new IllegalRowConvertion(data, e, field);
+                } else if (onBadLines == OnBadLines.WARN) {
+                    System.err.println("WARN: " + e.getMessage());
+                    record.put(field.name(), null);
+                } else if (onBadLines == OnBadLines.SKIP) {
+                    record.put(field.name(), null);
+                }
+            } catch (Exception e) {
+                if (onBadLines == OnBadLines.ERROR) {
+                    throw new IllegalRowConvertion(data, e, field);
+                } else if (onBadLines == OnBadLines.WARN) {
+                    System.err.println("WARN: Conversion error for field '" + field.name() + "': " + e.getMessage());
+                    record.put(field.name(), null);
+                } else {
+                    record.put(field.name(), null);
+                }
             }
         }
-    }
 
-    if (this.getStrictSchema() && schema.getFields().size() < data.size()) {
-        String message = "Data contains more fields than schema: expected " + schema.getFields().size() + ", got " + data.size();
-        if (onBadLines == OnBadLines.ERROR) {
-            throw new IllegalStrictRowConversion(schema, schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList()), data.values());
-        } else if (onBadLines == OnBadLines.WARN) {
-            System.err.println("WARN: " + message);
+        if (this.getStrictSchema() && schema.getFields().size() < data.size()) {
+            String message = "Data contains more fields than schema: expected " + schema.getFields().size() + ", got " + data.size();
+            if (onBadLines == OnBadLines.ERROR) {
+                throw new IllegalStrictRowConversion(schema, schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList()), data.values());
+            } else if (onBadLines == OnBadLines.WARN) {
+                System.err.println("WARN: " + message);
+            }
         }
+
+        return record;
     }
 
-    return record;
-    }
     public GenericData.Record fromArray(Schema schema, List<? extends Object> data, OnBadLines onBadLines) throws IllegalRowConvertion, IllegalStrictRowConversion {
         HashMap<String, Object> map = new HashMap<>();
         int index = 0;
@@ -568,7 +573,11 @@ public class AvroConverter {
     }
 
     protected static String trimExceptionMessage(Object data) throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = JacksonMapper.ofJson().copy()
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .setSerializationInclusion(JsonInclude.Include.ALWAYS)
+            .setTimeZone(TimeZone.getDefault());
+
         String s = mapper.writeValueAsString(data);
 
         if (s.length() > 250) {
