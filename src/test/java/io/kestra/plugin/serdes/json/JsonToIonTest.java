@@ -2,12 +2,15 @@ package io.kestra.plugin.serdes.json;
 
 import com.amazon.ion.IonType;
 import com.amazon.ion.system.IonSystemBuilder;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
@@ -29,13 +32,18 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.TimeZone;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
-class JsonWriterToIonTest {
-    private static ObjectMapper mapper = new ObjectMapper();
+class JsonToIonTest {
+
+    private static final ObjectMapper mapper = JacksonMapper.ofJson().copy()
+        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+        .setSerializationInclusion(JsonInclude.Include.ALWAYS)
+        .setTimeZone(TimeZone.getDefault());
 
     @Inject
     RunContextFactory runContextFactory;
