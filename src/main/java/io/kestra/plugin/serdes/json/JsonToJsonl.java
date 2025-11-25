@@ -31,7 +31,7 @@ import java.nio.charset.StandardCharsets;
 @ToString
 @EqualsAndHashCode
 @Schema(
-    title = "Convert a Json file into JsonL"
+    title = "Convert a JSON file into JSONL."
 )
 @Plugin(
     examples = {

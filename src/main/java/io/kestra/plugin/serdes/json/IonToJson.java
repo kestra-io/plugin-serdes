@@ -42,7 +42,7 @@ import java.util.*;
 @NoArgsConstructor
 @Schema(
     title = "Convert an ION file into a JSONL file.",
-    description = "JSONL is the referrer for newline-delimited JSON."
+    description = "JSONL refers to newline-delimited JSON."
 )
 @Plugin(
     examples = {
@@ -90,9 +90,9 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Is the file is a json new line (JSON-NL)",
-        description = "Is the file is a json with new line separator\n" +
-            "Warning, if not, the whole file will loaded in memory and can lead to out of memory!"
+        title = "Whether the file is newline-delimited JSON (JSONL)",
+        description = "Whether the file uses newline-delimited JSON.\n" +
+            "Warning: if not, the whole file will be loaded into memory and can lead to out-of-memory errors."
     )
     private final Property<Boolean> newLine = Property.ofValue(true);
 
