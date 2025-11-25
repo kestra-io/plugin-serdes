@@ -28,11 +28,11 @@ import java.util.stream.Collectors;
 @ToString
 @EqualsAndHashCode
 @Getter
-@NoArgsConstructor
-public abstract class AbstractAvroConverter extends Task {
+    @NoArgsConstructor
+    public abstract class AbstractAvroConverter extends Task {
     @Schema(
-        title = "The avro schema associated to the data",
-        description = "If empty the task will try to infer the schema from current data, you can use 'numberOfRowsToScan' property if needed"
+        title = "The avro schema associated with the data",
+        description = "If empty, the task will try to infer the schema from the current data; use the 'numberOfRowsToScan' property if needed"
     )
     @AvroSchemaValidation
     @PluginProperty(dynamic = true)
@@ -40,8 +40,8 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "Number of row that will be scanned while inferring. The bigger it is, the more precise the output schema will be.",
-        description = "Only use when 'schema' property is empty"
+        title = "Number of rows that will be scanned while inferring. The more rows scanned, the more precise the output schema will be.",
+        description = "Only use when the 'schema' property is empty"
     )
     private Property<Integer> numberOfRowsToScan = Property.ofValue(100);
 
@@ -119,15 +119,15 @@ public abstract class AbstractAvroConverter extends Task {
     @Builder.Default
     @Schema(
         title = "Try to infer all fields",
-        description = "If true, we try to infer all fields with `trueValues`, `trueValues` & `nullValues`." +
-            "If false, we will infer bool & null only on field declared on schema as `null` and `bool`."
+        description = "If true, we try to infer all fields using `trueValues`, `falseValues`, and `nullValues`." +
+            "If false, we infer booleans and nulls only on fields declared in the schema as `null` or `bool`."
     )
     protected Property<Boolean> inferAllFields = Property.ofValue(false);
 
     @Builder.Default
     @Schema(
         title = "Timezone to use when no timezone can be parsed on the source.",
-        description = "If null, the timezone will be `UTC` Default value is system timezone"
+        description = "If null, the timezone defaults to `UTC`. Default value is the system timezone"
     )
     protected final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
