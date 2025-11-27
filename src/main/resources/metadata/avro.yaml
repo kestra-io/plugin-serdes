@@ -1,0 +1,8 @@
+group: io.kestra.plugin.serdes.avro
+name: "avro"
+title: "Avro"
+description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the Apache Avro format."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

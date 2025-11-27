@@ -1,0 +1,8 @@
+group: io.kestra.plugin.serdes.markdown
+name: "markdown"
+title: "Markdown"
+description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the Markdown format."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
