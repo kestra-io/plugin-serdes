@@ -1,0 +1,8 @@
+group: io.kestra.plugin.serdes.parquet
+name: "parquet"
+title: "Parquet"
+description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the Apache Parquet format."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
