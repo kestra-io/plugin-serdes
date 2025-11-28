@@ -1,0 +1,8 @@
+group: io.kestra.plugin.serdes.xml
+name: "yaml"
+title: "YAML"
+description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the YAML format."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
