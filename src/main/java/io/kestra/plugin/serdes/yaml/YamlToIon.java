@@ -82,8 +82,8 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        URI rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
-        String rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
+        var rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
+        var rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
 
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 

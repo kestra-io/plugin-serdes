@@ -14,7 +14,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.SynchronousSink;
 
 import java.io.*;
 import java.net.URI;
@@ -88,17 +88,16 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
     @Builder.Default
     @Schema(
         title = "Produce JSONL",
-        description = "If true -> one JSON per line. If false then produce array/object."
+        description = "If true, then one JSON per line. If false, then produce array/object."
     )
-    private Property<Boolean> jsonl = Property.ofValue(true);
+    private Property<Boolean> jsonl = Property.ofValue(false);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        URI rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
-        boolean isJsonl = runContext.render(jsonl).as(Boolean.class).orElse(true);
-        String rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
-
-        String suffix = isJsonl ? ".jsonl" : ".json";
+        var rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
+        var rJsonl = runContext.render(jsonl).as(Boolean.class).orElse(false);
+        var rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
+        var suffix = rJsonl ? ".jsonl" : ".json";
         File tempFile = runContext.workingDir().createTempFile(suffix).toFile();
 
         long count;
@@ -110,7 +109,7 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
         ) {
             Iterator<Object> docs = YAML_MAPPER.readerFor(Object.class).readValues(reader);
 
-            if (isJsonl) {
+            if (rJsonl) {
                 Flux<Object> flow = Flux.generate(
                     () -> docs,
                     (it, sink) -> {
@@ -121,15 +120,7 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
                             }
 
                             Object doc = it.next();
-
-                            var sw = new StringWriter();
-                            JSON_MAPPER.writeValue(sw, doc);
-
-                            var jsonLine = sw.toString().stripLeading();
-
-                            writer.write(jsonLine);
-                            writer.write("\n");
-
+                            writeJsonlRecord(writer, doc);
                             sink.next(doc);
                         } catch (Exception e) {
                             sink.error(e);
@@ -144,54 +135,14 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
                 Flux<Object> flow = Flux.generate(
                     () -> new Object[]{docs, null, false},
                     (state, sink) -> {
-                        Iterator<Object> it = (Iterator<Object>) state[0];
-                        Object first = state[1];
-                        boolean isArray = (boolean) state[2];
-
                         try {
-                            if (first == null) {
-                                if (!it.hasNext()) {
-                                    jsonGen.writeStartObject();
-                                    jsonGen.writeEndObject();
-                                    sink.complete();
-                                    return state;
-                                }
-
-                                first = it.next();
-                                state[1] = first;
-
-                                if (it.hasNext() || first instanceof List) {
-                                    jsonGen.writeStartArray();
-                                    isArray = true;
-                                    state[2] = true;
-                                }
-
-                                jsonGen.writeObject(first);
-                                sink.next(first);
-                                return state;
-                            }
-
-                            if (it.hasNext()) {
-                                Object next = it.next();
-                                jsonGen.writeObject(next);
-                                sink.next(next);
-                                return state;
-                            }
-
-                            if (isArray) {
-                                jsonGen.writeEndArray();
-                            }
-
-                            sink.complete();
-                            return state;
-
+                            return processJsonArrayState(state, jsonGen, sink);
                         } catch (Exception e) {
                             sink.error(e);
                             return state;
                         }
                     }
                 );
-
                 count = flow.count().block();
             }
         }
@@ -201,6 +152,55 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
         return Output.builder()
             .uri(runContext.storage().putFile(tempFile))
             .build();
+    }
+
+    private void writeJsonlRecord(Writer writer, Object doc) throws IOException {
+        var sw = new StringWriter();
+        JSON_MAPPER.writeValue(sw, doc);
+        writer.write(sw.toString().stripLeading());
+        writer.write("\n");
+    }
+
+    private Object[] processJsonArrayState(Object[] state, JsonGenerator jsonGenerator, SynchronousSink<Object> sink) throws IOException {
+        Iterator<Object> it = (Iterator<Object>) state[0];
+        Object first = state[1];
+        boolean isArray = (boolean) state[2];
+
+        if (first == null) {
+            if (!it.hasNext()) {
+                jsonGenerator.writeStartObject();
+                jsonGenerator.writeEndObject();
+                sink.complete();
+                return state;
+            }
+
+            first = it.next();
+            state[1] = first;
+
+            if (it.hasNext() || first instanceof List) {
+                jsonGenerator.writeStartArray();
+                isArray = true;
+                state[2] = true;
+            }
+
+            jsonGenerator.writeObject(first);
+            sink.next(first);
+            return state;
+        }
+
+        if (it.hasNext()) {
+            Object next = it.next();
+            jsonGenerator.writeObject(next);
+            sink.next(next);
+            return state;
+        }
+
+        if (isArray) {
+            jsonGenerator.writeEndArray();
+        }
+
+        sink.complete();
+        return state;
     }
 
     @Builder

@@ -75,17 +75,17 @@ public class IonToYaml extends Task implements RunnableTask<IonToYaml.Output> {
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        URI rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
-        Charset outputCharset = Charset.forName(runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name()));
+        var rFrom = new URI(runContext.render(from).as(String.class).orElseThrow());
+        var rCharset = Charset.forName(runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name()));
 
         File tempFile = runContext.workingDir().createTempFile(".yaml").toFile();
-        ObjectMapper yamlMapper = JacksonMapper.ofYaml();
+        var yamlMapper = JacksonMapper.ofYaml();
 
         long count = 0;
 
         try (
             BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom)), FileSerde.BUFFER_SIZE);
-            BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile, outputCharset), FileSerde.BUFFER_SIZE)
+            BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile, rCharset), FileSerde.BUFFER_SIZE)
         ) {
 
             Flux<Object> flux = FileSerde.readAll(reader);

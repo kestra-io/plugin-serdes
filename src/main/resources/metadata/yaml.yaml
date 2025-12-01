@@ -1,4 +1,4 @@
-group: io.kestra.plugin.serdes.xml
+group: io.kestra.plugin.serdes.yaml
 name: "yaml"
 title: "YAML"
 description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the YAML format."

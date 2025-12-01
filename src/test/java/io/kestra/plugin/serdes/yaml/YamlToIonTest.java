@@ -18,7 +18,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 @KestraTest
