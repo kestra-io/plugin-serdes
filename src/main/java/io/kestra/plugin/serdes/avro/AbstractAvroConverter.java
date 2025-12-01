@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
 @ToString
 @EqualsAndHashCode
 @Getter
-    @NoArgsConstructor
-    public abstract class AbstractAvroConverter extends Task {
+@NoArgsConstructor
+public abstract class AbstractAvroConverter extends Task {
     @Schema(
         title = "The avro schema associated with the data",
         description = "If empty, the task will try to infer the schema from the current data; use the 'numberOfRowsToScan' property if needed"
