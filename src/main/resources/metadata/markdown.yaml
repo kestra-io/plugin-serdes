@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.markdown
 name: "markdown"
 title: "Markdown"
-description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the Markdown format."
-body: ""
+description: "Tasks that convert Markdown to text or HTML."
+body: "Provide Markdown content to render as plain text or HTML using the built-in converters, useful for generating notifications or documents from workflows."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
