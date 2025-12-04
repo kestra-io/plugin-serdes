@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.xml
 name: "xml"
 title: "XML"
-description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the XML format."
-body: ""
+description: "Tasks that convert between XML and Ion."
+body: "Provide XML input with optional namespaces to convert to Ion or supply Ion data to produce XML, enabling XML interchange within workflows."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

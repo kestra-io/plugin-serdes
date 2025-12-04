@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.yaml
 name: "yaml"
 title: "YAML"
-description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the YAML format."
-body: ""
+description: "Tasks that convert between YAML and Ion/JSON."
+body: "Provide YAML content to convert to Ion or JSON, or take Ion/JSON and emit YAML, making it easy to translate configs inside workflows."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

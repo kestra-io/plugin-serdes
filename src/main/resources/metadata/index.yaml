@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes
 name: "serdes"
 title: "Serialization"
-description: "Serialize and deserialize data formats in Kestra workflows."
-body: ""
+description: "Tasks that convert data between common formats for Kestra workflows."
+body: "Use format-specific tasks to transform files among JSON, CSV, Avro, Parquet, Excel, Protobuf, XML, Markdown, and YAML (via Ion), with options for schema validation, bad-line handling, and output destinations."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
