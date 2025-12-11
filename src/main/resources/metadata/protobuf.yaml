@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.protobuf
 name: "protobuf"
 title: "Protobuf"
-description: "This sub-group of plugins contains tasks for deserialization of files in the Protobuf format."
-body: ""
+description: "Tasks that convert Protocol Buffers messages to/from Ion."
+body: "Provide Protobuf descriptors and message data to convert to Ion for inspection or downstream transforms, or serialize Ion back to Protobuf binaries for interchange."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
