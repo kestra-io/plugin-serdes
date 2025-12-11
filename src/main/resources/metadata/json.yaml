@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.json
 name: "json"
 title: "JSON"
-description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the JSON format."
-body: ""
+description: "Tasks that convert JSON and JSONL to/from Ion."
+body: "Provide JSON or JSONL inputs to convert into Ion or other formats, or take Ion to emit JSON/JSONL, with options for pretty-printing and schema validation."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

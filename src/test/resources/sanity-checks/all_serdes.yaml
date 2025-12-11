@@ -9,7 +9,7 @@ tasks:
       - csv
       - excel
       - infer_ion_avro
-      - protobuf
+      - infer_ion_parquet
     tasks:
       - id: subflow
         type: io.kestra.plugin.core.flow.Subflow
