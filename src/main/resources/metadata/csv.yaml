@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.csv
 name: "csv"
 title: "CSV"
-description: "This sub-group of plugins contains tasks for serialization and deserialization of files in the CSV format."
-body: ""
+description: "Tasks that convert between CSV and Ion."
+body: "Provide CSV input with delimiter/quote/header options to convert to Ion, or supply Ion data to emit CSV, handling bad lines and encoding settings as needed."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
