@@ -69,7 +69,7 @@ dependencies {
     api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.15.2'
     api group: 'org.apache.poi', name: 'poi', version: '5.5.1'
     api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
-    api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.1.2'
+    api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.2.0'
     implementation("com.amazon.ion:ion-java:1.11.11")
     api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.4.2') {
         exclude group: 'org.slf4j'
