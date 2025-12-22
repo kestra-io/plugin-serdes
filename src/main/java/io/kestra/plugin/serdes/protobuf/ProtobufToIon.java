@@ -45,9 +45,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Schema(
-    title = "Convert a Protobuf file into Amazon Ion.",
-    description = """
+@Schema(title = "Convert a Protobuf file into Amazon Ion.", description = """
         The plugin reads one or more Protobuf messages from a binary file or stream,
         decodes them using a provided descriptor and message type name, and then serializes
         the result as Ion data based on [ProtoJSON Format](https://protobuf.dev/programming-guides/json/).
@@ -62,14 +60,9 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
                --descriptor_set_out=products.desc \
                src/main/proto/products.proto
         ```
-        """
-)
-@Plugin(
-    examples = {
-        @Example(
-            full = true,
-            title = "Convert a Protobuf file to the Amazon Ion format.",
-            code = """
+        """)
+@Plugin(examples = {
+        @Example(full = true, title = "Convert a Protobuf file to the Amazon Ion format.", code = """
                 id: protobuf_to_ion
                 namespace: company.team
 
@@ -83,17 +76,14 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
                     from: "{{ outputs.http_download.uri }}"
                     descriptorFile: "kestra:///path/to/proto.desc"
                     typeName: com.company.Product
-                """
-        )
-    },
-    metrics = {
+                """)
+}, metrics = {
         @Metric(name = "records", description = "Number of Protobuf messages converted", type = Counter.TYPE)
-    }
-)
+})
 public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Output> {
     private static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofJson().copy()
-        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-        .setSerializationInclusion(JsonInclude.Include.ALWAYS).setTimeZone(TimeZone.getDefault());
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .setSerializationInclusion(JsonInclude.Include.ALWAYS).setTimeZone(TimeZone.getDefault());
 
     @Builder
     @Getter
@@ -118,9 +108,9 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
 
     @Builder.Default
     @Schema(title = "Is the input a stream of length-delimited messages?", description = """
-        If true, the input file is expected to contain multiple length-delimited Protobuf messages.
-        If false, it will be parsed as a single Protobuf message.
-        """)
+            If true, the input file is expected to contain multiple length-delimited Protobuf messages.
+            If false, it will be parsed as a single Protobuf message.
+            """)
     private final Property<Boolean> delimited = Property.ofValue(false);
 
     @Builder.Default
@@ -137,24 +127,24 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
 
         // protobuf descriptor
         InputStream rDescriptorFileStream = URIFetcher
-            .of(runContext.render(descriptorFile).as(String.class).orElseThrow()).fetch(runContext);
+                .of(runContext.render(descriptorFile).as(String.class).orElseThrow()).fetch(runContext);
         String rTypeName = runContext.render(this.typeName).as(String.class).orElseThrow();
         boolean rIsDelimited = runContext.render(this.delimited).as(Boolean.class).orElseThrow();
         boolean rErrorOnUnknownFields = runContext.render(this.errorOnUnknownFields).as(Boolean.class).orElseThrow();
 
         FileDescriptorSet descriptorSet = FileDescriptorSet.parseFrom(rDescriptorFileStream);
-        Descriptor messageDescriptor = findMessageDescriptor(descriptorSet, rTypeName);
+        Descriptor messageDescriptor = ProtobufTools.findMessageDescriptor(descriptorSet, rTypeName);
         if (messageDescriptor == null) {
             throw new IllegalArgumentException("Message type not found in descriptor: " + rTypeName);
         }
 
         try (InputStream inputStream = runContext.storage().getFile(rFrom);
-             Writer writer = new BufferedWriter(new FileWriter(tempFile, StandardCharsets.UTF_8),
-                 FileSerde.BUFFER_SIZE)) {
+                Writer writer = new BufferedWriter(new FileWriter(tempFile, StandardCharsets.UTF_8),
+                        FileSerde.BUFFER_SIZE)) {
 
             Flux<Object> flowable = Flux.create(
-                this.nextMessage(inputStream, messageDescriptor, rIsDelimited, rErrorOnUnknownFields),
-                FluxSink.OverflowStrategy.BUFFER);
+                    this.nextMessage(inputStream, messageDescriptor, rIsDelimited, rErrorOnUnknownFields),
+                    FluxSink.OverflowStrategy.BUFFER);
             Mono<Long> count = FileSerde.writeAll(writer, flowable);
 
             // metrics & finalize
@@ -165,21 +155,8 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
         return Output.builder().uri(runContext.storage().putFile(tempFile)).build();
     }
 
-    private static Descriptor findMessageDescriptor(FileDescriptorSet descriptorSet, String typeName)
-        throws Descriptors.DescriptorValidationException {
-        for (FileDescriptorProto fileProto : descriptorSet.getFileList()) {
-            FileDescriptor fileDescriptor = FileDescriptor.buildFrom(fileProto, new FileDescriptor[]{});
-            String simpleName = typeName.substring(typeName.lastIndexOf('.') + 1);
-            Descriptor desc = fileDescriptor.findMessageTypeByName(simpleName);
-            if (desc != null) {
-                return desc;
-            }
-        }
-        return null;
-    }
-
     private Consumer<FluxSink<Object>> nextMessage(InputStream inputStream, Descriptor messageDescriptor,
-                                                   boolean isDelimited, boolean errorOnUnknown) throws IOException {
+            boolean isDelimited, boolean errorOnUnknown) throws IOException {
         ObjectReader objectReader = OBJECT_MAPPER.readerFor(Object.class);
 
         return throwConsumer(s -> {
@@ -200,7 +177,7 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
 
                 if (errorOnUnknown && !message.getUnknownFields().asMap().isEmpty()) {
                     throw new IllegalArgumentException(
-                        "Message contains unknown fields: " + message.getUnknownFields().asMap());
+                            "Message contains unknown fields: " + message.getUnknownFields().asMap());
                 }
 
                 // If we hit EOF or no fields, stop

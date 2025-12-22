@@ -1,11 +1,19 @@
-// protoc --proto_path=. --descriptor_set_out=./products.desc ./products.proto
+// protoc --proto_path=. --include_imports --descriptor_set_out=./products.desc  ./products.proto
 
 syntax = "proto3";
 package com.example;
+
+import "google/protobuf/timestamp.proto";
 
 message Product {
   string product_id = 1;
   string product_name = 2;
   string brand = 3;
   string description = 4;
+  optional google.protobuf.Timestamp create_time = 5;
+}
+
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
 }

@@ -2,11 +2,15 @@ package io.kestra.plugin.serdes.protobuf;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.*;
 import com.google.protobuf.DescriptorProtos.FileDescriptorSet;
+import com.google.protobuf.Descriptors.Descriptor;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
@@ -59,13 +63,13 @@ class ProtobufToIonTest {
 
         // Load descriptor
         FileDescriptorSet descriptorV10Set = FileDescriptorSet.parseFrom(new FileInputStream(descriptorV10File));
-        Descriptors.Descriptor descriptorV10 = findMessageDescriptor(descriptorV10Set, TYPE_NAME);
+        Descriptors.Descriptor descriptorV10 = ProtobufTools.findMessageDescriptor(descriptorV10Set, TYPE_NAME);
         if (descriptorV10 == null) {
             throw new IllegalArgumentException(
                     "Message type not found in descriptor: " + TYPE_NAME);
         }
         FileDescriptorSet descriptorV11Set = FileDescriptorSet.parseFrom(new FileInputStream(descriptorV11File));
-        Descriptors.Descriptor descriptorV11 = findMessageDescriptor(descriptorV11Set, TYPE_NAME);
+        Descriptors.Descriptor descriptorV11 = ProtobufTools.findMessageDescriptor(descriptorV11Set, TYPE_NAME);
         if (descriptorV11 == null) {
             throw new IllegalArgumentException(
                     "Message type not found in descriptor: " + TYPE_NAME);
@@ -159,21 +163,18 @@ class ProtobufToIonTest {
         });
     }
 
-    // ---------- Helpers ----------
-
-    private static Descriptors.Descriptor findMessageDescriptor(FileDescriptorSet descriptorSet,
-            String typeName) throws Descriptors.DescriptorValidationException {
-        for (DescriptorProtos.FileDescriptorProto fileProto : descriptorSet.getFileList()) {
-            Descriptors.FileDescriptor fileDescriptor = Descriptors.FileDescriptor
-                    .buildFrom(fileProto, new Descriptors.FileDescriptor[] {});
-            String simpleName = typeName.substring(typeName.lastIndexOf('.') + 1);
-            Descriptors.Descriptor desc = fileDescriptor.findMessageTypeByName(simpleName);
-            if (desc != null) {
-                return desc;
-            }
-        }
-        return null;
+    @Test
+    void testFindMessageDescriptor() throws Exception {
+        FileDescriptorSet descriptorV11Set = FileDescriptorSet.parseFrom(new FileInputStream(descriptorV11File));
+        Descriptor Timestamp1 = ProtobufTools.findMessageDescriptor(descriptorV11Set, "google.protobuf.Timestamp");
+        assertEquals(Timestamp1.getFullName(), "google.protobuf.Timestamp");
+        Descriptor Timestamp2 = ProtobufTools.findMessageDescriptor(descriptorV11Set, "com.example.Timestamp");
+        assertEquals(Timestamp2.getFullName(), "com.example.Timestamp");
+        Descriptor NotFound = ProtobufTools.findMessageDescriptor(descriptorV11Set, "Product");
+        assertNull(NotFound);
     }
+
+    // ---------- Helpers ----------
 
     private static void createSingleFile(File output, Descriptors.Descriptor descriptor,
             Map<String, Object> fields) throws IOException {
