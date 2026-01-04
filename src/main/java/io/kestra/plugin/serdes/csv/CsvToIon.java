@@ -98,12 +98,12 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     )
     private final Property<Boolean> skipEmptyRows = Property.ofValue(false);
 
-    @Builder.Default
+
     @Schema(
         title = "Specifies if an exception should be thrown, if CSV data contains different field count"
         )
     @Deprecated
-    private final Property<Boolean> errorOnDifferentFieldCount = Property.ofValue(false);
+    private Property<Boolean> errorOnDifferentFieldCount;
 
     @Builder.Default
     @Schema(
@@ -265,8 +265,6 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         builder.allowMissingFields(true);
         builder.allowExtraFields(true);
-
-
 
         runContext.render(allowExtraCharsAfterClosingQuote).as(Boolean.class)
             .ifPresent(builder::allowExtraCharsAfterClosingQuote);
