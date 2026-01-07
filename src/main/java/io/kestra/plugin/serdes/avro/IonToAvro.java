@@ -137,11 +137,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
                 new InferAvroSchema(
                     runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
                 ).inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
-                String inferredSchemaString = schemaOutputStream.toString();
-                if (inferredSchemaString.isEmpty()) {
-                    throw new IllegalStateException("Cannot infer Avro schema from ION input: the file appears to be empty or contains no valid records.");
-                }
-                schema = schemaParser.parse(inferredSchemaString);
+                schema = schemaParser.parse(schemaOutputStream.toString());
             }
         } else {
             try {
