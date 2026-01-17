@@ -102,7 +102,10 @@ class ParquetToIonWriterTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_empty_", ".ion");
         // Write nothing to the file - it's empty
 
-        URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+        URI uri;
+        try (InputStream inputStream = new FileInputStream(tempFile)) {
+            uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), inputStream);
+        }
 
         IonToParquet writer = IonToParquet.builder()
             .id(IonToParquet.class.getSimpleName())
@@ -111,10 +114,10 @@ class ParquetToIonWriterTest {
             .schema(null) // No schema - inference required
             .build();
 
-        org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalStateException exception = org.junit.jupiter.api.Assertions.assertThrows(
             IllegalStateException.class,
-            () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of())),
-            "Cannot infer Avro schema from ION input"
+            () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
         );
+        assertThat(exception.getMessage(), is("Cannot infer Avro schema: the input is empty or contains no valid records."));
     }
 }
