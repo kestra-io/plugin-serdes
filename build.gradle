@@ -87,7 +87,7 @@ dependencies {
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
 
-    implementation "org.commonmark:commonmark:0.27.0" // for Markdown
+    implementation "org.commonmark:commonmark:0.27.1" // for Markdown
 }
 
 configurations.configureEach {
