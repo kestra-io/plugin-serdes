@@ -59,8 +59,8 @@ dependencies {
     compileOnly 'ch.qos.logback:logback-classic'
 
     // Protobuf
-    implementation "com.google.protobuf:protobuf-java:4.33.2"
-    implementation "com.google.protobuf:protobuf-java-util:4.33.2"
+    implementation "com.google.protobuf:protobuf-java:4.33.5"
+    implementation "com.google.protobuf:protobuf-java-util:4.33.5"
 
     implementation 'de.siegmar:fastcsv:4.1.0'
     implementation ('org.apache.avro:avro:1.12.1') {
