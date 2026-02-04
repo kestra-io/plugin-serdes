@@ -42,6 +42,7 @@ public class InferAvroSchema {
      *
      * @param inputStream Ion source
      * @param output      where the resulting Avro schema will be written
+     * @throws IllegalStateException if the input stream is empty or contains no valid records
      */
     public void inferAvroSchemaFromIon(Reader inputStream, OutputStream output) {
         Mono<Schema> inferedSchema = null;
@@ -57,7 +58,11 @@ public class InferAvroSchema {
             throw new RuntimeException("could not parse Ion input stream, err: " + e.getMessage(), e);
         }
         try {
-            output.write(inferedSchema.block().toString().getBytes(StandardCharsets.UTF_8));
+            Schema schema = inferedSchema.block();
+            if (schema == null) {
+                throw new IllegalStateException("Cannot infer Avro schema: the input is empty or contains no valid records.");
+            }
+            output.write(schema.toString().getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new RuntimeException("could not write Avro schema in output stream, err: " + e.getMessage(), e);
         }
