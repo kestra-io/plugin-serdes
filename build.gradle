@@ -1,11 +1,11 @@
 plugins {
-    id "com.vanniktech.maven.publish" version "0.35.0"
+    id "com.vanniktech.maven.publish" version "0.36.0"
     id "io.kestra.gradle.inject-bom-versions" version "1.0.0"
     id 'java-library'
     id "idea"
     id 'jacoco'
     id "com.adarshr.test-logger" version "4.0.0"
-    id "com.gradleup.shadow" version "9.3.0"
+    id "com.gradleup.shadow" version "9.3.1"
     id 'signing'
     id "com.github.ben-manes.versions" version "0.53.0"
     id 'net.researchgate.release' version '3.1.0'
@@ -59,29 +59,40 @@ dependencies {
     compileOnly 'ch.qos.logback:logback-classic'
 
     // Protobuf
-    implementation "com.google.protobuf:protobuf-java:4.33.2"
-    implementation "com.google.protobuf:protobuf-java-util:4.33.2"
+    implementation "com.google.protobuf:protobuf-java:4.33.5"
+    implementation "com.google.protobuf:protobuf-java-util:4.33.5"
 
-    api 'de.siegmar:fastcsv:4.1.0'
-    api ('org.apache.avro:avro:1.12.1') {
+    implementation 'de.siegmar:fastcsv:4.1.0'
+    implementation ('org.apache.avro:avro:1.12.1') {
         exclude group: 'com.fasterxml.jackson.core'
     }
-    api group: 'org.apache.parquet', name: 'parquet-avro', version: '1.15.2'
-    api group: 'org.apache.poi', name: 'poi', version: '5.5.1'
-    api group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
-    api group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.2.0'
+    implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.17.0'
+    implementation group: 'org.apache.poi', name: 'poi', version: '5.5.1'
+    implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
+    implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.2.0'
     implementation("com.amazon.ion:ion-java:1.11.11")
-    api (group: 'org.apache.hadoop', name: 'hadoop-client', version: '3.4.2') {
-        exclude group: 'org.slf4j'
-        exclude group: 'com.fasterxml.jackson.core'
+    implementation("org.apache.hadoop:hadoop-common:3.4.2") {
+        exclude group: "org.slf4j"
+        exclude group: "com.fasterxml.jackson.core"
     }
-    api group: 'org.json', name: 'json', version: '20250517'
+    implementation("org.apache.hadoop:hadoop-auth:3.4.2") {
+        exclude group: "org.slf4j"
+        exclude group: "com.fasterxml.jackson.core"
+    }
+    implementation("org.apache.hadoop:hadoop-mapreduce-client-core:3.4.2") {
+        exclude group: "org.slf4j"
+        exclude group: "com.fasterxml.jackson.core"
+    }
+    implementation group: 'org.json', name: 'json', version: '20251224'
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
 
-    implementation "org.commonmark:commonmark:0.27.0" // for Markdown
+    implementation "org.commonmark:commonmark:0.27.1" // for Markdown
 }
 
+configurations.configureEach {
+    exclude group: "org.apache.hadoop", module: "hadoop-client"
+}
 
 /**********************************************************************************************************************\
  * Test
@@ -151,7 +162,7 @@ configurations {
 }
 
 dependencies {
-    agent "org.aspectj:aspectjweaver:1.9.25"
+    agent "org.aspectj:aspectjweaver:1.9.25.1"
 }
 
 test {
@@ -223,6 +234,14 @@ jar {
 shadowJar {
     archiveClassifier.set(null)
     mergeServiceFiles()
+
+    dependencies {
+        exclude(dependency("io.netty:netty-.*:.*"))
+        exclude(dependency("com.fasterxml.jackson.core:jackson-.*:.*"))
+        exclude(dependency("com.fasterxml.jackson.datatype:jackson-.*:.*"))
+        exclude(dependency("org.slf4j:slf4j-api:.*"))
+        exclude(dependency("ch.qos.logback:logback-classic:.*"))
+    }
 }
 
 /**********************************************************************************************************************\
