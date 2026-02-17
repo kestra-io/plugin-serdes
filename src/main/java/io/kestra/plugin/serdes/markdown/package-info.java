@@ -1,7 +1,9 @@
 @PluginSubGroup(
     title = "Markdown",
-    description = "This sub-group of plugins contains tasks for serialization and deserialization of files in the Markdown format.",
-    categories = PluginSubGroup.PluginCategory.TRANSFORMATION
+    description = "This sub-group of plugins contains tasks for serialization and deserialization of files in the Markdown format.",categories = {
+        PluginSubGroup.PluginCategory.DATA,
+        PluginSubGroup.PluginCategory.CORE
+    }
 )
 package io.kestra.plugin.serdes.markdown;
 
