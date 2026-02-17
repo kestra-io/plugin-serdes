@@ -60,7 +60,7 @@ public class InferAvroSchema {
         try {
             Schema schema = inferedSchema.block();
             if (schema == null) {
-                throw new IllegalStateException("Cannot infer Avro schema: the input is empty or contains no valid records.");
+                throw new IllegalStateException("Cannot infer Avro schema from ION input: the file appears to be empty or contains no valid records.");
             }
             output.write(schema.toString().getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {

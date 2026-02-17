@@ -118,6 +118,6 @@ class ParquetToIonWriterTest {
             IllegalStateException.class,
             () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
         );
-        assertThat(exception.getMessage(), is("Cannot infer Avro schema: the input is empty or contains no valid records."));
+        assertThat(exception.getMessage(), is("Cannot infer Avro schema from ION input: the file appears to be empty or contains no valid records."));
     }
 }

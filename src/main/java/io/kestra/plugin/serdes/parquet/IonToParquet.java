@@ -145,8 +145,6 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         tempDir.toFile().mkdirs();
         File tempFile = Files.createTempFile(tempDir, "", ".parquet").toFile();
 
-        BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
-
         // reader
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
@@ -190,8 +188,6 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));
-
-            output.flush();
         }
 
         return Output
