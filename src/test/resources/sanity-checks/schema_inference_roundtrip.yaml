@@ -1,0 +1,57 @@
+id: schema_inference_roundtrip
+namespace: sanitychecks.plugin-serdes
+
+description: |
+  Complete round-trip validation flow for schema inference feature.
+  Demonstrates:
+  1. CSV → ION conversion
+  2. ION → Parquet without explicit schema (automatic inference)
+  3. ION → Avro without explicit schema (automatic inference)
+  4. Round-trip validation back to ION
+  
+  This flow validates that schema inference produces correct, usable schemas
+  and that data integrity is maintained through the full conversion cycle.
+
+tasks:
+  # Step 1: Download sample CSV
+  - id: download_csv
+    type: io.kestra.plugin.core.http.Download
+    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/orders.csv
+
+  # Step 2: Convert CSV to ION (source format)
+  - id: csv_to_ion
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.download_csv.uri }}"
+
+  # Step 3a: ION → Parquet (schema inferred automatically)
+  - id: ion_to_parquet_inferred
+    type: io.kestra.plugin.serdes.parquet.IonToParquet
+    from: "{{ outputs.csv_to_ion.uri }}"
+    # No schema provided - inferred from ION structure
+
+  # Step 3b: ION → Avro (schema inferred automatically)
+  - id: ion_to_avro_inferred
+    type: io.kestra.plugin.serdes.avro.IonToAvro
+    from: "{{ outputs.csv_to_ion.uri }}"
+    # No schema provided - inferred from ION structure
+
+  # Step 4a: Parquet → ION (round-trip)
+  - id: parquet_to_ion
+    type: io.kestra.plugin.serdes.parquet.ParquetToIon
+    from: "{{ outputs.ion_to_parquet_inferred.uri }}"
+
+  # Step 4b: Avro → ION (round-trip)
+  - id: avro_to_ion
+    type: io.kestra.plugin.serdes.avro.AvroToIon
+    from: "{{ outputs.ion_to_avro_inferred.uri }}"
+
+  # Step 5: Validate data integrity through round-trips
+  - id: assert_roundtrip
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      # Original ION matches Parquet round-trip
+      - '{{ fromIon(read(outputs.csv_to_ion["uri"])).order_id == fromIon(read(outputs.parquet_to_ion["uri"])).order_id }}'
+      # Original ION matches Avro round-trip
+      - '{{ fromIon(read(outputs.csv_to_ion["uri"])).order_id == fromIon(read(outputs.avro_to_ion["uri"])).order_id }}'
+      # Both round-trips produce identical results
+      - '{{ fromIon(read(outputs.parquet_to_ion["uri"])).order_id == fromIon(read(outputs.avro_to_ion["uri"])).order_id }}'

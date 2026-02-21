@@ -145,19 +145,20 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         tempDir.toFile().mkdirs();
         File tempFile = Files.createTempFile(tempDir, "", ".parquet").toFile();
 
-        BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
-
         // reader
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // avro schema
         var schemaParser = new Schema.Parser();
-        Schema schema = null;
-        if(this.schema == null){
-            var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from));
-            var schemaOutputStream = new ByteArrayOutputStream();
-            new InferAvroSchema().inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
-            schema = schemaParser.parse(schemaOutputStream.toString());
+        Schema schema;
+        if (this.schema == null) {
+            try (var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from))) {
+                var schemaOutputStream = new ByteArrayOutputStream();
+                new InferAvroSchema(
+                    runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
+                ).inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
+                schema = schemaParser.parse(schemaOutputStream.toString());
+            }
         } else {
             schema = schemaParser.parse(runContext.render(this.schema));
         }
@@ -187,8 +188,6 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));
-
-            output.flush();
         }
 
         return Output
