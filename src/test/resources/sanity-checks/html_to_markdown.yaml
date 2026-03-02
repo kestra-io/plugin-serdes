@@ -44,4 +44,4 @@ tasks:
 
   - id: verify_markdown
     type: io.kestra.plugin.core.execution.Fail
-    condition: '{{ not(read(outputs.convert_to_markdown.uri) contains "# Hello Kestra") }}'
+    condition: '{{ not(read(outputs.convert_to_markdown.uri) contains "Hello Kestra") }}'

@@ -20,7 +20,6 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -32,7 +31,7 @@ import java.util.List;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an HTML file or string into Markdown format.",
+    title = "Convert an HTML file from Kestra internal storage into Markdown format.",
     description = "This task converts HTML content into Markdown, which is essential for LLM processing, documentation automation, and data cleaning pipelines. HTML is often too verbose for Large Language Models (LLMs) and consumes unnecessary tokens. This task allows you to build clean RAG (Retrieval-Augmented Generation) pipelines directly within Kestra."
 )
 @Plugin(
@@ -107,19 +106,14 @@ public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.
     )
     private Property<String> baseUri;
 
-    @Builder.Default
-    @Schema(title = "Charset to use for input/output.", description = "Default is UTF-8.")
-    private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
-
     @Override
     public Output run(RunContext runContext) throws Exception {
         var rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
-        var rCharset = Charset.forName(runContext.render(this.charset).as(String.class).orElse(StandardCharsets.UTF_8.name()));
         
         String htmlContent;
         
         try (var inputStream = runContext.storage().getFile(rFrom);
-             var reader = new BufferedReader(new InputStreamReader(inputStream, rCharset))) {
+             var reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             
             StringBuilder sb = new StringBuilder();
             String line;
@@ -177,7 +171,7 @@ public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.
         // Write to temp file
         var tempFile = runContext.workingDir().createTempFile(".md").toFile();
         
-        try (var writer = new OutputStreamWriter(new FileOutputStream(tempFile), rCharset)) {
+        try (var writer = new OutputStreamWriter(new FileOutputStream(tempFile), StandardCharsets.UTF_8)) {
             writer.write(markdown);
         }
 
