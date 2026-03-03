@@ -71,15 +71,15 @@ dependencies {
     implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
     implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.2.0'
     implementation("com.amazon.ion:ion-java:1.11.11")
-    implementation("org.apache.hadoop:hadoop-common:3.4.2") {
+    implementation("org.apache.hadoop:hadoop-common:3.4.3") {
         exclude group: "org.slf4j"
         exclude group: "com.fasterxml.jackson.core"
     }
-    implementation("org.apache.hadoop:hadoop-auth:3.4.2") {
+    implementation("org.apache.hadoop:hadoop-auth:3.4.3") {
         exclude group: "org.slf4j"
         exclude group: "com.fasterxml.jackson.core"
     }
-    implementation("org.apache.hadoop:hadoop-mapreduce-client-core:3.4.2") {
+    implementation("org.apache.hadoop:hadoop-mapreduce-client-core:3.4.3") {
         exclude group: "org.slf4j"
         exclude group: "com.fasterxml.jackson.core"
     }
@@ -88,6 +88,9 @@ dependencies {
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
 
     implementation "org.commonmark:commonmark:0.27.1" // for Markdown
+    implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
+    implementation "com.vladsch.flexmark:flexmark-html2md-converter:0.64.8" // for HTML to Markdown conversion
+    implementation "org.jsoup:jsoup:1.19.1" // for HTML parsing (required by flexmark-html2md-converter)
 }
 
 configurations.configureEach {
