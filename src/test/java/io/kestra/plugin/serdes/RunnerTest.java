@@ -43,14 +43,14 @@ class RunnerTest {
     @Test
     @ExecuteFlow("sanity-checks/infer_ion_avro.yaml")
     void infer_ion_avro(Execution execution) {
-        assertThat(execution.getTaskRunList(), hasSize(9));
+        assertThat(execution.getTaskRunList(), hasSize(10));
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
     }
 
     @Test
     @ExecuteFlow("sanity-checks/infer_ion_parquet.yaml")
     void infer_ion_parquet(Execution execution) {
-        assertThat(execution.getTaskRunList(), hasSize(5));
+        assertThat(execution.getTaskRunList(), hasSize(7));
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
     }
 }
