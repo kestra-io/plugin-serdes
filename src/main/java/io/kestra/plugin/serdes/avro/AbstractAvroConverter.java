@@ -52,7 +52,7 @@ public abstract class AbstractAvroConverter extends Task {
     protected final Property<List<String>> trueValues = Property.ofValue(Arrays.asList("t", "true", "enabled", "1", "on", "yes"));
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Values to consider as False"
     )
     protected final Property<List<String>> falseValues = Property.ofValue(Arrays.asList("f", "false", "disabled", "0", "off", "no", ""));

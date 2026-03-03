@@ -6,6 +6,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.validations.DateFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -22,7 +23,7 @@ import java.util.Date;
 
 public abstract class AbstractTextWriter extends Task {
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Format to use for date"
     )
     @PluginProperty(dynamic = true)
@@ -30,7 +31,7 @@ public abstract class AbstractTextWriter extends Task {
     private final String dateFormat = "yyyy-MM-dd";
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Format to use for time"
     )
     @PluginProperty(dynamic = true)
@@ -38,7 +39,7 @@ public abstract class AbstractTextWriter extends Task {
     private final String timeFormat = "HH:mm:ss[XXX]";
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Format to use for zoned datetime"
     )
     @PluginProperty(dynamic = true)
@@ -46,7 +47,7 @@ public abstract class AbstractTextWriter extends Task {
     private final String dateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS[XXX]";
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());

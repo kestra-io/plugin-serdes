@@ -12,6 +12,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroDeserializer;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -37,7 +38,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@io.swagger.v3.oas.annotations.media.Schema(
+@Schema(
     title = "Convert a Parquet file into ION."
 )
 @Plugin(
@@ -67,7 +68,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 )
 public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Output> {
     @NotNull
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Source file URI"
     )
     @PluginProperty(internalStorageURI = true)
@@ -142,7 +143,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @io.swagger.v3.oas.annotations.media.Schema(
+        @Schema(
             title = "URI of a temporary result file"
         )
         private URI uri;
