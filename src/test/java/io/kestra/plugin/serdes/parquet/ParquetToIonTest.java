@@ -25,7 +25,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
-class ParquetToIonWriterTest {
+class ParquetToIonTest {
     @Inject
     StorageInterface storageInterface;
 
@@ -35,7 +35,7 @@ class ParquetToIonWriterTest {
     @Test
     void ionWithInputSchema() throws Exception {
         testWithSchema(IOUtils.toString(
-            Objects.requireNonNull(ParquetToIonWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
+            Objects.requireNonNull(ParquetToIonTest.class.getClassLoader().getResource("avro/all.avsc")),
             StandardCharsets.UTF_8
         ));
     }

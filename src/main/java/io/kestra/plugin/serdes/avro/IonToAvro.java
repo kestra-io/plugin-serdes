@@ -10,10 +10,10 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
@@ -27,13 +27,14 @@ import java.util.Set;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@io.swagger.v3.oas.annotations.media.Schema(
+@Schema(
     title = "Convert an ION file into Avro."
 )
 @Plugin(
@@ -104,7 +105,7 @@ import java.net.URI;
 )
 public class IonToAvro extends AbstractAvroConverter implements RunnableTask<IonToAvro.Output> {
     @NotNull
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Source file URI"
     )
     @PluginProperty(internalStorageURI = true)
@@ -112,7 +113,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
 
     @Builder.Default
     @PluginProperty
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
         description = "Can be one of: `FAIL`, `WARN` or `SKIP`."
     )
@@ -129,15 +130,15 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
 
         // avro writer
-        var schemaParser = new Schema.Parser();
-        Schema schema;
+        var schemaParser = new org.apache.avro.Schema.Parser();
+        org.apache.avro.Schema schema;
         if (this.schema == null) {
             try (var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(rFrom))) {
                 var schemaOutputStream = new ByteArrayOutputStream();
                 new InferAvroSchema(
                     runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
                 ).inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
-                schema = schemaParser.parse(schemaOutputStream.toString());
+                schema = schemaParser.parse(schemaOutputStream.toString(StandardCharsets.UTF_8));
             }
         } else {
             try {
@@ -189,7 +190,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @io.swagger.v3.oas.annotations.media.Schema(
+        @Schema(
             title = "URI of a temporary result file"
         )
         private URI uri;
