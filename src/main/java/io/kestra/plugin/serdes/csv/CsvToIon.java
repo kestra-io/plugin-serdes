@@ -1,6 +1,5 @@
 package io.kestra.plugin.serdes.csv;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvReader;
 import de.siegmar.fastcsv.reader.CsvRecord;
@@ -15,6 +14,7 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.plugin.serdes.OnBadLines;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -25,11 +25,8 @@ import reactor.core.publisher.Mono;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import io.kestra.plugin.serdes.OnBadLines;
 
 @SuperBuilder
 @ToString
@@ -98,10 +95,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     )
     private final Property<Boolean> skipEmptyRows = Property.ofValue(false);
 
-
     @Schema(
         title = "Specifies if an exception should be thrown, if CSV data contains different field count"
-        )
+    )
     @Deprecated
     private Property<Boolean> errorOnDifferentFieldCount;
 
@@ -137,13 +133,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        // reader
         URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-        // temp file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
-        // configuration
         AtomicInteger skipped = new AtomicInteger();
 
         try (
@@ -188,8 +181,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 })
 
                 .flatMap(r -> {
-                    Map<String, Object> fields = new LinkedHashMap<>();
                     if (rHeaderValue) {
+                        Map<String, Object> fields = new LinkedHashMap<>();
                         if (r.getStartingLineNumber() == 1) {
                             for (int i = 0; i < r.getFieldCount(); i++) {
                                 headers.put(i, r.getField(i));
@@ -214,22 +207,22 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                             }
                             fields.put(header.getValue(), fieldValue);
                         }
+                        return Mono.just(fields);
                     } else {
-                        // No-header: Use positional column names
+                        List<Object> fields = new ArrayList<>(r.getFieldCount());
                         for (int i = 0; i < r.getFieldCount(); i++) {
                             String fieldValue = r.getField(i);
                             if ("\\N".equals(fieldValue)) {
                                 fieldValue = null;
                             }
-                            fields.put("col" + i, fieldValue);
+                            fields.add(fieldValue);
                         }
+                        return Mono.just(fields);
                     }
-                    return Mono.just(fields);
                 });
 
-           Mono<Long> count = FileSerde.writeAll(output, flowable);
+            Mono<Long> count = FileSerde.writeAll(output, flowable);
 
-            // metrics & finalize
             Long lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
@@ -274,7 +267,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         var handlerBuilder = de.siegmar.fastcsv.reader.CsvRecordHandler.builder();
         runContext.render(maxFieldSize).as(Integer.class)
-                       .ifPresent(handlerBuilder::maxFieldSize);
+            .ifPresent(handlerBuilder::maxFieldSize);
 
         var handler = handlerBuilder.build();
         return builder.build(handler, reader);

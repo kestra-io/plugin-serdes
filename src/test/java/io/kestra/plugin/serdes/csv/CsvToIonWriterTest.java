@@ -8,6 +8,7 @@ import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
@@ -22,6 +23,7 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -76,6 +78,34 @@ class CsvToIonWriterTest {
     @Test
     void noHeader() throws Exception {
         this.test("csv/insurance_sample_no_header.csv", false);
+    }
+
+    @Test
+    void noHeaderSingleColumnProducesListRows() throws Exception {
+        String csv = "ABC\nXYZ\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/singleColumnNoHeader.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("noHeaderSingleColumnProducesListRows")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(false))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(new InputStreamReader(in, StandardCharsets.UTF_8)).collectList().block();
+        }
+
+        assertThat(rows, is(notNullValue()));
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) List.of("ABC")));
+        assertThat(rows.get(1), is((Object) List.of("XYZ")));
     }
 
     @Test
