@@ -1,0 +1,47 @@
+id: html_to_markdown
+namespace: sanitychecks.plugin-serdes
+
+tasks:
+  - id: create_html
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      html: |
+        <!DOCTYPE html>
+        <html>
+        <head><title>Test Document</title></head>
+        <body>
+          <h1>Hello Kestra</h1>
+          <p>This is a <strong>test</strong> document with <em>various</em> HTML elements.</p>
+          <ul>
+            <li>First item</li>
+            <li>Second item</li>
+          </ul>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Key1</td>
+                <td>Value1</td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+        </html>
+
+  - id: write_html
+    type: io.kestra.plugin.core.storage.Write
+    content: "{{ outputs.create_html.values.html }}"
+    extension: ".html"
+
+  - id: convert_to_markdown
+    type: io.kestra.plugin.serdes.markdown.HtmlToMarkdown
+    from: "{{ outputs.write_html.uri }}"
+
+  - id: verify_markdown
+    type: io.kestra.plugin.core.execution.Fail
+    condition: '{{ not(read(outputs.convert_to_markdown.uri) contains "# Hello Kestra") }}'
