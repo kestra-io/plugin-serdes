@@ -27,6 +27,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
@@ -149,6 +150,77 @@ class XmlToIonWriterTest {
                 )
             );
         }
+    }
+
+    @Test
+    void readItemsListUnwrapsToIndividualRecords() throws Exception {
+        File sourceFile = SerdesUtils.resourceToFile("xml/items.xml");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        // Read back ION records
+        var records = new java.util.ArrayList<>();
+        try (var inputStream = new BufferedReader(new InputStreamReader(
+            runContextFactory.of().storage().getFile(readerOutput.getUri())))) {
+            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
+        }
+
+        // Should produce 3 individual records, not 1 nested record
+        assertThat(records.size(), is(3));
+
+        // Each record should contain job_title and avg_salary directly
+        @SuppressWarnings("unchecked")
+        Map<String, Object> first = (Map<String, Object>) records.getFirst();
+        assertThat(first.containsKey("job_title"), is(true));
+        assertThat(first.get("job_title"), is("BI Data Analyst"));
+    }
+
+    @Test
+    void roundTripIonToXmlAndBack() throws Exception {
+        // Write ION records to XML, then read back and verify we get the original records
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            List.of(
+                    ImmutableMap.of("job_title", "Data Engineer", "avg_salary", 157510.03),
+                    ImmutableMap.of("job_title", "Data Analyst", "avg_salary", 116348.29)
+                )
+                .forEach(throwConsumer(row -> FileSerde.write(output, row)));
+        }
+
+        URI ionUri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+        // Write to XML
+        IonToXml.Output writerOutput = this.writer(ionUri);
+
+        // Read back from XML
+        XmlToIon readerTask = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(writerOutput.getUri().toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = readerTask.run(TestsUtils.mockRunContext(this.runContextFactory, readerTask, ImmutableMap.of()));
+
+        // Read ION records
+        var records = new java.util.ArrayList<>();
+        try (var inputStream = new BufferedReader(new InputStreamReader(
+            runContextFactory.of().storage().getFile(readerOutput.getUri())))) {
+            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
+        }
+
+        // Should get 2 individual records back
+        assertThat(records.size(), is(2));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> first = (Map<String, Object>) records.getFirst();
+        assertThat(first.get("job_title"), is("Data Engineer"));
     }
 
     @Test

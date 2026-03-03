@@ -148,8 +148,42 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                 return null;
             }
         } else {
+            return unwrapRootArray(jsonObject);
+        }
+    }
+
+    /**
+     * Unwraps the root XML structure to extract the inner array of records when the XML
+     * follows the common pattern produced by {@link IonToXml}: {@code <items><item>...</item></items>}.
+     * <p>
+     * Handles two patterns:
+     * <ul>
+     *   <li>{@code {"root": [...]}} — root element directly contains an array</li>
+     *   <li>{@code {"root": {"child": [...]}}} — root element wraps a single child element containing an array</li>
+     * </ul>
+     * Falls back to returning the original JSONObject if the structure doesn't match.
+     */
+    private Object unwrapRootArray(JSONObject jsonObject) {
+        if (jsonObject.length() != 1) {
             return jsonObject;
         }
+
+        var rootKey = jsonObject.keys().next();
+        var rootValue = jsonObject.get(rootKey);
+
+        if (rootValue instanceof JSONArray) {
+            return rootValue;
+        }
+
+        if (rootValue instanceof JSONObject innerObj && innerObj.length() == 1) {
+            var innerKey = innerObj.keys().next();
+            var innerValue = innerObj.get(innerKey);
+            if (innerValue instanceof JSONArray) {
+                return innerValue;
+            }
+        }
+
+        return jsonObject;
     }
 
     @Builder
