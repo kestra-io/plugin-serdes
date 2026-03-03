@@ -52,7 +52,7 @@ public class HtmlToMarkdownTest {
         try (InputStream resultStream = storageInterface.get(MAIN_TENANT, null, output.getUri())) {
             String markdown = new String(resultStream.readAllBytes(), StandardCharsets.UTF_8);
 
-            assertThat(markdown, containsString("Hello Kestra"));
+            assertThat(markdown, containsString("# Hello Kestra"));
             assertThat(markdown, containsString("**bold**"));
             assertThat(markdown, containsString("*italic*"));
             assertThat(markdown, containsString("[link](https://kestra.io)"));
@@ -96,7 +96,7 @@ public class HtmlToMarkdownTest {
         try (InputStream resultStream = storageInterface.get(MAIN_TENANT, null, output.getUri())) {
             String markdown = new String(resultStream.readAllBytes(), StandardCharsets.UTF_8);
 
-            assertThat(markdown, containsString("Hello Kestra"));
+            assertThat(markdown, containsString("# Hello Kestra"));
             assertThat(markdown, containsString("**bold**"));
             assertThat(markdown, containsString("First item"));
             assertThat(markdown, containsString("Second item"));

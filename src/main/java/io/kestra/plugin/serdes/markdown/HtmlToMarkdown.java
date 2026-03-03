@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.markdown;
 
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
+import com.vladsch.flexmark.util.data.MutableDataSet;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -23,7 +24,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-
+import static com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter.SETEXT_HEADINGS;
 
 @SuperBuilder
 @ToString
@@ -95,13 +96,13 @@ public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.
     private Property<String> from;
 
     @Schema(
-        title = "List of HTML tags to ignore during conversion.",
+        title = "List of HTML tags to ignore during conversion",
         description = "Tags specified in this list will be skipped during the conversion process. Common tags to ignore include 'script', 'style', 'nav', etc."
     )
     private Property<List<String>> ignoreTags;
 
     @Schema(
-        title = "Base URI for resolving relative links.",
+        title = "Base URI for resolving relative links",
         description = "When provided, relative URLs in the HTML (e.g., href and src attributes) will be resolved to absolute URLs using this base URI."
     )
     private Property<String> baseUri;
@@ -163,9 +164,10 @@ public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.
             htmlContent = doc.html();
         }
 
-        // Configure FlexmarkHtmlConverter with ATX headings
-        var converter = FlexmarkHtmlConverter.builder()
-            .build();
+        // Configure FlexmarkHtmlConverter with ATX headings (# instead of underlines)
+        MutableDataSet options = new MutableDataSet();
+        options.set(SETEXT_HEADINGS, false);  // Use ATX headings (# format)
+        var converter = FlexmarkHtmlConverter.builder(options).build();
         String markdown = converter.convert(htmlContent);
 
         // Write to temp file

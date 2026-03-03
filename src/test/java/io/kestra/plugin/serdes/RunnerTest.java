@@ -34,6 +34,13 @@ class RunnerTest {
     }
 
     @Test
+    @ExecuteFlow("sanity-checks/html_to_markdown.yaml")
+    void html_to_markdown(Execution execution) {
+        assertThat(execution.getTaskRunList(), hasSize(4));
+        assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
+    }
+
+    @Test
     @ExecuteFlow("sanity-checks/infer_ion_avro.yaml")
     void infer_ion_avro(Execution execution) {
         assertThat(execution.getTaskRunList(), hasSize(9));
