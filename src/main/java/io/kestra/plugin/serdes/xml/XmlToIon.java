@@ -1,6 +1,5 @@
 package io.kestra.plugin.serdes.xml;
 
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -20,12 +19,15 @@ import org.json.JSONObject;
 import org.json.XML;
 import org.json.XMLParserConfiguration;
 
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -78,7 +80,11 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Schema(
-        title = "XPath use to query in the XML file."
+        title = "Path selector to stream matching elements from the XML file.",
+        description = """
+            When set, uses StAX streaming to extract elements matching the given path
+            (e.g. `/catalog/book`). Each matching element is written as a separate ION record.
+            When not set, the entire XML file is parsed into a single ION record."""
     )
     private Property<String> query;
 
@@ -89,46 +95,22 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        // reader
-        URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        var from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        var rCharset = runContext.render(charset).as(String.class).orElseThrow();
+        var rQuery = runContext.render(this.query).as(String.class);
 
-        // temp file
-        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+        var tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
-        try (
-            Reader input = new BufferedReader(
-                new InputStreamReader(
-                    runContext.storage().getFile(from),
-                    runContext.render(charset).as(String.class).orElseThrow()
-                ),
-                FileSerde.BUFFER_SIZE
-            );
-            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
-        ) {
-            XMLParserConfiguration xmlParserConfiguration = new XMLParserConfiguration();
-            if (parserConfiguration != null) {
-                var renderedParserConfig = runContext.render(parserConfiguration.getForceList()).asList(String.class);
-                xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(renderedParserConfig));
-            }
-            JSONObject jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
+        var xmlParserConfiguration = new XMLParserConfiguration();
+        if (parserConfiguration != null) {
+            var rParserConfig = runContext.render(parserConfiguration.getForceList()).asList(String.class);
+            xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(rParserConfig));
+        }
 
-            Object result = result(jsonObject, runContext);
-
-            if (result instanceof JSONObject) {
-                Map<String, Object> map = ((JSONObject) result).toMap();
-                FileSerde.write(output, map);
-                runContext.metric(Counter.of("records", map.size()));
-            } else if (result instanceof JSONArray) {
-                List<Object> list = ((JSONArray) result).toList();
-                list.forEach(throwConsumer(o -> {
-                    FileSerde.write(output, o);
-                }));
-                runContext.metric(Counter.of("records", list.size()));
-            } else {
-                FileSerde.write(output, result);
-            }
-
-            output.flush();
+        if (rQuery.isPresent()) {
+            runStreaming(runContext, from, rCharset, rQuery.get(), xmlParserConfiguration, tempFile);
+        } else {
+            runBatch(runContext, from, rCharset, xmlParserConfiguration, tempFile);
         }
 
         return Output
@@ -137,18 +119,30 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             .build();
     }
 
-    private Object result(JSONObject jsonObject, RunContext runContext) throws IllegalVariableEvaluationException {
-        var renderedQuery = runContext.render(this.query).as(String.class);
-        var logger = runContext.logger();
-        if (renderedQuery.isPresent()) {
-            try {
-                return jsonObject.query(renderedQuery.get());
-            } catch (Exception e) {
-                logger.debug("JsonObject query failed, Object maybe null or empty.");
-                return null;
+    private void runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
+        try (
+            Reader input = new BufferedReader(
+                new InputStreamReader(runContext.storage().getFile(from), charset),
+                FileSerde.BUFFER_SIZE
+            );
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
+        ) {
+            var jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
+            var result = unwrapRootArray(jsonObject);
+
+            if (result instanceof JSONArray array) {
+                var list = array.toList();
+                list.forEach(throwConsumer(o -> FileSerde.write(output, o)));
+                runContext.metric(Counter.of("records", list.size()));
+            } else if (result instanceof JSONObject obj) {
+                var map = obj.toMap();
+                FileSerde.write(output, map);
+                runContext.metric(Counter.of("records", map.size()));
+            } else {
+                FileSerde.write(output, result);
             }
-        } else {
-            return unwrapRootArray(jsonObject);
+
+            output.flush();
         }
     }
 
@@ -184,6 +178,206 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         }
 
         return jsonObject;
+    }
+
+    private void runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
+        // Parse query: "/catalog/book" → parentSegments=["catalog"], elementName="book"
+        var segments = query.replaceFirst("^/", "").split("/");
+        var parentSegments = new String[segments.length - 1];
+        System.arraycopy(segments, 0, parentSegments, 0, segments.length - 1);
+        var elementName = segments[segments.length - 1];
+
+        var factory = XMLInputFactory.newInstance();
+        // Disable external entities for security
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+
+        var recordCount = 0;
+
+        try (
+            InputStream is = runContext.storage().getFile(from);
+            BufferedInputStream bis = new BufferedInputStream(is, FileSerde.BUFFER_SIZE);
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
+        ) {
+            XMLStreamReader reader;
+            try {
+                reader = factory.createXMLStreamReader(bis, charset);
+            } catch (XMLStreamException e) {
+                // Empty or unparseable XML file — produce empty output
+                runContext.logger().debug("Failed to parse XML stream, file may be empty.");
+                output.flush();
+                return;
+            }
+
+            try {
+                boolean parentFound;
+                try {
+                    parentFound = navigateToParent(reader, parentSegments);
+                } catch (XMLStreamException e) {
+                    // Empty or malformed XML — produce empty output
+                    runContext.logger().debug("Failed to navigate XML stream, file may be empty.");
+                    output.flush();
+                    return;
+                }
+                if (!parentFound) {
+                    output.flush();
+                    return;
+                }
+
+                // Now we are positioned on the parent element's START_ELEMENT.
+                // Iterate over its children looking for matching elements.
+                int depth = 0;
+                while (reader.hasNext()) {
+                    int event = reader.next();
+                    if (event == XMLStreamConstants.START_ELEMENT) {
+                        if (depth == 0 && reader.getLocalName().equals(elementName)) {
+                            String xmlFragment = readElementAsXml(reader);
+                            JSONObject parsed = XML.toJSONObject(xmlFragment, xmlParserConfiguration);
+                            // Unwrap the outer element key
+                            Object inner = parsed.opt(elementName);
+                            if (inner instanceof JSONObject) {
+                                FileSerde.write(output, ((JSONObject) inner).toMap());
+                            } else if (inner instanceof JSONArray) {
+                                List<Object> list = ((JSONArray) inner).toList();
+                                for (Object o : list) {
+                                    FileSerde.write(output, o);
+                                    recordCount++;
+                                }
+                                continue;
+                            } else {
+                                FileSerde.write(output, inner);
+                            }
+                            recordCount++;
+                        } else {
+                            // Non-matching child: skip its entire subtree
+                            skipElement(reader);
+                        }
+                    } else if (event == XMLStreamConstants.END_ELEMENT) {
+                        if (depth == 0) {
+                            // End of the parent element
+                            break;
+                        }
+                        depth--;
+                    }
+                }
+            } finally {
+                reader.close();
+            }
+
+            output.flush();
+        }
+
+        runContext.metric(Counter.of("records", recordCount));
+    }
+
+    /**
+     * Advance the StAX reader to the start element matching the parent path.
+     * For example, parentSegments=["catalog"] will position on &lt;catalog&gt;.
+     * Returns false if the parent path was not found.
+     */
+    private boolean navigateToParent(XMLStreamReader reader, String[] parentSegments) throws Exception {
+        for (String segment : parentSegments) {
+            boolean found = false;
+            while (reader.hasNext()) {
+                int event = reader.next();
+                if (event == XMLStreamConstants.START_ELEMENT) {
+                    if (reader.getLocalName().equals(segment)) {
+                        found = true;
+                        break;
+                    } else {
+                        skipElement(reader);
+                    }
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Read the current element (the reader is positioned on its START_ELEMENT)
+     * and return its complete XML subtree as a string, including the element tag itself.
+     * After this method returns, the reader is positioned just after the matching END_ELEMENT.
+     */
+    private String readElementAsXml(XMLStreamReader reader) throws Exception {
+        var sb = new StringBuilder();
+        var localName = reader.getLocalName();
+
+        // Write opening tag with attributes
+        sb.append('<').append(localName);
+        for (int i = 0; i < reader.getAttributeCount(); i++) {
+            sb.append(' ').append(reader.getAttributeLocalName(i))
+                .append("=\"").append(escapeXmlAttribute(reader.getAttributeValue(i))).append('"');
+        }
+        sb.append('>');
+
+        int depth = 1;
+        while (reader.hasNext() && depth > 0) {
+            int event = reader.next();
+            switch (event) {
+                case XMLStreamConstants.START_ELEMENT:
+                    depth++;
+                    sb.append('<').append(reader.getLocalName());
+                    for (int i = 0; i < reader.getAttributeCount(); i++) {
+                        sb.append(' ').append(reader.getAttributeLocalName(i))
+                            .append("=\"").append(escapeXmlAttribute(reader.getAttributeValue(i))).append('"');
+                    }
+                    sb.append('>');
+                    break;
+                case XMLStreamConstants.END_ELEMENT:
+                    depth--;
+                    if (depth > 0) {
+                        sb.append("</").append(reader.getLocalName()).append('>');
+                    }
+                    break;
+                case XMLStreamConstants.CHARACTERS:
+                case XMLStreamConstants.SPACE:
+                    sb.append(escapeXmlContent(reader.getText()));
+                    break;
+                case XMLStreamConstants.CDATA:
+                    sb.append("<![CDATA[").append(reader.getText()).append("]]>");
+                    break;
+                default:
+                    break;
+            }
+        }
+        // Close the outer element
+        sb.append("</").append(localName).append('>');
+
+        return sb.toString();
+    }
+
+    /**
+     * Skip the current element and all its children.
+     * The reader must be positioned on a START_ELEMENT.
+     * After this method returns, the reader is positioned just after the matching END_ELEMENT.
+     */
+    private void skipElement(XMLStreamReader reader) throws Exception {
+        int depth = 1;
+        while (reader.hasNext() && depth > 0) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                depth++;
+            } else if (event == XMLStreamConstants.END_ELEMENT) {
+                depth--;
+            }
+        }
+    }
+
+    private static String escapeXmlContent(String text) {
+        return text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;");
+    }
+
+    private static String escapeXmlAttribute(String text) {
+        return text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;");
     }
 
     @Builder
