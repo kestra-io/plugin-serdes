@@ -12,10 +12,10 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.serdes.avro.AbstractAvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -27,6 +27,7 @@ import org.apache.parquet.hadoop.util.HadoopOutputFile;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Locale;
 
@@ -38,7 +39,7 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@io.swagger.v3.oas.annotations.media.Schema(
+@Schema(
     title = "Convert an ION file into Parquet."
 )
 @Plugin(
@@ -93,38 +94,38 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
 )
 public class IonToParquet extends AbstractAvroConverter implements RunnableTask<IonToParquet.Output> {
     @NotNull
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Source file URI"
     )
     @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "The compression to used"
     )
     Property<CompressionCodec> compressionCodec = Property.ofValue(CompressionCodec.GZIP);
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Target row group size"
     )
     private Property<Version> parquetVersion = Property.ofValue(Version.V2);
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Target row group size"
     )
     private Property<Long> rowGroupSize = Property.ofValue((long) org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE);
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Target page size"
     )
     private Property<Integer> pageSize = Property.ofValue(ParquetWriter.DEFAULT_PAGE_SIZE);
 
     @Builder.Default
-    @io.swagger.v3.oas.annotations.media.Schema(
+    @Schema(
         title = "Max dictionary page size"
     )
     private Property<Integer> dictionaryPageSize = Property.ofValue(ParquetWriter.DEFAULT_PAGE_SIZE);
@@ -145,19 +146,20 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         tempDir.toFile().mkdirs();
         File tempFile = Files.createTempFile(tempDir, "", ".parquet").toFile();
 
-        BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile));
-
         // reader
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // avro schema
-        var schemaParser = new Schema.Parser();
-        Schema schema = null;
-        if(this.schema == null){
-            var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from));
-            var schemaOutputStream = new ByteArrayOutputStream();
-            new InferAvroSchema().inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
-            schema = schemaParser.parse(schemaOutputStream.toString());
+        var schemaParser = new org.apache.avro.Schema.Parser();
+        org.apache.avro.Schema schema;
+        if (this.schema == null) {
+            try (var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from))) {
+                var schemaOutputStream = new ByteArrayOutputStream();
+                new InferAvroSchema(
+                    runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
+                ).inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
+                schema = schemaParser.parse(schemaOutputStream.toString(StandardCharsets.UTF_8));
+            }
         } else {
             schema = schemaParser.parse(runContext.render(this.schema));
         }
@@ -187,8 +189,6 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));
-
-            output.flush();
         }
 
         return Output
@@ -200,7 +200,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @io.swagger.v3.oas.annotations.media.Schema(
+        @Schema(
             title = "URI of a temporary result file"
         )
         private URI uri;

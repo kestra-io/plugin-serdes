@@ -1,23 +1,58 @@
 id: infer_ion_parquet
 namespace: sanitychecks.plugin-serdes
 
+description: |
+  Demonstrates ION to Parquet conversion with multiple approaches:
+  1. Automatic schema inference (no schema property)
+  2. Explicit schema provided
+  Round-trip validation ensures data integrity.
+
 tasks:
   - id: create_csv
     type: io.kestra.plugin.core.http.Download
     uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/orders.csv
+
   - id: convert_to_ion
     type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{ outputs.create_csv.uri}}"
+    from: "{{ outputs.create_csv.uri }}"
 
-  - id: convert_ion_to_parquet_using_an_inferred_schema
+  # APPROACH 1: Automatic schema inference (no schema property)
+  - id: convert_ion_to_parquet_auto_inference
     type: io.kestra.plugin.serdes.parquet.IonToParquet
     from: "{{ outputs.convert_to_ion.uri }}"
+    # Schema omitted - will be inferred automatically from ION structure
 
-  - id: convert_back_to_ion
+  - id: convert_back_to_ion_auto_inference
     type: io.kestra.plugin.serdes.parquet.ParquetToIon
-    from: "{{ outputs.convert_ion_to_parquet_using_an_inferred_schema.uri }}"
+    from: "{{ outputs.convert_ion_to_parquet_auto_inference.uri }}"
 
+  # APPROACH 2: Explicit schema
+  - id: convert_ion_to_parquet_explicit_schema
+    type: io.kestra.plugin.serdes.parquet.IonToParquet
+    from: "{{ outputs.convert_to_ion.uri }}"
+    schema: |
+      {
+        "type": "record",
+        "name": "Order",
+        "namespace": "com.example.orders",
+        "fields": [
+          { "name": "order_id", "type": "string" },
+          { "name": "customer_name", "type": "string" },
+          { "name": "customer_email", "type": "string" },
+          { "name": "product_id", "type": "int" },
+          { "name": "price", "type": "float" },
+          { "name": "quantity", "type": "int" },
+          { "name": "total", "type": "float" }
+        ]
+      }
+
+  - id: convert_back_to_ion_explicit_schema
+    type: io.kestra.plugin.serdes.parquet.ParquetToIon
+    from: "{{ outputs.convert_ion_to_parquet_explicit_schema.uri }}"
+
+  # Validate both approaches produce equivalent results
   - id: assert
     type: io.kestra.plugin.core.execution.Assert
     conditions:
-      - '{{ fromIon(read(outputs.convert_to_ion["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion["uri"])).order_id }}'
+      - '{{ fromIon(read(outputs.convert_to_ion["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion_auto_inference["uri"])).order_id }}'
+      - '{{ fromIon(read(outputs.convert_back_to_ion_auto_inference["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion_explicit_schema["uri"])).order_id }}'

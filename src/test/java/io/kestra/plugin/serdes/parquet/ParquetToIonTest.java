@@ -25,7 +25,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
-class ParquetToIonWriterTest {
+class ParquetToIonTest {
     @Inject
     StorageInterface storageInterface;
 
@@ -35,7 +35,7 @@ class ParquetToIonWriterTest {
     @Test
     void ionWithInputSchema() throws Exception {
         testWithSchema(IOUtils.toString(
-            Objects.requireNonNull(ParquetToIonWriterTest.class.getClassLoader().getResource("avro/all.avsc")),
+            Objects.requireNonNull(ParquetToIonTest.class.getClassLoader().getResource("avro/all.avsc")),
             StandardCharsets.UTF_8
         ));
     }
@@ -95,5 +95,29 @@ class ParquetToIonWriterTest {
             assertThat(result.get(0).get("ZonedDateTime"), instanceOf(LocalDateTime.class));
             assertThat(result.get(0).get("ZonedDateTime"), is(LocalDateTime.parse("2021-08-02T10:00:00")));
         }
+    }
+
+    @Test
+    void inferenceFailsOnEmptyFile() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_empty_", ".ion");
+        // Write nothing to the file - it's empty
+
+        URI uri;
+        try (InputStream inputStream = new FileInputStream(tempFile)) {
+            uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), inputStream);
+        }
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IonToParquet.class.getSimpleName())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(null) // No schema - inference required
+            .build();
+
+        IllegalStateException exception = org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalStateException.class,
+            () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
+        );
+        assertThat(exception.getMessage(), is("Cannot infer Avro schema from ION input: the file appears to be empty or contains no valid records."));
     }
 }

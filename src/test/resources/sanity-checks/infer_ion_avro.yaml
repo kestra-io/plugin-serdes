@@ -1,21 +1,25 @@
 id: infer_ion_avro
 namespace: sanitychecks.plugin-serdes
 
+description: |
+  Demonstrates ION to Avro conversion with multiple approaches:
+  1. Explicit schema provided
+  2. Schema inferred automatically (no schema property)
+  3. Schema inferred via InferAvroSchemaFromIon task
+
 tasks:
   - id: create_csv
     type: io.kestra.plugin.core.http.Download
     uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/orders.csv
+
   - id: convert_to_ion
     type: io.kestra.plugin.serdes.csv.CsvToIon
-    from: "{{ outputs.create_csv.uri}}"
-  - id: convert_to_json
-    type: io.kestra.plugin.serdes.json.IonToJson
-    from: "{{ outputs.convert_to_ion.uri}}"
+    from: "{{ outputs.create_csv.uri }}"
 
-  # OLD WAY
-  - id: convert_to_avro_with_a_know_schema
+  # APPROACH 1: Explicit schema
+  - id: convert_to_avro_with_explicit_schema
     type: io.kestra.plugin.serdes.avro.IonToAvro
-    from: "{{ outputs.convert_to_ion.uri}}"
+    from: "{{ outputs.convert_to_ion.uri }}"
     schema: |
       {
         "type": "record",
@@ -23,7 +27,7 @@ tasks:
         "namespace": "com.example.orders",
         "fields": [
           { "name": "order_id", "type": "string" },
-          { "name": "ustomer_name", "type": "string" },
+          { "name": "customer_name", "type": "string" },
           { "name": "customer_email", "type": "string" },
           { "name": "product_id", "type": "int" },
           { "name": "price", "type": "float" },
@@ -31,23 +35,38 @@ tasks:
           { "name": "total", "type": "float" }
         ]
       }
-  - id: convert_back_to_ion_known_schema
-    type: io.kestra.plugin.serdes.avro.AvroToIon
-    from: "{{ outputs.convert_to_avro_with_a_know_schema.uri }}"
 
-  # NEW WAY WITH INFERENCE
+  - id: convert_back_to_ion_explicit_schema
+    type: io.kestra.plugin.serdes.avro.AvroToIon
+    from: "{{ outputs.convert_to_avro_with_explicit_schema.uri }}"
+
+  # APPROACH 2: Automatic schema inference (no schema property)
+  - id: convert_to_avro_with_auto_inference
+    type: io.kestra.plugin.serdes.avro.IonToAvro
+    from: "{{ outputs.convert_to_ion.uri }}"
+    # Schema omitted - will be inferred automatically from ION structure
+
+  - id: convert_back_to_ion_auto_inference
+    type: io.kestra.plugin.serdes.avro.AvroToIon
+    from: "{{ outputs.convert_to_avro_with_auto_inference.uri }}"
+
+  # APPROACH 3: Explicit inference step (for schema inspection/reuse)
   - id: infer_avro_schema_from_ion
     type: io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon
-    from: "{{ outputs.convert_to_ion.uri}}"
-  - id: convert_ion_to_avro_using_an_inferred_schema
+    from: "{{ outputs.convert_to_ion.uri }}"
+
+  - id: convert_to_avro_with_inferred_schema_step
     type: io.kestra.plugin.serdes.avro.IonToAvro
     from: "{{ outputs.convert_to_ion.uri }}"
     schema: "{{ read(outputs.infer_avro_schema_from_ion.uri) }}"
-  - id: convert_back_to_ion_inferred_schema
-    type: io.kestra.plugin.serdes.avro.AvroToIon
-    from: "{{ outputs.convert_ion_to_avro_using_an_inferred_schema.uri }}"
 
+  - id: convert_back_to_ion_inferred_schema_step
+    type: io.kestra.plugin.serdes.avro.AvroToIon
+    from: "{{ outputs.convert_to_avro_with_inferred_schema_step.uri }}"
+
+  # Validate all approaches produce equivalent results
   - id: assert
     type: io.kestra.plugin.core.execution.Assert
     conditions:
-      - '{{ fromIon(read(outputs.convert_back_to_ion_known_schema["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion_inferred_schema["uri"])).order_id }}'
+      - '{{ fromIon(read(outputs.convert_back_to_ion_explicit_schema["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion_auto_inference["uri"])).order_id }}'
+      - '{{ fromIon(read(outputs.convert_back_to_ion_auto_inference["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion_inferred_schema_step["uri"])).order_id }}'
