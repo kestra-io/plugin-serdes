@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<items>
+  <item>
+    <job_title>BI Data Analyst</job_title>
+    <avg_salary>836644.8</avg_salary>
+  </item>
+  <item>
+    <job_title>ML Engineer</job_title>
+    <avg_salary>679247.63</avg_salary>
+  </item>
+  <item>
+    <job_title>Data Scientist</job_title>
+    <avg_salary>257422.32</avg_salary>
+  </item>
+</items>
