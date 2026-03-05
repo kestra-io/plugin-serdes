@@ -252,4 +252,33 @@ class XmlToIonWriterTest {
             InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is("\"\""));
     }
+
+    @Test
+    void largeXmlStreaming() throws Exception {
+        int recordCount = 10_000;
+
+        // Generate a large XML file
+        File largeXml = File.createTempFile("large_xml_", ".xml");
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(largeXml))) {
+            bw.write("<?xml version=\"1.0\"?>\n<catalog>\n");
+            for (int i = 0; i < recordCount; i++) {
+                bw.write("  <item id=\"" + i + "\"><name>Item " + i + "</name><value>" + (i * 1.5) + "</value></item>\n");
+            }
+            bw.write("</catalog>\n");
+        }
+
+        XmlToIon.Output output = this.reader(largeXml, "/catalog/item");
+
+        // Read back all records and count them
+        int count = 0;
+        try (BufferedReader br = new BufferedReader(
+            new InputStreamReader(runContextFactory.of().storage().getFile(output.getUri())))) {
+            while (br.readLine() != null) {
+                count++;
+            }
+        }
+
+        assertThat(count, is(recordCount));
+        largeXml.delete();
+    }
 }
