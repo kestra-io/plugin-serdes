@@ -133,6 +133,169 @@ class IonToCsvTest {
     }
 
     @Test
+    void alwaysDelimitTextFalse_mixedTypes() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            List.of(
+                    ImmutableMap.builder()
+                        .put("referencia", "PE1617279780")
+                        .put("descripcion", "E:4 PAST FR")
+                        .put("cantidad", 1)
+                        .put("precio", 34.03)
+                        .build()
+                )
+                .forEach(throwConsumer(row -> FileSerde.write(output, row)));
+
+            URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+            IonToCsv writer = IonToCsv.builder()
+                .id(IonToCsvTest.class.getSimpleName())
+                .type(IonToCsv.class.getName())
+                .from(Property.ofValue(uri.toString()))
+                .header(Property.ofValue(false))
+                .alwaysDelimitText(Property.ofValue(false))
+                .build();
+            IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri())));
+
+            // With alwaysDelimitText=false, plain strings and numbers should NOT be quoted
+            assertThat(out, is("PE1617279780,E:4 PAST FR,1,34.03\n"));
+        }
+    }
+
+    @Test
+    void quoteModeNonNumeric() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            List.of(
+                    ImmutableMap.builder()
+                        .put("referencia", "PE1617279780")
+                        .put("descripcion", "E:4 PAST FR")
+                        .put("cantidad", 1)
+                        .put("precio", 34.03)
+                        .build()
+                )
+                .forEach(throwConsumer(row -> FileSerde.write(output, row)));
+
+            URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+            IonToCsv writer = IonToCsv.builder()
+                .id(IonToCsvTest.class.getSimpleName())
+                .type(IonToCsv.class.getName())
+                .from(Property.ofValue(uri.toString()))
+                .header(Property.ofValue(false))
+                .quoteMode(Property.ofValue(IonToCsv.QuoteMode.NON_NUMERIC))
+                .build();
+            IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri())));
+
+            // NON_NUMERIC: strings are quoted, numbers are not
+            assertThat(out, is("\"PE1617279780\",\"E:4 PAST FR\",1,34.03\n"));
+        }
+    }
+
+    @Test
+    void quoteModeNonNumeric_withHeader() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            List.of(
+                    ImmutableMap.builder()
+                        .put("referencia", "PE1617279780")
+                        .put("descripcion", "E:4 PAST FR")
+                        .put("cantidad", 1)
+                        .put("precio", 34.03)
+                        .build()
+                )
+                .forEach(throwConsumer(row -> FileSerde.write(output, row)));
+
+            URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+            IonToCsv writer = IonToCsv.builder()
+                .id(IonToCsvTest.class.getSimpleName())
+                .type(IonToCsv.class.getName())
+                .from(Property.ofValue(uri.toString()))
+                .header(Property.ofValue(true))
+                .quoteMode(Property.ofValue(IonToCsv.QuoteMode.NON_NUMERIC))
+                .build();
+            IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri())));
+
+            // Headers are also quoted (they are strings), data numbers are not
+            assertThat(out, is("\"referencia\",\"descripcion\",\"cantidad\",\"precio\"\n\"PE1617279780\",\"E:4 PAST FR\",1,34.03\n"));
+        }
+    }
+
+    @Test
+    void quoteModeNonNumeric_negativeAndDecimal() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            List.of(
+                    ImmutableMap.builder()
+                        .put("label", "test")
+                        .put("positive_int", 42)
+                        .put("negative_int", -7)
+                        .put("decimal", 3.14)
+                        .put("negative_decimal", -0.5)
+                        .put("not_a_number", "12abc")
+                        .build()
+                )
+                .forEach(throwConsumer(row -> FileSerde.write(output, row)));
+
+            URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+            IonToCsv writer = IonToCsv.builder()
+                .id(IonToCsvTest.class.getSimpleName())
+                .type(IonToCsv.class.getName())
+                .from(Property.ofValue(uri.toString()))
+                .header(Property.ofValue(false))
+                .quoteMode(Property.ofValue(IonToCsv.QuoteMode.NON_NUMERIC))
+                .build();
+            IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri())));
+
+            // Strings and non-numeric values are quoted, all numeric formats are not
+            assertThat(out, is("\"test\",42,-7,3.14,-0.5,\"12abc\"\n"));
+        }
+    }
+
+    @Test
+    void alwaysDelimitTextFalse_preQuotedStrings() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            List.of(
+                    ImmutableMap.builder()
+                        .put("referencia", "\"PE1617279780\"")
+                        .put("descripcion", "\"E:4 PAST FR\"")
+                        .put("cantidad", 1)
+                        .put("precio", 34.03)
+                        .build()
+                )
+                .forEach(throwConsumer(row -> FileSerde.write(output, row)));
+
+            URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+            IonToCsv writer = IonToCsv.builder()
+                .id(IonToCsvTest.class.getSimpleName())
+                .type(IonToCsv.class.getName())
+                .from(Property.ofValue(uri.toString()))
+                .header(Property.ofValue(false))
+                .alwaysDelimitText(Property.ofValue(false))
+                .build();
+            IonToCsv.Output writerRunOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri())));
+
+            // Pre-embedded quotes get escaped per RFC 4180: " becomes "" and field is quoted
+            // This is expected CSV behavior - the user's workaround of pre-quoting makes it worse
+            assertThat(out, is("\"\"\"PE1617279780\"\"\",\"\"\"E:4 PAST FR\"\"\",1,34.03\n"));
+        }
+    }
+
+    @Test
     void ion() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {

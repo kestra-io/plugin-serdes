@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.csv;
 import de.siegmar.fastcsv.writer.CsvWriter;
 import de.siegmar.fastcsv.writer.LineDelimiter;
 import de.siegmar.fastcsv.writer.QuoteStrategies;
+import de.siegmar.fastcsv.writer.QuoteStrategy;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
@@ -70,6 +71,35 @@ import java.util.function.Consumer;
                     type: io.kestra.plugin.serdes.csv.IonToCsv
                     from: "{{ outputs.avg_salary_by_job_title.uri }}"
                 """
+        ),
+        @Example(
+            full = true,
+            title = "Query a database and export to CSV with quoted strings but unquoted numbers using the NON_NUMERIC quote mode.",
+            code = """
+                id: export_csv_non_numeric
+                namespace: company.team
+
+                tasks:
+                  - id: query
+                    type: io.kestra.plugin.jdbc.snowflake.Query
+                    fetchType: STORE
+                    sql: |
+                      SELECT
+                        Referencia,
+                        Descripcion,
+                        Cantidad,
+                        Precio
+                      FROM my_table
+                    url: "jdbc:snowflake://{{ namespace.snowflake.account }}.snowflakecomputing.com"
+                    username: "{{ namespace.snowflake.user }}"
+                    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+                  - id: to_csv
+                    type: io.kestra.plugin.serdes.csv.IonToCsv
+                    from: "{{ outputs.query.uri }}"
+                    header: false
+                    quoteMode: NON_NUMERIC
+                """
         )
     },
     metrics = {
@@ -111,9 +141,20 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
 
     @Builder.Default
     @Schema(
-        title = "Whether fields should always be delimited using the textDelimiter option."
+        title = "Whether fields should always be delimited using the textDelimiter option",
+        description = "Deprecated: use `quoteMode` instead for more control. If `quoteMode` is set, this property is ignored."
     )
     private final Property<Boolean> alwaysDelimitText = Property.ofValue(false);
+
+    @Schema(
+        title = "Controls when fields are quoted",
+        description = """
+            When set, this property takes precedence over `alwaysDelimitText`.
+            - `ALWAYS`: quote all fields.
+            - `REQUIRED`: only quote fields that contain special characters (field separator, quote character, or newlines) as per RFC 4180.
+            - `NON_NUMERIC`: quote all fields except those that are numeric (integer or decimal). Useful when downstream systems expect quoted strings but unquoted numbers."""
+    )
+    private Property<QuoteMode> quoteMode;
 
     @Builder.Default
     @Schema(
@@ -207,10 +248,65 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
             .map(LineDelimiter::of)
             .ifPresent(builder::lineDelimiter);
 
-        runContext.render(this.alwaysDelimitText).as(Boolean.class)
-            .filter(Boolean.TRUE::equals)
-            .ifPresent(b -> builder.quoteStrategy(QuoteStrategies.ALWAYS));
+        var rQuoteMode = this.quoteMode != null
+            ? runContext.render(this.quoteMode).as(QuoteMode.class).orElse(null)
+            : null;
+
+        if (rQuoteMode != null) {
+            builder.quoteStrategy(rQuoteMode.toQuoteStrategy());
+        } else {
+            runContext.render(this.alwaysDelimitText).as(Boolean.class)
+                .filter(Boolean.TRUE::equals)
+                .ifPresent(b -> builder.quoteStrategy(QuoteStrategies.ALWAYS));
+        }
 
         return builder.build(writer);
+    }
+
+    public enum QuoteMode {
+        ALWAYS,
+        REQUIRED,
+        NON_NUMERIC;
+
+        private static final QuoteStrategy NON_NUMERIC_STRATEGY = new QuoteStrategy() {
+            @Override
+            public boolean quoteValue(int lineNo, int fieldIdx, String value) {
+                return !isNumeric(value);
+            }
+
+            private boolean isNumeric(String value) {
+                if (value.isEmpty()) {
+                    return false;
+                }
+                int start = 0;
+                if (value.charAt(0) == '-' || value.charAt(0) == '+') {
+                    if (value.length() == 1) {
+                        return false;
+                    }
+                    start = 1;
+                }
+                boolean hasDecimalPoint = false;
+                for (int i = start; i < value.length(); i++) {
+                    var c = value.charAt(i);
+                    if (c == '.') {
+                        if (hasDecimalPoint) {
+                            return false;
+                        }
+                        hasDecimalPoint = true;
+                    } else if (c < '0' || c > '9') {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        };
+
+        QuoteStrategy toQuoteStrategy() {
+            return switch (this) {
+                case ALWAYS -> QuoteStrategies.ALWAYS;
+                case REQUIRED -> QuoteStrategies.REQUIRED;
+                case NON_NUMERIC -> NON_NUMERIC_STRATEGY;
+            };
+        }
     }
 }
