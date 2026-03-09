@@ -62,7 +62,7 @@ dependencies {
     implementation "com.google.protobuf:protobuf-java:4.34.0"
     implementation "com.google.protobuf:protobuf-java-util:4.34.0"
 
-    implementation 'de.siegmar:fastcsv:4.1.0'
+    implementation 'de.siegmar:fastcsv:4.1.1'
     implementation ('org.apache.avro:avro:1.12.1') {
         exclude group: 'com.fasterxml.jackson.core'
     }
