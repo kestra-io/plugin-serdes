@@ -90,7 +90,7 @@ dependencies {
     implementation "org.commonmark:commonmark:0.27.1" // for Markdown
     implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
     implementation "com.vladsch.flexmark:flexmark-html2md-converter:0.64.8" // for HTML to Markdown conversion
-    implementation "org.jsoup:jsoup:1.19.1" // for HTML parsing (required by flexmark-html2md-converter)
+    implementation "org.jsoup:jsoup:1.22.1" // for HTML parsing (required by flexmark-html2md-converter)
 }
 
 configurations.configureEach {
