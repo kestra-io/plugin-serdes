@@ -1,10 +1,10 @@
 package io.kestra.plugin.serdes.avro.infer;
 
+import java.util.List;
+
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static io.kestra.plugin.serdes.avro.infer.InferAvroSchema.mergeTypes;
 import static org.apache.avro.Schema.Type.*;
@@ -14,11 +14,14 @@ public class MergeAvroTypesTest {
 
     @Test
     void equals() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(STRING))),
-            new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(STRING)))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+        assertThat(
+            mergeTypes(
+                new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(STRING))),
+                new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(STRING)))
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(Schema.Type.UNION);
                 assertThat(schema.getTypes())
                     .extracting(Schema::getType).containsOnly(NULL, STRING);
@@ -27,11 +30,14 @@ public class MergeAvroTypesTest {
 
     @Test
     void mergeTwoSingleSchema() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.create(NULL)),
-            new Field(rndStr(), Schema.create(STRING))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+        assertThat(
+            mergeTypes(
+                new Field(rndStr(), Schema.create(NULL)),
+                new Field(rndStr(), Schema.create(STRING))
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(Schema.Type.UNION);
                 assertThat(schema.getTypes())
                     .extracting(Schema::getType).containsOnly(NULL, STRING);
@@ -40,11 +46,14 @@ public class MergeAvroTypesTest {
 
     @Test
     void mergeAIsUnion_doesNotContainsB() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(STRING))),
-            new Field(rndStr(), Schema.create(INT))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+        assertThat(
+            mergeTypes(
+                new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(STRING))),
+                new Field(rndStr(), Schema.create(INT))
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(Schema.Type.UNION);
                 assertThat(schema.getTypes())
                     .extracting(Schema::getType).containsOnly(NULL, STRING, INT);
@@ -53,11 +62,14 @@ public class MergeAvroTypesTest {
 
     @Test
     void mergeBIsUnion_doesNotContainsA() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.create(INT)),
-            new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(STRING)))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+        assertThat(
+            mergeTypes(
+                new Field(rndStr(), Schema.create(INT)),
+                new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(STRING)))
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(Schema.Type.UNION);
                 assertThat(schema.getTypes())
                     .extracting(Schema::getType).containsOnly(NULL, STRING, INT);
@@ -66,11 +78,14 @@ public class MergeAvroTypesTest {
 
     @Test
     void mergeAIsUnion_alreadyContainsA() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(INT))),
-            new Field(rndStr(), Schema.create(INT))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+        assertThat(
+            mergeTypes(
+                new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(INT))),
+                new Field(rndStr(), Schema.create(INT))
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(Schema.Type.UNION);
                 assertThat(schema.getTypes())
                     .extracting(Schema::getType).containsOnly(NULL, INT);
@@ -79,11 +94,14 @@ public class MergeAvroTypesTest {
 
     @Test
     void mergeBIsUnion_alreadyContainsA() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.create(INT)),
-            new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(INT)))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+        assertThat(
+            mergeTypes(
+                new Field(rndStr(), Schema.create(INT)),
+                new Field(rndStr(), Schema.createUnion(Schema.create(NULL), Schema.create(INT)))
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(Schema.Type.UNION);
                 assertThat(schema.getTypes())
                     .extracting(Schema::getType).containsOnly(NULL, INT);
@@ -92,15 +110,24 @@ public class MergeAvroTypesTest {
 
     @Test
     void mergeObjects_with_sameField() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.createRecord(rndStr(), "doc", "namespace", false,
-                List.of(new Field("myField", Schema.create(STRING)))
-            )),
-            new Field(rndStr(), Schema.createRecord(rndStr(), "doc", "namespace", false,
-                List.of(new Field("myField", Schema.create(STRING)))
-            ))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+        assertThat(
+            mergeTypes(
+                new Field(
+                    rndStr(), Schema.createRecord(
+                        rndStr(), "doc", "namespace", false,
+                        List.of(new Field("myField", Schema.create(STRING)))
+                    )
+                ),
+                new Field(
+                    rndStr(), Schema.createRecord(
+                        rndStr(), "doc", "namespace", false,
+                        List.of(new Field("myField", Schema.create(STRING)))
+                    )
+                )
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(RECORD);
                 assertThat(schema.getFields())
                     .extracting(Field::name).containsOnly("myField");
@@ -109,23 +136,32 @@ public class MergeAvroTypesTest {
 
     @Test
     void mergeObjects_with_commonField_havingMultipleTypes() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.createRecord(rndStr(), "doc", "namespace", false,
-                List.of(
-                    new Field("fieldOne", Schema.create(NULL)),
-                    new Field("fieldTwo", Schema.createUnion(Schema.create(NULL), Schema.create(STRING))),
-                    new Field("fieldThree", Schema.createUnion(Schema.create(NULL), Schema.create(INT)))
+        assertThat(
+            mergeTypes(
+                new Field(
+                    rndStr(), Schema.createRecord(
+                        rndStr(), "doc", "namespace", false,
+                        List.of(
+                            new Field("fieldOne", Schema.create(NULL)),
+                            new Field("fieldTwo", Schema.createUnion(Schema.create(NULL), Schema.create(STRING))),
+                            new Field("fieldThree", Schema.createUnion(Schema.create(NULL), Schema.create(INT)))
+                        )
+                    )
+                ),
+                new Field(
+                    rndStr(), Schema.createRecord(
+                        rndStr(), "doc", "namespace", false,
+                        List.of(
+                            new Field("fieldOne", Schema.create(STRING)),
+                            new Field("fieldTwo", Schema.create(STRING)),
+                            new Field("fieldThree", Schema.create(STRING))
+                        )
+                    )
                 )
-            )),
-            new Field(rndStr(), Schema.createRecord(rndStr(), "doc", "namespace", false,
-                List.of(
-                    new Field("fieldOne", Schema.create(STRING)),
-                    new Field("fieldTwo", Schema.create(STRING)),
-                    new Field("fieldThree", Schema.create(STRING))
-                )
-            ))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(RECORD);
                 assertThat(schema.getFields())
                     .extracting(Field::name).containsOnly("fieldOne", "fieldTwo", "fieldThree");
@@ -143,27 +179,41 @@ public class MergeAvroTypesTest {
 
     @Test
     void mergeBothAreUnionOfRecords_AHasAnAdditionalType() {
-        assertThat(mergeTypes(
-            new Field(rndStr(), Schema.createUnion(Schema.create(NULL),
-                Schema.createRecord(rndStr(), "doc", "namespace", false,
-                    List.of(
-                        new Field("fieldOne", Schema.create(STRING)),
-                        new Field("fieldTwo", Schema.create(STRING))
+        assertThat(
+            mergeTypes(
+                new Field(
+                    rndStr(), Schema.createUnion(
+                        Schema.create(NULL),
+                        Schema.createRecord(
+                            rndStr(), "doc", "namespace", false,
+                            List.of(
+                                new Field("fieldOne", Schema.create(STRING)),
+                                new Field("fieldTwo", Schema.create(STRING))
+                            )
+                        )
                     )
-                ))),
-            new Field(rndStr(), Schema.createUnion(Schema.create(NULL),
-                Schema.createRecord(rndStr(), "doc", "namespace", false,
-                    List.of(
-                        new Field("fieldOne", Schema.create(STRING))
+                ),
+                new Field(
+                    rndStr(), Schema.createUnion(
+                        Schema.create(NULL),
+                        Schema.createRecord(
+                            rndStr(), "doc", "namespace", false,
+                            List.of(
+                                new Field("fieldOne", Schema.create(STRING))
+                            )
+                        )
                     )
-                )))
-        )).extracting(Field::schema)
-            .satisfies(schema -> {
+                )
+            )
+        ).extracting(Field::schema)
+            .satisfies(schema ->
+            {
                 assertThat(schema).extracting(Schema::getType).isEqualTo(UNION);
                 assertThat(schema.getTypes())
                     .extracting(Schema::getType)
                     .containsOnly(NULL, RECORD);
-                assertThat(schema.getTypes().stream().filter(x -> x.getType().equals(RECORD)).findFirst().get()).satisfies(record -> {
+                assertThat(schema.getTypes().stream().filter(x -> x.getType().equals(RECORD)).findFirst().get()).satisfies(record ->
+                {
                     assertThat(record.getFields())
                         .extracting(Field::name).containsOnly("fieldOne", "fieldTwo");
                 });

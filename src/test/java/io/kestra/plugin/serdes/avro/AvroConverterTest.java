@@ -1,17 +1,11 @@
 package io.kestra.plugin.serdes.avro;
 
-import com.google.common.collect.ImmutableMap;
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.tenant.TenantService;
-import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.plugin.serdes.csv.CsvToIon;
-import io.kestra.plugin.serdes.json.JsonToIon;
-import jakarta.inject.Inject;
-import jakarta.validation.ConstraintViolationException;
+import java.io.*;
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Objects;
+import java.util.function.Consumer;
+
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
@@ -22,11 +16,20 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.*;
 import org.junit.jupiter.api.Test;
 
-import java.io.*;
-import java.net.URI;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.function.Consumer;
+import com.google.common.collect.ImmutableMap;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.serdes.SerdesUtils;
+import io.kestra.plugin.serdes.csv.CsvToIon;
+import io.kestra.plugin.serdes.json.JsonToIon;
+
+import jakarta.inject.Inject;
+import jakarta.validation.ConstraintViolationException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -72,10 +75,18 @@ public class AvroConverterTest {
 
         assertThat(
             IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, avroRunOutput.getUri())),
-            is(IonToAvroTest.avroSize(
-                new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                        .getResource("csv/full.avro"))
-                    .toURI())))
+            is(
+                IonToAvroTest.avroSize(
+                    new FileInputStream(
+                        new File(
+                            Objects.requireNonNull(
+                                IonToAvroTest.class.getClassLoader()
+                                    .getResource("csv/full.avro")
+                            )
+                                .toURI()
+                        )
+                    )
+                )
             )
         );
     }
@@ -107,10 +118,18 @@ public class AvroConverterTest {
 
         assertThat(
             IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, avroRunOutput.getUri())),
-            is(IonToAvroTest.avroSize(
-                new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                        .getResource("csv/full.avro"))
-                    .toURI())))
+            is(
+                IonToAvroTest.avroSize(
+                    new FileInputStream(
+                        new File(
+                            Objects.requireNonNull(
+                                IonToAvroTest.class.getClassLoader()
+                                    .getResource("csv/full.avro")
+                            )
+                                .toURI()
+                        )
+                    )
+                )
             )
         );
     }
@@ -141,7 +160,8 @@ public class AvroConverterTest {
             .strictSchema(Property.ofValue(true))
             .build();
 
-        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+        RuntimeException re = assertThrows(RuntimeException.class, () ->
+        {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 
@@ -175,7 +195,8 @@ public class AvroConverterTest {
             .strictSchema(Property.ofValue(true))
             .build();
 
-        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+        RuntimeException re = assertThrows(RuntimeException.class, () ->
+        {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 
@@ -236,7 +257,8 @@ public class AvroConverterTest {
             .strictSchema(Property.ofValue(true))
             .build();
 
-        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+        RuntimeException re = assertThrows(RuntimeException.class, () ->
+        {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 
@@ -268,7 +290,8 @@ public class AvroConverterTest {
             .strictSchema(Property.ofValue(true))
             .build();
 
-        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+        RuntimeException re = assertThrows(RuntimeException.class, () ->
+        {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 
@@ -302,7 +325,8 @@ public class AvroConverterTest {
             .timeFormat("H:mm")
             .build();
 
-        RuntimeException spe = assertThrows(ConstraintViolationException.class, () -> {
+        RuntimeException spe = assertThrows(ConstraintViolationException.class, () ->
+        {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 
@@ -337,16 +361,25 @@ public class AvroConverterTest {
 
         assertThat(
             IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, avroRunOutput.getUri())),
-            is(IonToAvroTest.avroSize(
-                new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                        .getResource("csv/portfolio_aliases.avro"))
-                    .toURI())))
+            is(
+                IonToAvroTest.avroSize(
+                    new FileInputStream(
+                        new File(
+                            Objects.requireNonNull(
+                                IonToAvroTest.class.getClassLoader()
+                                    .getResource("csv/portfolio_aliases.avro")
+                            )
+                                .toURI()
+                        )
+                    )
+                )
             )
         );
 
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
         DataFileStream<GenericRecord> dataFileReader = new DataFileStream<>(this.storageInterface.get(TenantService.MAIN_TENANT, null, avroRunOutput.getUri()), datumReader);
-        dataFileReader.forEach(genericRecord -> {
+        dataFileReader.forEach(genericRecord ->
+        {
             GenericRecord scenario = ((GenericRecord) ((GenericRecord) genericRecord.get("it")).get("selectedScenario"));
             assertThat(scenario.get("nbJH_DTP_Sales"), notNullValue());
             assertThat(scenario.get("nbJH_DTP_Cloud_Connectivity"), notNullValue());
@@ -379,7 +412,8 @@ public class AvroConverterTest {
             .timeFormat("H:mm")
             .build();
 
-        RuntimeException re = assertThrows(RuntimeException.class, () -> {
+        RuntimeException re = assertThrows(RuntimeException.class, () ->
+        {
             task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
         });
 

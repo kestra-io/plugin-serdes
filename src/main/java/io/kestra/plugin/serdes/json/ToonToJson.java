@@ -1,26 +1,5 @@
 package io.kestra.plugin.serdes.json;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.NullNode;
-import io.kestra.core.models.annotations.Example;
-import io.kestra.core.models.annotations.Metric;
-import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.executions.metrics.Counter;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.FileSerde;
-import io.kestra.core.serializers.JacksonMapper;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
-
 import java.io.*;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -32,6 +11,29 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.NullNode;
+
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
+import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.serializers.JacksonMapper;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
 @ToString
@@ -182,8 +184,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
     private static class ToonParser {
         private static final int INDENT_SIZE = 2;
 
-        private static final Pattern KEY_ARRAY_PATTERN =
-            Pattern.compile("^(.*?)\\[(\\d+)](?:\\{([^}]*)})?$");
+        private static final Pattern KEY_ARRAY_PATTERN = Pattern.compile("^(.*?)\\[(\\d+)](?:\\{([^}]*)})?$");
 
         private final List<Line> lines = new ArrayList<>();
         private int index = 0;
@@ -192,7 +193,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
         private long count = 0;
 
         /**
-         * @param text   line without leading indentation
+         * @param text line without leading indentation
          * @param indent indentation level (0,1,2,...) in units of INDENT_SIZE
          */
         private record Line(String text, int indent) {
@@ -546,9 +547,11 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             }
 
             // quoted string
-            if (trimmed.length() >= 2 &&
-                trimmed.charAt(0) == '"' &&
-                trimmed.charAt(trimmed.length() - 1) == '"') {
+            if (
+                trimmed.length() >= 2 &&
+                    trimmed.charAt(0) == '"' &&
+                    trimmed.charAt(trimmed.length() - 1) == '"'
+            ) {
                 return unescape(trimmed.substring(1, trimmed.length() - 1));
             }
 

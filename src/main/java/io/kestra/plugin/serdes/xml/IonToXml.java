@@ -1,5 +1,13 @@
 package io.kestra.plugin.serdes.xml;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.TimeZone;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -7,6 +15,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.ser.ToXmlGenerator;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -17,18 +26,11 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.TimeZone;
 
 @SuperBuilder
 @ToString
@@ -113,7 +115,9 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
 
         try (
             Writer outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(runContext.render(charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), Charset.forName(runContext.render(charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE)
+            Reader inputStream = new BufferedReader(
+                new InputStreamReader(runContext.storage().getFile(from), Charset.forName(runContext.render(charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE
+            )
         ) {
             XmlMapper mapper = new XmlMapper();
 
@@ -124,7 +128,6 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
                 .setTimeZone(TimeZone.getTimeZone(ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow())))
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module());
-
 
             ObjectWriter objectWriter = mapper.writer()
                 .withRootName(runContext.render(this.rootName).as(String.class).orElseThrow())

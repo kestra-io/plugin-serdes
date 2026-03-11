@@ -1,26 +1,5 @@
 package io.kestra.plugin.serdes.excel;
 
-import io.kestra.core.models.annotations.Example;
-import io.kestra.core.models.annotations.Metric;
-import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.executions.metrics.Counter;
-import io.kestra.core.models.property.Data;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.FileSerde;
-import io.kestra.plugin.serdes.AbstractTextWriter;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.streaming.SXSSFCell;
-import org.apache.poi.xssf.streaming.SXSSFRow;
-import org.apache.poi.xssf.streaming.SXSSFSheet;
-import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -33,6 +12,29 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFCell;
+import org.apache.poi.xssf.streaming.SXSSFRow;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
+import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Data;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
+import io.kestra.plugin.serdes.AbstractTextWriter;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
@@ -109,7 +111,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
     @Schema(
         title = Data.From.TITLE,
         description = Data.From.DESCRIPTION,
-        anyOf = {String.class, Map.class}
+        anyOf = { String.class, Map.class }
     )
     @PluginProperty(dynamic = true)
     private Object from;
@@ -240,7 +242,6 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
         return lineCount;
     }
-
 
     private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber, boolean styles, String renderedTimeZoneId) {
         SXSSFCell cell = xssfRow.createCell(rowNumber);

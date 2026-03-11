@@ -1,11 +1,5 @@
 package io.kestra.plugin.serdes.avro.infer;
 
-import io.kestra.core.serializers.FileSerde;
-import org.apache.avro.LogicalTypes;
-import org.apache.avro.Schema;
-import org.apache.avro.Schema.Field;
-import reactor.core.publisher.Mono;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Reader;
@@ -15,6 +9,14 @@ import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.apache.avro.LogicalTypes;
+import org.apache.avro.Schema;
+import org.apache.avro.Schema.Field;
+
+import io.kestra.core.serializers.FileSerde;
+
+import reactor.core.publisher.Mono;
 
 import static org.apache.avro.Schema.Field.NULL_DEFAULT_VALUE;
 import static org.apache.avro.Schema.Type.*;
@@ -41,7 +43,7 @@ public class InferAvroSchema {
      * infer an Avro schema from a Ion source
      *
      * @param inputStream Ion source
-     * @param output      where the resulting Avro schema will be written
+     * @param output where the resulting Avro schema will be written
      * @throws IllegalStateException if the input stream is empty or contains no valid records
      */
     public void inferAvroSchemaFromIon(Reader inputStream, OutputStream output) {
@@ -76,11 +78,11 @@ public class InferAvroSchema {
             var inferredFields = new ArrayList<Field>();
             for (Map.Entry<String, Object> field : map.entrySet()) {
                 inferredFields.add(
-                        inferField(
-                                fieldFullPath + "_" + fieldName + "_" + field.getKey(),
-                                field.getKey(),
-                                field.getValue()
-                        )
+                    inferField(
+                        fieldFullPath + "_" + fieldName + "_" + field.getKey(),
+                        field.getKey(),
+                        field.getValue()
+                    )
                 );
             }
 
@@ -141,7 +143,7 @@ public class InferAvroSchema {
                     )
                 );
             }
-        } else if (node instanceof byte[]) {  // primitive types
+        } else if (node instanceof byte[]) { // primitive types
             inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.BYTES)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (node instanceof String || node instanceof BigDecimal) {
             inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.STRING)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
@@ -154,14 +156,22 @@ public class InferAvroSchema {
         } else if (node instanceof Boolean) {
             inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.BOOLEAN)), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
         } else if (
-                Stream.of(Instant.class, ZonedDateTime.class, LocalDateTime.class, OffsetDateTime.class)
-                        .anyMatch(c -> c.isInstance(node))
+            Stream.of(Instant.class, ZonedDateTime.class, LocalDateTime.class, OffsetDateTime.class)
+                .anyMatch(c -> c.isInstance(node))
         ) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG))), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(
+                fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG))), NULL_DEFAULT_DESCRIPTION,
+                NULL_DEFAULT_VALUE
+            );
         } else if (node instanceof LocalDate || node instanceof Date) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT))), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(
+                fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT))), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE
+            );
         } else if (node instanceof LocalTime || node instanceof OffsetTime) {
-            inferredField = new Field(fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT))), NULL_DEFAULT_DESCRIPTION, NULL_DEFAULT_VALUE);
+            inferredField = new Field(
+                fieldName, Schema.createUnion(Schema.create(Schema.Type.NULL), LogicalTypes.timeMillis().addToSchema(Schema.create(Schema.Type.INT))), NULL_DEFAULT_DESCRIPTION,
+                NULL_DEFAULT_VALUE
+            );
         } else if (node == null) {
             inferredField = new Field(fieldName, Schema.create(Schema.Type.NULL));
         }
@@ -230,13 +240,14 @@ public class InferAvroSchema {
 
     private static Field mergeTwoRecords(Field a, Field b) {
         var mergedFields = new ArrayList<Field>();
-        var allCommonField = Stream.concat(a.schema().getFields().stream().map(Field::name), b.schema().getFields().stream().map(Field::name)).collect(Collectors.toCollection(LinkedHashSet::new));
+        var allCommonField = Stream.concat(a.schema().getFields().stream().map(Field::name), b.schema().getFields().stream().map(Field::name))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
         for (String commonField : allCommonField) {
             var fieldFromA = a.schema().getField(commonField);
             var fieldFromB = b.schema().getField(commonField);
             if (fieldFromA != null && fieldFromB != null) {
                 mergedFields.add(
-                        mergeTypes(fieldFromA, fieldFromB)
+                    mergeTypes(fieldFromA, fieldFromB)
                 );
             } else if (fieldFromA != null) {
                 mergedFields.add(new Field(fieldFromA, fieldFromA.schema()));
@@ -245,15 +256,15 @@ public class InferAvroSchema {
             }
         }
         return new Field(
-                a,
-                Schema.createRecord(
-                        a.schema().getName(),
-                        a.schema().getDoc(),
-                        a.schema().getNamespace(),
-                        false,
-                        // recreate them to reset the position and avoid and error
-                        mergedFields.stream().map(field -> new Field(field.name(), field.schema())).collect(Collectors.toList())
-                )
+            a,
+            Schema.createRecord(
+                a.schema().getName(),
+                a.schema().getDoc(),
+                a.schema().getNamespace(),
+                false,
+                // recreate them to reset the position and avoid and error
+                mergedFields.stream().map(field -> new Field(field.name(), field.schema())).collect(Collectors.toList())
+            )
         );
     }
 }

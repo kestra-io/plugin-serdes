@@ -1,8 +1,22 @@
 package io.kestra.plugin.serdes.csv;
 
+import java.io.*;
+import java.net.URI;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
+
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
@@ -13,19 +27,8 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 import io.kestra.plugin.serdes.avro.IonToAvro;
-import jakarta.inject.Inject;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Test;
 
-import java.io.*;
-import java.net.URI;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -137,13 +140,13 @@ class IonToCsvTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("referencia", "PE1617279780")
-                        .put("descripcion", "E:4 PAST FR")
-                        .put("cantidad", 1)
-                        .put("precio", 34.03)
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("referencia", "PE1617279780")
+                    .put("descripcion", "E:4 PAST FR")
+                    .put("cantidad", 1)
+                    .put("precio", 34.03)
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
@@ -169,13 +172,13 @@ class IonToCsvTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("referencia", "PE1617279780")
-                        .put("descripcion", "E:4 PAST FR")
-                        .put("cantidad", 1)
-                        .put("precio", 34.03)
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("referencia", "PE1617279780")
+                    .put("descripcion", "E:4 PAST FR")
+                    .put("cantidad", 1)
+                    .put("precio", 34.03)
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
@@ -201,13 +204,13 @@ class IonToCsvTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("referencia", "PE1617279780")
-                        .put("descripcion", "E:4 PAST FR")
-                        .put("cantidad", 1)
-                        .put("precio", 34.03)
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("referencia", "PE1617279780")
+                    .put("descripcion", "E:4 PAST FR")
+                    .put("cantidad", 1)
+                    .put("precio", 34.03)
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
@@ -233,15 +236,15 @@ class IonToCsvTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("label", "test")
-                        .put("positive_int", 42)
-                        .put("negative_int", -7)
-                        .put("decimal", 3.14)
-                        .put("negative_decimal", -0.5)
-                        .put("not_a_number", "12abc")
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("label", "test")
+                    .put("positive_int", 42)
+                    .put("negative_int", -7)
+                    .put("decimal", 3.14)
+                    .put("negative_decimal", -0.5)
+                    .put("not_a_number", "12abc")
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
@@ -267,13 +270,13 @@ class IonToCsvTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("referencia", "\"PE1617279780\"")
-                        .put("descripcion", "\"E:4 PAST FR\"")
-                        .put("cantidad", 1)
-                        .put("precio", 34.03)
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("referencia", "\"PE1617279780\"")
+                    .put("descripcion", "\"E:4 PAST FR\"")
+                    .put("cantidad", 1)
+                    .put("precio", 34.03)
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
@@ -300,21 +303,21 @@ class IonToCsvTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("String", "string")
-                        .put("Int", 2)
-                        .put("Float", 3.2F)
-                        .put("Double", 3.2D)
-                        .put("Instant", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant())
-                        .put("ZonedDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00"))
-                        .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime().truncatedTo(ChronoUnit.MINUTES))
-                        .put("OffsetDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime())
-                        .put("LocalDate", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDate())
-                        .put("LocalTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalTime())
-                        .put("OffsetTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime().toOffsetTime())
-                        .put("Date", Date.from(ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant()))
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("String", "string")
+                    .put("Int", 2)
+                    .put("Float", 3.2F)
+                    .put("Double", 3.2D)
+                    .put("Instant", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant())
+                    .put("ZonedDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00"))
+                    .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime().truncatedTo(ChronoUnit.MINUTES))
+                    .put("OffsetDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime())
+                    .put("LocalDate", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDate())
+                    .put("LocalTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalTime())
+                    .put("OffsetTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime().toOffsetTime())
+                    .put("Date", Date.from(ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant()))
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
@@ -332,19 +335,20 @@ class IonToCsvTest {
 
             assertThat(
                 IOUtils.toString(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri()), Charsets.UTF_8),
-                is("\"string\"," +
-                    "\"2\"," +
-                    "\"3.200000047683716\"," +
-                    "\"3.2\"," +
-                    "\"2021-05-05T10:21:12.123Z\"," +
-                    "\"2021-05-05T11:21:12.123+01:00\"," +
-                    "\"2021-05-05T12:21:00.000\"," +
-                    "\"2021-05-05T11:21:12.123+01:00\"," +
-                    "\"2021-05-05\"," +
-                    "\"12:21:12\"," +
-                    "\"12:21:12+02:00\"," +
-                    "\"2021-05-05T10:21:12.123Z\"" +
-                    "\n"
+                is(
+                    "\"string\"," +
+                        "\"2\"," +
+                        "\"3.200000047683716\"," +
+                        "\"3.2\"," +
+                        "\"2021-05-05T10:21:12.123Z\"," +
+                        "\"2021-05-05T11:21:12.123+01:00\"," +
+                        "\"2021-05-05T12:21:00.000\"," +
+                        "\"2021-05-05T11:21:12.123+01:00\"," +
+                        "\"2021-05-05\"," +
+                        "\"12:21:12\"," +
+                        "\"12:21:12+02:00\"," +
+                        "\"2021-05-05T10:21:12.123Z\"" +
+                        "\n"
                 )
             );
         }

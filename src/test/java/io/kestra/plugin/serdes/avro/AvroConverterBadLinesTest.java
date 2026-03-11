@@ -1,14 +1,15 @@
 package io.kestra.plugin.serdes.avro;
 
-import io.kestra.plugin.serdes.OnBadLines;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-import java.util.HashMap;
-import java.util.Map;
+import io.kestra.plugin.serdes.OnBadLines;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,8 +21,8 @@ class AvroConverterBadLinesTest {
         .build();
 
     private Schema simpleSchema = SchemaBuilder.record("TestRecord").fields()
-        .name("id").type().optional().stringType()  // Nullable string
-        .name("age").type().intType().noDefault()  // Non-nullable int
+        .name("id").type().optional().stringType() // Nullable string
+        .name("age").type().intType().noDefault() // Non-nullable int
         .endRecord();
 
     @Test
@@ -74,13 +75,11 @@ class AvroConverterBadLinesTest {
             .endRecord();
 
         Map<String, Object> extraData = new HashMap<>(Map.of("id", "123"));
-        extraData.put("extra", "bad");  // Extra field
+        extraData.put("extra", "bad"); // Extra field
 
-        assertThrows(AvroConverter.IllegalStrictRowConversion.class, () ->
-            converter.fromMap(strictSchema, extraData, OnBadLines.ERROR));
+        assertThrows(AvroConverter.IllegalStrictRowConversion.class, () -> converter.fromMap(strictSchema, extraData, OnBadLines.ERROR));
 
-        assertDoesNotThrow(() ->
-            converter.fromMap(strictSchema, extraData, OnBadLines.WARN));
+        assertDoesNotThrow(() -> converter.fromMap(strictSchema, extraData, OnBadLines.WARN));
         var recordWarn = converter.fromMap(strictSchema, extraData, OnBadLines.SKIP);
         assertNotNull(recordWarn);
         assertEquals("123", recordWarn.get("id").toString());
@@ -91,13 +90,15 @@ class AvroConverterBadLinesTest {
         // Schema with nested record
         Schema nestedSchema = SchemaBuilder.record("Nested").fields()
             .name("outer").type().stringType().noDefault()
-            .name("inner").type(SchemaBuilder.record("Inner").fields()
-                .name("badField").type().intType().noDefault()
-                .endRecord()).noDefault()
+            .name("inner").type(
+                SchemaBuilder.record("Inner").fields()
+                    .name("badField").type().intType().noDefault()
+                    .endRecord()
+            ).noDefault()
             .endRecord();
 
         Map<String, Object> inner = new HashMap<>();
-        inner.put("badField", null);  // Bad null in non-nullable
+        inner.put("badField", null); // Bad null in non-nullable
         Map<String, Object> nestedData = Map.of("outer", "test", "inner", inner);
 
         var record = converter.fromMap(nestedSchema, nestedData, OnBadLines.SKIP);

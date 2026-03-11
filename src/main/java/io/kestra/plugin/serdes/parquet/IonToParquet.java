@@ -1,5 +1,20 @@
 package io.kestra.plugin.serdes.parquet;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Locale;
+
+import org.apache.avro.generic.GenericData;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.avro.AvroParquetWriter;
+import org.apache.parquet.hadoop.ParquetFileWriter;
+import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.parquet.hadoop.util.HadoopOutputFile;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -12,24 +27,11 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.serdes.avro.AbstractAvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.generic.GenericData;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.avro.AvroParquetWriter;
-import org.apache.parquet.hadoop.ParquetFileWriter;
-import org.apache.parquet.hadoop.ParquetWriter;
-import org.apache.parquet.hadoop.metadata.CompressionCodecName;
-import org.apache.parquet.hadoop.util.HadoopOutputFile;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.Locale;
 
 import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_1_0;
 import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_2_0;
@@ -168,8 +170,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         CompressionCodecName codec = runContext.render(this.compressionCodec).as(CompressionCodec.class).orElseThrow().parquetCodec();
         HadoopOutputFile outfileFile = HadoopOutputFile.fromPath(new Path(tempFile.getPath()), new Configuration());
 
-        AvroParquetWriter.Builder<GenericData.Record> parquetWriterBuilder = AvroParquetWriter
-            .<GenericData.Record>builder(outfileFile)
+        AvroParquetWriter.Builder<GenericData.Record> parquetWriterBuilder = AvroParquetWriter.<GenericData.Record> builder(outfileFile)
             .withWriterVersion(runContext.render(parquetVersion).as(Version.class).orElseThrow() == Version.V2 ? PARQUET_2_0 : PARQUET_1_0)
             .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
             .withCompressionCodec(codec)

@@ -1,5 +1,16 @@
 package io.kestra.plugin.serdes.markdown;
 
+import java.io.BufferedReader;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
+import org.commonmark.node.*;
+import org.commonmark.parser.Parser;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -9,20 +20,11 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.commonmark.node.*;
-import org.commonmark.parser.Parser;
-
-import java.io.BufferedReader;
-import java.io.FileOutputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @ToString
@@ -84,8 +86,10 @@ public class MarkdownToText extends Task implements RunnableTask<MarkdownToText.
         var tempFile = runContext.workingDir().createTempFile(".txt").toFile();
 
         String markdown;
-        try (var inputStream = runContext.storage().getFile(rFrom);
-             var reader = new BufferedReader(new InputStreamReader(inputStream, rCharset))) {
+        try (
+            var inputStream = runContext.storage().getFile(rFrom);
+            var reader = new BufferedReader(new InputStreamReader(inputStream, rCharset))
+        ) {
 
             StringBuilder sb = new StringBuilder();
             String line;
@@ -107,7 +111,8 @@ public class MarkdownToText extends Task implements RunnableTask<MarkdownToText.
     }
 
     private String toPlainText(String markdown) {
-        if (markdown == null) return "";
+        if (markdown == null)
+            return "";
 
         Parser parser = Parser.builder().build();
         Node document = parser.parse(markdown);

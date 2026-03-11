@@ -1,10 +1,11 @@
 package io.kestra.plugin.serdes.parquet;
 
-import ch.qos.logback.classic.LoggerContext;
+import java.io.IOException;
+
 import org.slf4j.LoggerFactory;
 import org.xerial.snappy.Snappy;
 
-import java.io.IOException;
+import ch.qos.logback.classic.LoggerContext;
 
 public abstract class ParquetTools {
     static void handleLogger() {

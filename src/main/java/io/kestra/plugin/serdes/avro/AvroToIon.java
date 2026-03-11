@@ -1,5 +1,15 @@
 package io.kestra.plugin.serdes.avro;
 
+import java.io.*;
+import java.net.URI;
+import java.util.Collection;
+import java.util.Map;
+
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -11,22 +21,14 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.OnBadLines;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import java.util.Collection;
-
-import java.io.*;
-import java.net.URI;
-import java.util.Map;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -91,23 +93,25 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         ) {
             org.apache.avro.Schema avroSchema = dataFileStream.getSchema();
 
-           Flux<GenericRecord> flowable = Flux
-    .create(
-        throwConsumer((FluxSink<GenericRecord> s) ->
-            nextRow(dataFileStream, avroSchema, rOnBadLinesValue, runContext, s)
-        ),
-        FluxSink.OverflowStrategy.BUFFER
-    )
-    .onErrorResume(Exception.class, e -> {
-        if (rOnBadLinesValue == OnBadLines.ERROR) {
-            return Flux.error(new IllegalCellConversion("Bad Avro record encountered: " + e.getMessage(), e));
-        } else if (rOnBadLinesValue == OnBadLines.WARN) {
-            runContext.logger().warn("Bad Avro record encountered (skipped): {}", e.getMessage());
-        }
-        return Flux.<GenericRecord>empty();
-    });
+            Flux<GenericRecord> flowable = Flux
+                .create(
+                    throwConsumer(
+                        (FluxSink<GenericRecord> s) -> nextRow(dataFileStream, avroSchema, rOnBadLinesValue, runContext, s)
+                    ),
+                    FluxSink.OverflowStrategy.BUFFER
+                )
+                .onErrorResume(Exception.class, e ->
+                {
+                    if (rOnBadLinesValue == OnBadLines.ERROR) {
+                        return Flux.error(new IllegalCellConversion("Bad Avro record encountered: " + e.getMessage(), e));
+                    } else if (rOnBadLinesValue == OnBadLines.WARN) {
+                        runContext.logger().warn("Bad Avro record encountered (skipped): {}", e.getMessage());
+                    }
+                    return Flux.<GenericRecord> empty();
+                });
 
-            Flux<Map<String, Object>> deserialized = flowable.map(record -> {
+            Flux<Map<String, Object>> deserialized = flowable.map(record ->
+            {
                 try {
                     return AvroDeserializer.recordDeserializer(record);
                 } catch (Exception e) {
@@ -131,7 +135,8 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         return new Output(runContext.storage().putFile(tempFile));
     }
 
-    private void nextRow(DataFileStream<GenericRecord> dataFileStream, org.apache.avro.Schema avroSchema, OnBadLines onBadLinesValue, RunContext runContext, FluxSink<GenericRecord> sink) throws IOException {
+    private void nextRow(DataFileStream<GenericRecord> dataFileStream, org.apache.avro.Schema avroSchema, OnBadLines onBadLinesValue, RunContext runContext, FluxSink<GenericRecord> sink)
+        throws IOException {
         GenericRecord record = null;
         while (dataFileStream.hasNext()) {
             try {
@@ -178,6 +183,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         }
         sink.complete();
     }
+
     private void validateFieldType(Object value, org.apache.avro.Schema fieldSchema, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
         if (value == null) {
             if (isNullable(fieldSchema)) {

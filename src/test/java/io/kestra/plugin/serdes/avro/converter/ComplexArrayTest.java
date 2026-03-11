@@ -1,21 +1,25 @@
 package io.kestra.plugin.serdes.avro.converter;
 
-import io.kestra.plugin.serdes.avro.AvroConverterTest;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Stream;
+
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Stream;
+import io.kestra.plugin.serdes.avro.AvroConverterTest;
 
 public class ComplexArrayTest {
     static Stream<Arguments> source() {
         return Stream.of(
             Arguments.of(Arrays.asList("42.2", 42.2D), Arrays.asList(42.2F, 42.2F), Schema.create(Schema.Type.FLOAT)),
-            Arguments.of(Arrays.asList("null", "true", true, false, null), Arrays.asList(null, true, true, false, null), Schema.createUnion(Schema.create(Schema.Type.BOOLEAN), Schema.create(Schema.Type.NULL)))
+            Arguments.of(
+                Arrays.asList("null", "true", true, false, null), Arrays.asList(null, true, true, false, null),
+                Schema.createUnion(Schema.create(Schema.Type.BOOLEAN), Schema.create(Schema.Type.NULL))
+            )
         );
     }
 

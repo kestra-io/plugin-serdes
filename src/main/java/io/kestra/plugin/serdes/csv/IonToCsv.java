@@ -1,9 +1,13 @@
 package io.kestra.plugin.serdes.csv;
 
-import de.siegmar.fastcsv.writer.CsvWriter;
-import de.siegmar.fastcsv.writer.LineDelimiter;
-import de.siegmar.fastcsv.writer.QuoteStrategies;
-import de.siegmar.fastcsv.writer.QuoteStrategy;
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
@@ -15,20 +19,17 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.AbstractTextWriter;
+
+import de.siegmar.fastcsv.writer.CsvWriter;
+import de.siegmar.fastcsv.writer.LineDelimiter;
+import de.siegmar.fastcsv.writer.QuoteStrategies;
+import de.siegmar.fastcsv.writer.QuoteStrategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
 
 @SuperBuilder
 @ToString
@@ -161,7 +162,6 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         title = "The name of a supported charset"
     )
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
-
 
     @Override
     public Output run(RunContext runContext) throws Exception {

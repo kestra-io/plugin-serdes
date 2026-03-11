@@ -1,6 +1,16 @@
 package io.kestra.plugin.serdes.parquet;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.*;
+import java.util.*;
+
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
+
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
@@ -9,15 +19,8 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import jakarta.inject.Inject;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Test;
 
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.time.*;
-import java.util.*;
+import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -34,10 +37,12 @@ class ParquetToIonTest {
 
     @Test
     void ionWithInputSchema() throws Exception {
-        testWithSchema(IOUtils.toString(
-            Objects.requireNonNull(ParquetToIonTest.class.getClassLoader().getResource("avro/all.avsc")),
-            StandardCharsets.UTF_8
-        ));
+        testWithSchema(
+            IOUtils.toString(
+                Objects.requireNonNull(ParquetToIonTest.class.getClassLoader().getResource("avro/all.avsc")),
+                StandardCharsets.UTF_8
+            )
+        );
     }
 
     @Test
@@ -50,21 +55,21 @@ class ParquetToIonTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("String", "string")
-                        .put("Int", 2)
-                        .put("Float", 3.2F)
-                        .put("Double", 3.2D)
-                        .put("Instant", Instant.now())
-                        .put("ZonedDateTime", ZonedDateTime.parse("2021-08-02T12:00:00+02:00"))
-                        .put("LocalDateTime", LocalDateTime.now())
-                        .put("OffsetDateTime", OffsetDateTime.now())
-                        .put("LocalDate", LocalDate.now())
-                        .put("LocalTime", LocalTime.now())
-                        .put("OffsetTime", OffsetTime.now())
-                        .put("Date", new Date())
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("String", "string")
+                    .put("Int", 2)
+                    .put("Float", 3.2F)
+                    .put("Double", 3.2D)
+                    .put("Instant", Instant.now())
+                    .put("ZonedDateTime", ZonedDateTime.parse("2021-08-02T12:00:00+02:00"))
+                    .put("LocalDateTime", LocalDateTime.now())
+                    .put("OffsetDateTime", OffsetDateTime.now())
+                    .put("LocalDate", LocalDate.now())
+                    .put("LocalTime", LocalTime.now())
+                    .put("OffsetTime", OffsetTime.now())
+                    .put("Date", new Date())
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));

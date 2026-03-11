@@ -1,13 +1,13 @@
 package io.kestra.plugin.serdes.avro.infer;
 
-import org.junit.jupiter.api.Test;
-import org.skyscreamer.jsonassert.JSONAssert;
-import org.skyscreamer.jsonassert.JSONCompareMode;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+
+import org.junit.jupiter.api.Test;
+import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompareMode;
 
 public class InferAvroSchemaFromIonTest {
     @Test
@@ -30,7 +30,8 @@ public class InferAvroSchemaFromIonTest {
                 """,
             """
                 {"type": "array", "items": [ "null", "string" ]}
-                """);
+                """
+        );
     }
 
     @Test
@@ -105,7 +106,8 @@ public class InferAvroSchemaFromIonTest {
 
     @Test
     void array_of_objects_with_unmatching_types() throws IOException {
-        this.run("""
+        this.run(
+            """
                 {
                     myArray: [
                         {myName: "one"},

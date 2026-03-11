@@ -1,5 +1,17 @@
 package io.kestra.plugin.serdes.parquet;
 
+import java.io.*;
+import java.net.URI;
+import java.util.Map;
+import java.util.function.Consumer;
+
+import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.avro.AvroParquetReader;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -12,24 +24,14 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroDeserializer;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.avro.AvroParquetReader;
-import org.apache.parquet.hadoop.util.HadoopInputFile;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-
-import java.io.*;
-import java.net.URI;
-import java.util.Map;
-import java.util.function.Consumer;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -97,7 +99,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
         Path parquetHadoopPath = new Path(parquetFile.getPath());
         HadoopInputFile parquetOutputFile = HadoopInputFile.fromPath(parquetHadoopPath, new Configuration());
 
-        AvroParquetReader.Builder<GenericRecord> parquetReaderBuilder = AvroParquetReader.<GenericRecord>builder(parquetOutputFile)
+        AvroParquetReader.Builder<GenericRecord> parquetReaderBuilder = AvroParquetReader.<GenericRecord> builder(parquetOutputFile)
             .disableCompatibility()
             .withDataModel(AvroConverter.genericData());
 
@@ -124,7 +126,8 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
     }
 
     private Consumer<FluxSink<GenericRecord>> nextRow(org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader) throws IOException {
-        return throwConsumer(s -> {
+        return throwConsumer(s ->
+        {
             boolean next = true;
             while (next) {
                 GenericRecord record = parquetReader.read();

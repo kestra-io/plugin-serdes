@@ -1,9 +1,18 @@
 package io.kestra.plugin.serdes.json;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.TimeZone;
+import java.util.function.Consumer;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.SerializationFeature;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -15,6 +24,7 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -22,14 +32,6 @@ import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.TimeZone;
-import java.util.function.Consumer;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -156,7 +158,8 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
     private Consumer<FluxSink<Object>> nextRow(BufferedReader inputStream, boolean newLine) throws IOException {
         ObjectReader objectReader = OBJECT_MAPPER.readerFor(Object.class);
 
-        return throwConsumer(s -> {
+        return throwConsumer(s ->
+        {
             if (newLine) {
                 String line;
                 while ((line = inputStream.readLine()) != null) {

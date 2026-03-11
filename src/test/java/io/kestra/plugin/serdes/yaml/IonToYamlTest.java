@@ -1,26 +1,28 @@
 package io.kestra.plugin.serdes.yaml;
 
-import com.amazon.ion.IonStruct;
-import com.amazon.ion.IonSystem;
-import com.amazon.ion.IonWriter;
-import com.amazon.ion.system.IonSystemBuilder;
-import com.amazon.ion.system.IonTextWriterBuilder;
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.utils.IdUtils;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
+import com.amazon.ion.IonStruct;
+import com.amazon.ion.IonSystem;
+import com.amazon.ion.IonWriter;
+import com.amazon.ion.system.IonSystemBuilder;
+import com.amazon.ion.system.IonTextWriterBuilder;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.utils.IdUtils;
+
+import jakarta.inject.Inject;
+
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 

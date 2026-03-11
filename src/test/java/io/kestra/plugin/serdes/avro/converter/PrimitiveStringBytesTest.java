@@ -1,14 +1,15 @@
 package io.kestra.plugin.serdes.avro.converter;
 
-import io.kestra.plugin.serdes.avro.AvroConverterTest;
+import java.nio.ByteBuffer;
+import java.util.stream.Stream;
+
 import org.apache.avro.Schema;
 import org.apache.avro.util.Utf8;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.nio.ByteBuffer;
-import java.util.stream.Stream;
+import io.kestra.plugin.serdes.avro.AvroConverterTest;
 
 public class PrimitiveStringBytesTest {
     static Stream<Arguments> source() {
@@ -34,7 +35,9 @@ public class PrimitiveStringBytesTest {
     @ParameterizedTest
     @MethodSource("source")
     static void convertBytes(Object v, String expected) throws Exception {
-        AvroConverterTest.Utils.oneField(v, ByteBuffer.wrap(new Utf8(expected.getBytes()).getBytes()), Schema.create(Schema.Type.BYTES),
-            false);
+        AvroConverterTest.Utils.oneField(
+            v, ByteBuffer.wrap(new Utf8(expected.getBytes()).getBytes()), Schema.create(Schema.Type.BYTES),
+            false
+        );
     }
 }

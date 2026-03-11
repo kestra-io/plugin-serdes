@@ -1,6 +1,21 @@
 package io.kestra.plugin.serdes.avro.infer;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.time.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
+import org.skyscreamer.jsonassert.JSONAssert;
+
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
@@ -11,20 +26,8 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon;
 import io.kestra.plugin.serdes.csv.IonToCsv;
-import jakarta.inject.Inject;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Test;
-import org.skyscreamer.jsonassert.JSONAssert;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.time.*;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
+import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -41,24 +44,24 @@ public class InferAvroSchemaTest {
         var tempFile = File.createTempFile(InferAvroSchemaTest.class.getSimpleName().toLowerCase() + "_", ".ion");
         try (var output = new FileOutputStream(tempFile)) {
             List.of(
-                    new HashMap<>() {
-                        {
-                            put("myString", "string");
-                            put("myInt", 2);
-                            put("myFloat", 3.2F);
-                            put("myDouble", 3.2D);
-                            put("myInstant", Instant.now());
-                            put("myZonedDateTime", ZonedDateTime.now());
-                            put("myLocalDateTime", LocalDateTime.now());
-                            put("myOffsetDateTime", OffsetDateTime.now());
-                            put("myLocalDate", LocalDate.now());
-                            put("myLocalTime", LocalTime.now());
-                            put("myOffsetTime", OffsetTime.now());
-                            put("myDate", new Date());
+                new HashMap<>() {
+                    {
+                        put("myString", "string");
+                        put("myInt", 2);
+                        put("myFloat", 3.2F);
+                        put("myDouble", 3.2D);
+                        put("myInstant", Instant.now());
+                        put("myZonedDateTime", ZonedDateTime.now());
+                        put("myLocalDateTime", LocalDateTime.now());
+                        put("myOffsetDateTime", OffsetDateTime.now());
+                        put("myLocalDate", LocalDate.now());
+                        put("myLocalTime", LocalTime.now());
+                        put("myOffsetTime", OffsetTime.now());
+                        put("myDate", new Date());
 
-                        }
                     }
-                )
+                }
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             var inputIonFileUri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
@@ -72,7 +75,8 @@ public class InferAvroSchemaTest {
 
             // then
             var resultingSchemaStr = IOUtils.toString(new InputStreamReader(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri())));
-            JSONAssert.assertEquals("""
+            JSONAssert.assertEquals(
+                """
                     {
                       "type": "record",
                       "name": "root",

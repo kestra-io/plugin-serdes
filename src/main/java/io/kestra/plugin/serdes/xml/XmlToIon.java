@@ -1,5 +1,21 @@
 package io.kestra.plugin.serdes.xml;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.List;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.XML;
+import org.json.XMLParserConfiguration;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -10,24 +26,11 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.XML;
-import org.json.XMLParserConfiguration;
-
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamConstants;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.List;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -152,8 +155,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
      * <p>
      * Handles two patterns:
      * <ul>
-     *   <li>{@code {"root": [...]}} — root element directly contains an array</li>
-     *   <li>{@code {"root": {"child": [...]}}} — root element wraps a single child element containing an array</li>
+     * <li>{@code {"root": [...]}} — root element directly contains an array</li>
+     * <li>{@code {"root": {"child": [...]}}} — root element wraps a single child element containing an array</li>
      * </ul>
      * Falls back to returning the original JSONObject if the structure doesn't match.
      */

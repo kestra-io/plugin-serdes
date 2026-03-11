@@ -1,6 +1,12 @@
 package io.kestra.plugin.serdes.yaml;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -12,17 +18,13 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
 
 @SuperBuilder
 @NoArgsConstructor
@@ -97,7 +99,8 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
 
             Flux<Object> flow = Flux.generate(
                 () -> docs,
-                (iterator, sink) -> {
+                (iterator, sink) ->
+                {
                     try {
                         if (iterator.hasNext()) {
                             Object doc = iterator.next();

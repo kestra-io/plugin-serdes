@@ -1,7 +1,8 @@
 package io.kestra.plugin.serdes.avro.converter;
 
-import com.google.common.collect.ImmutableMap;
-import io.kestra.plugin.serdes.avro.AvroConverterTest;
+import java.util.Map;
+import java.util.stream.Stream;
+
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.util.Utf8;
@@ -9,8 +10,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.Map;
-import java.util.stream.Stream;
+import com.google.common.collect.ImmutableMap;
+
+import io.kestra.plugin.serdes.avro.AvroConverterTest;
 
 public class ComplexMapTest {
     static Stream<Arguments> source() {
@@ -18,7 +20,8 @@ public class ComplexMapTest {
             Arguments.of(
                 ImmutableMap.of("a", 42.2D, "b", "42", "c", 42.2D),
                 ImmutableMap.of(new Utf8("a".getBytes()), 42.2F, new Utf8("b".getBytes()), 42F, new Utf8("c".getBytes()), 42.2F),
-                Schema.create(Schema.Type.FLOAT))
+                Schema.create(Schema.Type.FLOAT)
+            )
         );
     }
 

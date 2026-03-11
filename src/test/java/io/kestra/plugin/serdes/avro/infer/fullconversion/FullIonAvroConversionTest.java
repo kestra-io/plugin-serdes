@@ -1,8 +1,15 @@
 package io.kestra.plugin.serdes.avro.infer.fullconversion;
 
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+
+import org.apache.commons.io.IOUtils;
+
 import com.amazon.ion.system.IonSystemBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.models.property.Property;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
@@ -10,11 +17,6 @@ import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.avro.AvroToIon;
 import io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon;
 import io.kestra.plugin.serdes.avro.IonToAvro;
-import org.apache.commons.io.IOUtils;
-
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

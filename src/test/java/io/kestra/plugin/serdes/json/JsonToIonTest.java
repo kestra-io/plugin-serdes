@@ -1,24 +1,5 @@
 package io.kestra.plugin.serdes.json;
 
-import com.amazon.ion.IonType;
-import com.amazon.ion.system.IonSystemBuilder;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableMap;
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.tenant.TenantService;
-import io.kestra.core.utils.IdUtils;
-import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.serdes.SerdesUtils;
-import io.kestra.plugin.serdes.avro.IonToAvro;
-import jakarta.inject.Inject;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Test;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -29,6 +10,28 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
+
+import com.amazon.ion.IonType;
+import com.amazon.ion.system.IonSystemBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableMap;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.IdUtils;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.serdes.SerdesUtils;
+import io.kestra.plugin.serdes.avro.IonToAvro;
+
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -143,8 +146,10 @@ class JsonToIonTest {
         var truncatedInstant = instant.truncatedTo(ChronoUnit.MILLIS);
         var truncatedInstantStr = truncatedInstant.toString();
 
-        try (var output = new FileOutputStream(tempFile);
-             var writer = ionSystem.newTextWriter(output)) {
+        try (
+            var output = new FileOutputStream(tempFile);
+            var writer = ionSystem.newTextWriter(output)
+        ) {
 
             writer.stepIn(IonType.STRUCT);
 

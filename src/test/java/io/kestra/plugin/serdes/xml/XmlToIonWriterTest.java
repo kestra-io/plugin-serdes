@@ -1,9 +1,23 @@
 package io.kestra.plugin.serdes.xml;
 
+import java.io.*;
+import java.net.URI;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
@@ -16,19 +30,8 @@ import io.kestra.plugin.serdes.SerdesUtils;
 import io.kestra.plugin.serdes.avro.IonToAvro;
 import io.kestra.plugin.serdes.csv.IonToCsv;
 import io.kestra.plugin.serdes.json.IonToJson;
-import jakarta.inject.Inject;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Test;
 
-import java.io.*;
-import java.net.URI;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -103,21 +106,21 @@ class XmlToIonWriterTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("String", "string")
-                        .put("Int", 2)
-                        .put("Float", 3.2F)
-                        .put("Double", 3.2D)
-                        .put("Instant", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant())
-                        .put("ZonedDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00"))
-                        .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime().truncatedTo(ChronoUnit.MINUTES))
-                        .put("OffsetDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime())
-                        .put("LocalDate", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDate())
-                        .put("LocalTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalTime())
-                        .put("OffsetTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime().toOffsetTime())
-                        .put("Date", Date.from(ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant()))
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("String", "string")
+                    .put("Int", 2)
+                    .put("Float", 3.2F)
+                    .put("Double", 3.2D)
+                    .put("Instant", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant())
+                    .put("ZonedDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00"))
+                    .put("LocalDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDateTime().truncatedTo(ChronoUnit.MINUTES))
+                    .put("OffsetDateTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime())
+                    .put("LocalDate", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalDate())
+                    .put("LocalTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toLocalTime())
+                    .put("OffsetTime", ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toOffsetDateTime().toOffsetTime())
+                    .put("Date", Date.from(ZonedDateTime.parse("2021-05-05T12:21:12.123456+02:00").toInstant()))
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
@@ -133,20 +136,21 @@ class XmlToIonWriterTest {
 
             assertThat(
                 IOUtils.toString(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri()), Charsets.UTF_8),
-                is("<?xml version='1.0' encoding='UTF-8'?>\n<items>\n  <item>\n    " +
-                    "<String>string</String>\n    " +
-                    "<Int>2</Int>\n    " +
-                    "<Float>3.200000047683716</Float>\n    " +
-                    "<Double>3.2</Double>\n    " +
-                    "<Instant>2021-05-05T10:21:12.123Z</Instant>\n    " +
-                    "<ZonedDateTime>2021-05-05T11:21:12.123456+01:00</ZonedDateTime>\n    " +
-                    "<LocalDateTime>2021-05-05T12:21:00</LocalDateTime>\n    " +
-                    "<OffsetDateTime>2021-05-05T11:21:12.123456+01:00</OffsetDateTime>\n    " +
-                    "<LocalDate>2021-05-05</LocalDate>\n    " +
-                    "<LocalTime>12:21:12.123456</LocalTime>\n    " +
-                    "<OffsetTime>12:21:12.123456+02:00</OffsetTime>\n    " +
-                    "<Date>2021-05-05T10:21:12.123Z</Date>\n  " +
-                    "</item>\n</items>\n"
+                is(
+                    "<?xml version='1.0' encoding='UTF-8'?>\n<items>\n  <item>\n    " +
+                        "<String>string</String>\n    " +
+                        "<Int>2</Int>\n    " +
+                        "<Float>3.200000047683716</Float>\n    " +
+                        "<Double>3.2</Double>\n    " +
+                        "<Instant>2021-05-05T10:21:12.123Z</Instant>\n    " +
+                        "<ZonedDateTime>2021-05-05T11:21:12.123456+01:00</ZonedDateTime>\n    " +
+                        "<LocalDateTime>2021-05-05T12:21:00</LocalDateTime>\n    " +
+                        "<OffsetDateTime>2021-05-05T11:21:12.123456+01:00</OffsetDateTime>\n    " +
+                        "<LocalDate>2021-05-05</LocalDate>\n    " +
+                        "<LocalTime>12:21:12.123456</LocalTime>\n    " +
+                        "<OffsetTime>12:21:12.123456+02:00</OffsetTime>\n    " +
+                        "<Date>2021-05-05T10:21:12.123Z</Date>\n  " +
+                        "</item>\n</items>\n"
                 )
             );
         }
@@ -167,8 +171,13 @@ class XmlToIonWriterTest {
 
         // Read back ION records
         var records = new java.util.ArrayList<>();
-        try (var inputStream = new BufferedReader(new InputStreamReader(
-            runContextFactory.of().storage().getFile(readerOutput.getUri())))) {
+        try (
+            var inputStream = new BufferedReader(
+                new InputStreamReader(
+                    runContextFactory.of().storage().getFile(readerOutput.getUri())
+                )
+            )
+        ) {
             FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
         }
 
@@ -188,9 +197,9 @@ class XmlToIonWriterTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.of("job_title", "Data Engineer", "avg_salary", 157510.03),
-                    ImmutableMap.of("job_title", "Data Analyst", "avg_salary", 116348.29)
-                )
+                ImmutableMap.of("job_title", "Data Engineer", "avg_salary", 157510.03),
+                ImmutableMap.of("job_title", "Data Analyst", "avg_salary", 116348.29)
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
         }
 
@@ -210,8 +219,13 @@ class XmlToIonWriterTest {
 
         // Read ION records
         var records = new java.util.ArrayList<>();
-        try (var inputStream = new BufferedReader(new InputStreamReader(
-            runContextFactory.of().storage().getFile(readerOutput.getUri())))) {
+        try (
+            var inputStream = new BufferedReader(
+                new InputStreamReader(
+                    runContextFactory.of().storage().getFile(readerOutput.getUri())
+                )
+            )
+        ) {
             FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
         }
 
@@ -224,32 +238,29 @@ class XmlToIonWriterTest {
     }
 
     @Test
-        // Assert that there is no exception throw when reading an empty file
+    // Assert that there is no exception throw when reading an empty file
     void readEmpty() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
-        String tagContent = new BufferedReader(new
-            InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+        String tagContent = new BufferedReader(new InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is(""));
     }
 
     @Test
-        // Assert that there is no exception throw when reading an empty file
+    // Assert that there is no exception throw when reading an empty file
     void readEmptyTagBadQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
-        String tagContent = new BufferedReader(new
-            InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+        String tagContent = new BufferedReader(new InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is(""));
     }
 
     @Test
-        // Assert that there is no exception throw when reading an empty file
+    // Assert that there is no exception throw when reading an empty file
     void readEmptyTagGoodQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/catalog");
-        String tagContent = new BufferedReader(new
-            InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+        String tagContent = new BufferedReader(new InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
         assertThat(tagContent, is("\"\""));
     }
 
@@ -271,8 +282,11 @@ class XmlToIonWriterTest {
 
         // Read back all records and count them
         int count = 0;
-        try (BufferedReader br = new BufferedReader(
-            new InputStreamReader(runContextFactory.of().storage().getFile(output.getUri())))) {
+        try (
+            BufferedReader br = new BufferedReader(
+                new InputStreamReader(runContextFactory.of().storage().getFile(output.getUri()))
+            )
+        ) {
             while (br.readLine() != null) {
                 count++;
             }

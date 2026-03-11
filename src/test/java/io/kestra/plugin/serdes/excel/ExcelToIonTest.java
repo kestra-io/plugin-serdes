@@ -1,20 +1,5 @@
 package io.kestra.plugin.serdes.excel;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.io.CharStreams;
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.tenant.TenantService;
-import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.serdes.SerdesUtils;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
@@ -22,6 +7,24 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.util.List;
 import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.io.CharStreams;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.serdes.SerdesUtils;
+
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -116,13 +119,15 @@ public class ExcelToIonTest {
                 .id(ExcelToIonTest.class.getSimpleName())
                 .type(ExcelToIon.class.getName())
                 .from(Property.ofValue(source.toString()))
-                .sheetsTitle(Property.ofValue(
-                    List.of(
-                        "Worksheet_1",
-                        "Worksheet_2",
-                        "Worksheet_3"
+                .sheetsTitle(
+                    Property.ofValue(
+                        List.of(
+                            "Worksheet_1",
+                            "Worksheet_2",
+                            "Worksheet_3"
+                        )
                     )
-                ))
+                )
                 .header(Property.ofValue(true))
                 .build();
 

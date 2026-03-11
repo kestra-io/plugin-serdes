@@ -1,8 +1,18 @@
 package io.kestra.plugin.serdes.yaml;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
+
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -14,21 +24,13 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.function.Consumer;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 
@@ -151,7 +153,8 @@ public class JsonToYaml extends Task implements RunnableTask<JsonToYaml.Output> 
     }
 
     private Consumer<FluxSink<Object>> nextJson(BufferedReader reader, boolean jsonl) {
-        return throwConsumer(sink -> {
+        return throwConsumer(sink ->
+        {
             try {
                 if (jsonl) {
                     String line;

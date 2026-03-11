@@ -1,9 +1,15 @@
 package io.kestra.plugin.serdes.json;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -15,15 +21,11 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @NoArgsConstructor
@@ -70,12 +72,12 @@ import java.nio.charset.StandardCharsets;
                 """
         )
     },
-   metrics = {
-       @Metric(
-           name = "records",
-           type = Counter.TYPE
-       )
-   }
+    metrics = {
+        @Metric(
+            name = "records",
+            type = Counter.TYPE
+        )
+    }
 )
 public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output> {
     @Builder.Default
@@ -84,7 +86,7 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
         description = "The character set to use for reading and writing the file."
     )
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
-    
+
     @NotNull
     @Schema(
         title = "Source file URI"
@@ -115,7 +117,7 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
             // Use streaming parser to avoid loading entire file into memory
             JsonParser jsonParser = mapper.getFactory().createParser(reader);
 
-            long[] count = {0};
+            long[] count = { 0 };
 
             try {
                 JsonToken token = jsonParser.nextToken();
@@ -168,7 +170,6 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
             .uri(outputUri)
             .build();
     }
-
 
     @Getter
     @Builder

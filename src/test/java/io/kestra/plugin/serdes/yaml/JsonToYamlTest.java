@@ -1,17 +1,19 @@
 package io.kestra.plugin.serdes.yaml;
 
+import java.io.ByteArrayInputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -28,7 +30,8 @@ class JsonToYamlTest {
     StorageInterface storage;
 
     private URI put(String content) throws Exception {
-        return storage.put(MAIN_TENANT, null,
+        return storage.put(
+            MAIN_TENANT, null,
             URI.create("/" + IdUtils.create() + ".json"),
             new ByteArrayInputStream(content.getBytes(UTF_8))
         );

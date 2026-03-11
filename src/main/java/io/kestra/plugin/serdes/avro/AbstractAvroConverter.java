@@ -1,5 +1,14 @@
 package io.kestra.plugin.serdes.avro;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.apache.avro.generic.GenericData;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
@@ -9,20 +18,12 @@ import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.Rethrow;
 import io.kestra.core.validations.DateFormat;
 import io.kestra.plugin.serdes.OnBadLines;
+
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.generic.GenericData;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.io.IOException;
-import java.io.Reader;
-import java.time.ZoneId;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @SuperBuilder
 @ToString
@@ -61,21 +62,23 @@ public abstract class AbstractAvroConverter extends Task {
     @Schema(
         title = "Values to consider as null"
     )
-    protected final Property<List<String>> nullValues = Property.ofValue(Arrays.asList(
-        "",
-        "#N/A",
-        "#N/A N/A",
-        "#NA",
-        "-1.#IND",
-        "-1.#QNAN",
-        "-NaN",
-        "1.#IND",
-        "1.#QNAN",
-        "NA",
-        "n/a",
-        "nan",
-        "null"
-    ));
+    protected final Property<List<String>> nullValues = Property.ofValue(
+        Arrays.asList(
+            "",
+            "#N/A",
+            "#N/A N/A",
+            "#NA",
+            "-1.#IND",
+            "-1.#QNAN",
+            "-NaN",
+            "1.#IND",
+            "1.#QNAN",
+            "NA",
+            "n/a",
+            "nan",
+            "null"
+        )
+    );
 
     @Builder.Default
     @Schema(
@@ -138,8 +141,8 @@ public abstract class AbstractAvroConverter extends Task {
     )
     protected final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
-
-    protected <E extends Exception> Long convert(Reader inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext) throws IOException, IllegalVariableEvaluationException {
+    protected <E extends Exception> Long convert(Reader inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext)
+        throws IOException, IllegalVariableEvaluationException {
         OnBadLines rOnBadLines = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
         AvroConverter converter = AvroConverter.builder()
             .schema(runContext.render(this.schema))
@@ -158,7 +161,8 @@ public abstract class AbstractAvroConverter extends Task {
 
         Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
             .map(this.convertToAvro(schema, converter, rOnBadLines))
-            .doOnNext(datum -> {
+            .doOnNext(datum ->
+            {
                 try {
                     consumer.accept(datum);
                 } catch (Throwable e) {
@@ -180,12 +184,14 @@ public abstract class AbstractAvroConverter extends Task {
         Mono<Long> count = flowable.count();
         return count.block();
     }
+
     @SuppressWarnings("unchecked")
-    protected Function<Object, GenericData.Record> convertToAvro( org.apache.avro.Schema schema, AvroConverter converter, OnBadLines onBadLines) {
-        return row -> {
+    protected Function<Object, GenericData.Record> convertToAvro(org.apache.avro.Schema schema, AvroConverter converter, OnBadLines onBadLines) {
+        return row ->
+        {
             try {
                 if (row instanceof List) {
-                    List<?> casted = (List<?>) row;  // Allow Object for flexibility
+                    List<?> casted = (List<?>) row; // Allow Object for flexibility
                     return converter.fromArray(schema, casted, onBadLines);
                 } else if (row instanceof Map) {
                     Map<String, Object> mapRow = (Map<String, Object>) row;

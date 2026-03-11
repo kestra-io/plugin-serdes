@@ -1,9 +1,26 @@
 package io.kestra.plugin.serdes.avro;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
+
 import com.devskiller.friendly_id.FriendlyId;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
@@ -13,22 +30,8 @@ import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.csv.IonToCsv;
-import jakarta.inject.Inject;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Test;
 
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.time.*;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
+import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -57,9 +60,15 @@ class IonToAvroTest {
             TenantService.MAIN_TENANT,
             null,
             new URI("/" + FriendlyId.createFriendlyId()),
-            new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                    .getResource(file))
-                .toURI()))
+            new FileInputStream(
+                new File(
+                    Objects.requireNonNull(
+                        IonToAvroTest.class.getClassLoader()
+                            .getResource(file)
+                    )
+                        .toURI()
+                )
+            )
         );
 
         IonToAvro task = IonToAvro.builder()
@@ -79,10 +88,18 @@ class IonToAvroTest {
 
         assertThat(
             IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri())),
-            is(IonToAvroTest.avroSize(
-                new FileInputStream(new File(Objects.requireNonNull(IonToAvroTest.class.getClassLoader()
-                        .getResource("csv/insurance_sample.avro"))
-                    .toURI())))
+            is(
+                IonToAvroTest.avroSize(
+                    new FileInputStream(
+                        new File(
+                            Objects.requireNonNull(
+                                IonToAvroTest.class.getClassLoader()
+                                    .getResource("csv/insurance_sample.avro")
+                            )
+                                .toURI()
+                        )
+                    )
+                )
             )
         );
     }
@@ -98,10 +115,12 @@ class IonToAvroTest {
 
     @Test
     void ion() throws Exception {
-        runIonToAvroTestWithSchema(IOUtils.toString(
-            Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("avro/all.avsc")),
-            StandardCharsets.UTF_8
-        ));
+        runIonToAvroTestWithSchema(
+            IOUtils.toString(
+                Objects.requireNonNull(IonToAvroTest.class.getClassLoader().getResource("avro/all.avsc")),
+                StandardCharsets.UTF_8
+            )
+        );
     }
 
     @Test
@@ -113,21 +132,21 @@ class IonToAvroTest {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
-                    ImmutableMap.builder()
-                        .put("String", "string")
-                        .put("Int", 2)
-                        .put("Float", 3.2F)
-                        .put("Double", 3.2D)
-                        .put("Instant", Instant.now())
-                        .put("ZonedDateTime", ZonedDateTime.now())
-                        .put("LocalDateTime", LocalDateTime.now())
-                        .put("OffsetDateTime", OffsetDateTime.now())
-                        .put("LocalDate", LocalDate.now())
-                        .put("LocalTime", LocalTime.now())
-                        .put("OffsetTime", OffsetTime.now())
-                        .put("Date", new Date())
-                        .build()
-                )
+                ImmutableMap.builder()
+                    .put("String", "string")
+                    .put("Int", 2)
+                    .put("Float", 3.2F)
+                    .put("Double", 3.2D)
+                    .put("Instant", Instant.now())
+                    .put("ZonedDateTime", ZonedDateTime.now())
+                    .put("LocalDateTime", LocalDateTime.now())
+                    .put("OffsetDateTime", OffsetDateTime.now())
+                    .put("LocalDate", LocalDate.now())
+                    .put("LocalTime", LocalTime.now())
+                    .put("OffsetTime", OffsetTime.now())
+                    .put("Date", new Date())
+                    .build()
+            )
                 .forEach(throwConsumer(row -> FileSerde.write(output, row)));
 
             URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));

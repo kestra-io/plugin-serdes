@@ -1,10 +1,20 @@
 package io.kestra.plugin.serdes.json;
 
+import java.io.*;
+import java.math.BigDecimal;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.TimeZone;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -16,19 +26,11 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.io.*;
-import java.math.BigDecimal;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.TimeZone;
 
 @SuperBuilder
 @ToString
@@ -242,9 +244,9 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         /**
          * Encode an array according to TOON 2.0 rules.
          *
-         * @param array  the array node
+         * @param array the array node
          * @param indent indentation level
-         * @param key    object key or null for root arrays
+         * @param key object key or null for root arrays
          */
         private void writeArray(JsonNode array, int indent, String key) throws IOException {
             int size = array.size();

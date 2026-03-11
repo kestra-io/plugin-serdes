@@ -1,19 +1,21 @@
 package io.kestra.plugin.serdes.json;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
-import org.junit.jupiter.api.Test;
 
 import jakarta.inject.Inject;
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -443,8 +445,11 @@ class JsonToJsonlTest {
 
     private URI createInputFile(String content, java.nio.charset.Charset charset) throws IOException {
         File tempFile = File.createTempFile("test-input-", ".json");
-        try (BufferedWriter writer = new BufferedWriter(
-            new OutputStreamWriter(new FileOutputStream(tempFile), charset))) {
+        try (
+            BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(tempFile), charset)
+            )
+        ) {
             writer.write(content);
         }
 
@@ -458,8 +463,11 @@ class JsonToJsonlTest {
 
     private List<String> readLinesFromUri(URI uri) throws IOException {
         List<String> lines = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(
-            new InputStreamReader(storageInterface.get(MAIN_TENANT, null, uri), StandardCharsets.UTF_8))) {
+        try (
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(storageInterface.get(MAIN_TENANT, null, uri), StandardCharsets.UTF_8)
+            )
+        ) {
             String line;
             while ((line = reader.readLine()) != null) {
                 if (!line.trim().isEmpty()) {

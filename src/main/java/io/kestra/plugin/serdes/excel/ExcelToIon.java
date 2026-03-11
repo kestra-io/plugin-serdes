@@ -1,6 +1,18 @@
 package io.kestra.plugin.serdes.excel;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.URI;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.poi.ss.usermodel.*;
+
 import com.github.pjfanning.xlsx.StreamingReader;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -12,22 +24,13 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.ListUtils;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.poi.ss.usermodel.*;
 import reactor.core.publisher.Flux;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.URI;
-import java.time.ZoneId;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
@@ -177,7 +180,8 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                 if (lastColNum == -1 && rowIterator.hasNext()) {
                     var firstDataRow = rowIterator.next();
                     lastColNum = firstDataRow.getLastCellNum();
-                    if (lastColNum == -1) lastColNum = 0;
+                    if (lastColNum == -1)
+                        lastColNum = 0;
                     sheetRawData.add(processRow(firstDataRow, firstColNum, lastColNum, renderedValueRender, renderedSkipEmptyRowsValue, renderedDateTimeRender));
                 }
 

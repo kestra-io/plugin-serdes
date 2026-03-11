@@ -1,6 +1,15 @@
 package io.kestra.plugin.serdes.json;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.Test;
+
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
@@ -8,14 +17,8 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
-import jakarta.inject.Inject;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
-import org.junit.jupiter.api.Test;
 
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -261,8 +264,10 @@ class JsonToToonTest {
         JsonToToon.Output output = convert(temp);
 
         // read as streaming to avoid using too much memory
-        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri());
-             BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+        try (
+            InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri());
+            BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))
+        ) {
 
             // The first line must be a tabular header
             String firstLine = br.readLine();

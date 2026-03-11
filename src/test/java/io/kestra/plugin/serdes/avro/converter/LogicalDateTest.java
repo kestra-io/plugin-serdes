@@ -1,7 +1,10 @@
 package io.kestra.plugin.serdes.avro.converter;
 
-import io.kestra.plugin.serdes.avro.AvroConverter;
-import io.kestra.plugin.serdes.avro.AvroConverterTest;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.stream.Stream;
+
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.junit.jupiter.api.Nested;
@@ -10,17 +13,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.time.LocalDate;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.stream.Stream;
+import io.kestra.plugin.serdes.avro.AvroConverter;
+import io.kestra.plugin.serdes.avro.AvroConverterTest;
 
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 
 @TestInstance(PER_CLASS)
 @Nested
-public
-class LogicalDateTest {
+public class LogicalDateTest {
     private Schema schema = LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT));
 
     Stream<Arguments> source() {
@@ -30,9 +30,13 @@ class LogicalDateTest {
             Arguments.of(LocalDate.parse("2011-12-03+01:00", DateTimeFormatter.ISO_DATE), LocalDate.parse("2011-12-03+01:00", DateTimeFormatter.ISO_DATE)),
             Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
             Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toInstant(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
-            Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toOffsetDateTime(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
-            Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toLocalDate(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
-            Arguments.of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toLocalDateTime(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE))
+            Arguments.of(
+                ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toOffsetDateTime(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)
+            ),
+            Arguments
+                .of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toLocalDate(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE)),
+            Arguments
+                .of(ZonedDateTime.parse("2019-12-26T12:13:11.123000+01:00", DateTimeFormatter.ISO_DATE_TIME).toLocalDateTime(), LocalDate.parse("2019-12-26+01:00", DateTimeFormatter.ISO_DATE))
         );
     }
 

@@ -1,5 +1,15 @@
 package io.kestra.plugin.serdes.markdown;
 
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.HtmlRenderer;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -9,19 +19,11 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.commonmark.parser.Parser;
-import org.commonmark.renderer.html.HtmlRenderer;
-
-import java.io.FileOutputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @ToString
@@ -81,9 +83,11 @@ public class MarkdownToHtml extends Task implements RunnableTask<MarkdownToHtml.
 
         var tempFile = runContext.workingDir().createTempFile(".html").toFile();
 
-        try (var inputStream = runContext.storage().getFile(rFrom);
-             var reader = new InputStreamReader(inputStream, rCharset);
-             var writer = new OutputStreamWriter(new FileOutputStream(tempFile), rCharset)) {
+        try (
+            var inputStream = runContext.storage().getFile(rFrom);
+            var reader = new InputStreamReader(inputStream, rCharset);
+            var writer = new OutputStreamWriter(new FileOutputStream(tempFile), rCharset)
+        ) {
 
             var parser = Parser.builder().build();
             var document = parser.parseReader(reader);

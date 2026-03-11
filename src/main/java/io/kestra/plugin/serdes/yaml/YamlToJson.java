@@ -1,7 +1,15 @@
 package io.kestra.plugin.serdes.yaml;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
+import java.util.List;
+
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.kestra.core.models.annotations.*;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
@@ -9,19 +17,13 @@ import io.kestra.core.models.tasks.*;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SynchronousSink;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
-import java.util.List;
 
 @SuperBuilder
 @NoArgsConstructor
@@ -112,7 +114,8 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
             if (rJsonl) {
                 Flux<Object> flow = Flux.generate(
                     () -> docs,
-                    (it, sink) -> {
+                    (it, sink) ->
+                    {
                         try {
                             if (!it.hasNext()) {
                                 sink.complete();
@@ -130,11 +133,11 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
                 );
 
                 count = flow.count().block();
-            }
-            else {
+            } else {
                 Flux<Object> flow = Flux.generate(
-                    () -> new Object[]{docs, null, false},
-                    (state, sink) -> {
+                    () -> new Object[] { docs, null, false },
+                    (state, sink) ->
+                    {
                         try {
                             return processJsonArrayState(state, jsonGen, sink);
                         } catch (Exception e) {

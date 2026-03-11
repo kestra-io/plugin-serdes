@@ -1,7 +1,18 @@
 package io.kestra.plugin.serdes.excel;
 
-import bad.robot.excel.matchers.WorkbookMatcher;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.net.URI;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.Test;
+
 import com.google.common.collect.ImmutableMap;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
@@ -12,17 +23,9 @@ import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
-import jakarta.inject.Inject;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.junit.jupiter.api.Test;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.net.URI;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
+import bad.robot.excel.matchers.WorkbookMatcher;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -188,7 +191,8 @@ class IonToExcelTest {
                     "Worksheet_1", inputUri.toString(),
                     "Worksheet_2", inputUri.toString(),
                     "Worksheet_3", inputUri.toString()
-                ))
+                )
+            )
             .build();
 
         IonToExcel.Output excelOutput = writer.run(

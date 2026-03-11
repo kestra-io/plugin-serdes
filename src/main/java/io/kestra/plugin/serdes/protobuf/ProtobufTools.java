@@ -11,13 +11,13 @@ import com.google.protobuf.Descriptors.FileDescriptor;
 
 public class ProtobufTools {
     public static Descriptor findMessageDescriptor(
-            FileDescriptorSet descriptorSet,
-            String fullyQualifiedTypeName) throws Descriptors.DescriptorValidationException {
+        FileDescriptorSet descriptorSet,
+        String fullyQualifiedTypeName) throws Descriptors.DescriptorValidationException {
 
         // Normalize name (remove leading dot if present)
         String normalizedName = fullyQualifiedTypeName.startsWith(".")
-                ? fullyQualifiedTypeName.substring(1)
-                : fullyQualifiedTypeName;
+            ? fullyQualifiedTypeName.substring(1)
+            : fullyQualifiedTypeName;
 
         // Build all FileDescriptors with dependencies
         Map<String, FileDescriptor> fileDescriptors = new HashMap<>();
@@ -37,27 +37,28 @@ public class ProtobufTools {
     }
 
     private static FileDescriptor buildFileDescriptor(
-            FileDescriptorProto fileProto,
-            FileDescriptorSet set,
-            Map<String, FileDescriptor> cache) throws Descriptors.DescriptorValidationException {
+        FileDescriptorProto fileProto,
+        FileDescriptorSet set,
+        Map<String, FileDescriptor> cache) throws Descriptors.DescriptorValidationException {
 
         if (cache.containsKey(fileProto.getName())) {
             return cache.get(fileProto.getName());
         }
 
         FileDescriptor[] dependencies = fileProto.getDependencyList().stream()
-                .map(depName -> {
-                    FileDescriptorProto depProto = set.getFileList().stream()
-                            .filter(fp -> fp.getName().equals(depName))
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalStateException("Missing dependency: " + depName));
-                    try {
-                        return buildFileDescriptor(depProto, set, cache);
-                    } catch (Descriptors.DescriptorValidationException e) {
-                        throw new RuntimeException(e);
-                    }
-                })
-                .toArray(FileDescriptor[]::new);
+            .map(depName ->
+            {
+                FileDescriptorProto depProto = set.getFileList().stream()
+                    .filter(fp -> fp.getName().equals(depName))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Missing dependency: " + depName));
+                try {
+                    return buildFileDescriptor(depProto, set, cache);
+                } catch (Descriptors.DescriptorValidationException e) {
+                    throw new RuntimeException(e);
+                }
+            })
+            .toArray(FileDescriptor[]::new);
 
         FileDescriptor fd = FileDescriptor.buildFrom(fileProto, dependencies);
         cache.put(fileProto.getName(), fd);
@@ -65,8 +66,8 @@ public class ProtobufTools {
     }
 
     private static Descriptor findMessageRecursively(
-            FileDescriptor fd,
-            String fullName) {
+        FileDescriptor fd,
+        String fullName) {
         for (Descriptor desc : fd.getMessageTypes()) {
             Descriptor found = findInDescriptor(desc, fullName);
             if (found != null) {
@@ -77,8 +78,8 @@ public class ProtobufTools {
     }
 
     private static Descriptor findInDescriptor(
-            Descriptor desc,
-            String fullName) {
+        Descriptor desc,
+        String fullName) {
         if (desc.getFullName().equals(fullName)) {
             return desc;
         }

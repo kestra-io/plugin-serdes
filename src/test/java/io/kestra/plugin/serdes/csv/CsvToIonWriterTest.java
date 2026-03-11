@@ -1,8 +1,18 @@
 package io.kestra.plugin.serdes.csv;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
-import de.siegmar.fastcsv.reader.CsvParseException;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
@@ -12,18 +22,11 @@ import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.serdes.SerdesUtils;
-import jakarta.inject.Inject;
 import io.kestra.plugin.serdes.OnBadLines;
-import org.junit.jupiter.api.Test;
+import io.kestra.plugin.serdes.SerdesUtils;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
+import de.siegmar.fastcsv.reader.CsvParseException;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -165,12 +168,13 @@ class CsvToIonWriterTest {
         assertThat(cause.getMessage(), containsString("maximum buffer size"));
     }
 
-
     @Test
     void largeQuotedFieldParsesWhenBufferSufficient() throws Exception {
         String csv = "col1\n\"" + "x".repeat(50) + "\"\n";
-        URI src = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/okbuf.csv"),
-            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)));
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/okbuf.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
 
         CsvToIon reader = CsvToIon.builder()
             .id("largeQuotedFieldParsesWhenBufferSufficient")
@@ -209,6 +213,7 @@ class CsvToIonWriterTest {
 
         assertThat(thrown.getMessage(), containsString("Bad line encountered (field count mismatch): Expected 2, got 3 fields."));
     }
+
     @Test
     void badLinesWarnAndSkip() throws Exception {
         String csv = "header1,header2\nvalue1,value2\nvalue3,\"value4\nvalue6,value7\nvalue8,value9,value10\nvalue11,value12"; // Bad lines: value3,"value4 (unclosed quote), value8,value9,value10 (field count mismatch)
@@ -257,18 +262,19 @@ class CsvToIonWriterTest {
 
         assertThat(recordsSkip.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
     }
+
     @Test
     void testCsvWithBadRows() throws Exception {
         String csv = "name,age,city\n" +
-            "Alice,New York\n" +           // less column → bad row
-            "Bob,25,London,extra\n" +     // extra column → bad row
-            "Charlie,35,Paris";           // correct row
+            "Alice,New York\n" + // less column → bad row
+            "Bob,25,London,extra\n" + // extra column → bad row
+            "Charlie,35,Paris"; // correct row
 
         // Put CSV in storage
         URI src = storageInterface.put(
-                TenantService.MAIN_TENANT, null, URI.create("/badRows.csv"),
-                new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
-                );
+            TenantService.MAIN_TENANT, null, URI.create("/badRows.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
 
         // WARN mode
         CsvToIon readerWarn = CsvToIon.builder()

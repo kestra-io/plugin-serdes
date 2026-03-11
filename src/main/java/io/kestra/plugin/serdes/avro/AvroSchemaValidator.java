@@ -1,9 +1,10 @@
 package io.kestra.plugin.serdes.avro;
 
-import jakarta.validation.ConstraintValidator;
-import jakarta.validation.ConstraintValidatorContext;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
+
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
 
 public class AvroSchemaValidator implements ConstraintValidator<AvroSchemaValidation, String> {
 

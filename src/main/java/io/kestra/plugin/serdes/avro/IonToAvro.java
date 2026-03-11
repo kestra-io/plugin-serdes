@@ -1,5 +1,17 @@
 package io.kestra.plugin.serdes.avro;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.apache.avro.SchemaParseException;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumWriter;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -9,25 +21,15 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.plugin.serdes.OnBadLines;
 import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.avro.file.DataFileWriter;
-import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumWriter;
-import io.kestra.plugin.serdes.OnBadLines;
-import org.apache.avro.SchemaParseException;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
-import java.util.HashSet;
-import java.util.Set;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @ToString
@@ -143,8 +145,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         } else {
             try {
                 schema = schemaParser.parse(runContext.render(this.schema));
-            }
-            catch (SchemaParseException e) {
+            } catch (SchemaParseException e) {
                 Set<ConstraintViolation<?>> violations = new HashSet<>(); // Simulate
                 // Add violation for 'schema' property
                 throw new ConstraintViolationException("Invalid Avro schema: " + e.getMessage(), violations);
@@ -159,7 +160,8 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
-            Long lineCount = this.convert(inputStream, schema, record -> {
+            Long lineCount = this.convert(inputStream, schema, record ->
+            {
                 try {
                     dataFileWriter.append(record);
                 } catch (Exception e) {

@@ -1,14 +1,5 @@
 package io.kestra.plugin.serdes.avro;
 
-import org.apache.avro.Conversions.DecimalConversion;
-import org.apache.avro.Conversions.UUIDConversion;
-import org.apache.avro.LogicalType;
-import org.apache.avro.Schema;
-import org.apache.avro.Schema.Type;
-import org.apache.avro.data.TimeConversions.*;
-import org.apache.avro.generic.GenericFixed;
-import org.apache.avro.generic.GenericRecord;
-
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -17,6 +8,15 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import org.apache.avro.Conversions.DecimalConversion;
+import org.apache.avro.Conversions.UUIDConversion;
+import org.apache.avro.LogicalType;
+import org.apache.avro.Schema;
+import org.apache.avro.Schema.Type;
+import org.apache.avro.data.TimeConversions.*;
+import org.apache.avro.generic.GenericFixed;
+import org.apache.avro.generic.GenericRecord;
 
 public class AvroDeserializer {
     private static final String DECIMAL = "decimal";
@@ -138,9 +138,11 @@ public class AvroDeserializer {
         return value
             .entrySet()
             .stream()
-            .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                e -> AvroDeserializer.objectDeserializer(e.getValue(), schema.getValueType()))
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    e -> AvroDeserializer.objectDeserializer(e.getValue(), schema.getValueType())
+                )
             );
     }
 

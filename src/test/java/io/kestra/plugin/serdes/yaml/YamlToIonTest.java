@@ -1,24 +1,27 @@
 package io.kestra.plugin.serdes.yaml;
 
-import com.amazon.ion.*;
-import com.amazon.ion.system.IonSystemBuilder;
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.utils.IdUtils;
-import static org.hamcrest.Matchers.is;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
-
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
+import com.amazon.ion.*;
+import com.amazon.ion.system.IonSystemBuilder;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.utils.IdUtils;
+
+import jakarta.inject.Inject;
+
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
 @KestraTest
 class YamlToIonTest {
@@ -29,7 +32,8 @@ class YamlToIonTest {
     StorageInterface storage;
 
     private URI put(String yaml) throws Exception {
-        return storage.put(MAIN_TENANT, null,
+        return storage.put(
+            MAIN_TENANT, null,
             URI.create("/" + IdUtils.create() + ".yaml"),
             new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8))
         );

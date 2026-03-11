@@ -1,7 +1,16 @@
 package io.kestra.plugin.serdes.markdown;
 
+import java.io.BufferedReader;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
 import com.vladsch.flexmark.util.data.MutableDataSet;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -11,18 +20,11 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import java.io.BufferedReader;
-import java.io.FileOutputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 import static com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter.SETEXT_HEADINGS;
 
@@ -110,12 +112,14 @@ public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.
     @Override
     public Output run(RunContext runContext) throws Exception {
         var rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
-        
+
         String htmlContent;
-        
-        try (var inputStream = runContext.storage().getFile(rFrom);
-             var reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            
+
+        try (
+            var inputStream = runContext.storage().getFile(rFrom);
+            var reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))
+        ) {
+
             StringBuilder sb = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
@@ -131,9 +135,9 @@ public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.
             if (this.baseUri != null) {
                 baseUriValue = runContext.render(this.baseUri).as(String.class).orElse(null);
             }
-            
+
             doc = org.jsoup.Jsoup.parse(htmlContent, baseUriValue != null ? baseUriValue : "");
-            
+
             // Apply ignore tags if specified
             if (this.ignoreTags != null) {
                 var rIgnoreTags = runContext.render(this.ignoreTags).asList(String.class);
@@ -143,36 +147,38 @@ public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.
                     }
                 }
             }
-            
+
             // Apply base URI if specified
             if (baseUriValue != null && !baseUriValue.isEmpty()) {
                 doc.setBaseUri(baseUriValue);
-                doc.select("a[href]").forEach(link -> {
+                doc.select("a[href]").forEach(link ->
+                {
                     String absUrl = link.absUrl("href");
                     if (!absUrl.isEmpty()) {
                         link.attr("href", absUrl);
                     }
                 });
-                doc.select("img[src]").forEach(img -> {
+                doc.select("img[src]").forEach(img ->
+                {
                     String absUrl = img.absUrl("src");
                     if (!absUrl.isEmpty()) {
                         img.attr("src", absUrl);
                     }
                 });
             }
-            
+
             htmlContent = doc.html();
         }
 
         // Configure FlexmarkHtmlConverter with ATX headings (# instead of underlines)
         MutableDataSet options = new MutableDataSet();
-        options.set(SETEXT_HEADINGS, false);  // Use ATX headings (# format)
+        options.set(SETEXT_HEADINGS, false); // Use ATX headings (# format)
         var converter = FlexmarkHtmlConverter.builder(options).build();
         String markdown = converter.convert(htmlContent);
 
         // Write to temp file
         var tempFile = runContext.workingDir().createTempFile(".md").toFile();
-        
+
         try (var writer = new OutputStreamWriter(new FileOutputStream(tempFile), StandardCharsets.UTF_8)) {
             writer.write(markdown);
         }

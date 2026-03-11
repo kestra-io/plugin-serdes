@@ -1,8 +1,11 @@
 package io.kestra.plugin.serdes.csv;
 
-import de.siegmar.fastcsv.reader.CsvParseException;
-import de.siegmar.fastcsv.reader.CsvReader;
-import de.siegmar.fastcsv.reader.CsvRecord;
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
@@ -15,18 +18,16 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.OnBadLines;
+
+import de.siegmar.fastcsv.reader.CsvParseException;
+import de.siegmar.fastcsv.reader.CsvReader;
+import de.siegmar.fastcsv.reader.CsvRecord;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @SuperBuilder
 @ToString
@@ -67,7 +68,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     @NotNull
     @Schema(
-        title = "Source file URI")
+        title = "Source file URI"
+    )
     @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
@@ -145,7 +147,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                     runContext.storage().getFile(rFrom),
                     runContext.render(charset).as(String.class).orElseThrow()
                 ),
-                FileSerde.BUFFER_SIZE);
+                FileSerde.BUFFER_SIZE
+            );
             CsvReader<CsvRecord> csvReader = this.csvReader(reader, runContext);
             Writer output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
         ) {
@@ -156,7 +159,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
             Flux<Object> flowable = Flux
                 .fromIterable(csvReader)
-                .onErrorResume(CsvParseException.class, e -> {
+                .onErrorResume(CsvParseException.class, e ->
+                {
                     if (rOnBadLinesValue == OnBadLines.ERROR) {
                         return Flux.error(e);
                     } else if (rOnBadLinesValue == OnBadLines.WARN) {
@@ -166,7 +170,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                     }
                     return Flux.empty();
                 })
-                .filter(csvRecord -> {
+                .filter(csvRecord ->
+                {
                     if (rHeaderValue && csvRecord.getStartingLineNumber() == 1) {
                         for (int i = 0; i < csvRecord.getFieldCount(); i++) {
                             headers.put(i, csvRecord.getField(i));
@@ -180,7 +185,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                     return true;
                 })
 
-                .flatMap(r -> {
+                .flatMap(r ->
+                {
                     if (rHeaderValue) {
                         Map<String, Object> fields = new LinkedHashMap<>();
                         if (r.getStartingLineNumber() == 1) {

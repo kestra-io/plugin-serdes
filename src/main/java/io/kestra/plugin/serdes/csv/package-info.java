@@ -1,6 +1,6 @@
 @PluginSubGroup(
     title = "CSV",
-    description = "This sub-group of plugins contains tasks for serialization and deserialization of files in the CSV format.",categories = {
+    description = "This sub-group of plugins contains tasks for serialization and deserialization of files in the CSV format.", categories = {
         PluginSubGroup.PluginCategory.CORE
     }
 )

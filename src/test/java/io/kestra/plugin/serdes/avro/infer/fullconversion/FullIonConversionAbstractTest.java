@@ -1,12 +1,14 @@
 package io.kestra.plugin.serdes.avro.infer.fullconversion;
 
-import io.kestra.core.junit.annotations.KestraTest;
-import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.storages.StorageInterface;
-import jakarta.inject.Inject;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+
+import jakarta.inject.Inject;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @KestraTest
@@ -36,13 +38,15 @@ public abstract class FullIonConversionAbstractTest {
 
     @Test
     void real() throws Exception {
-        this.run( // this type conversion could obviously be improved
+        this.run(
+            // this type conversion could obviously be improved
             """
-            {"hello": 3.14}
-            """,
+                {"hello": 3.14}
+                """,
             """
-            {"hello": "3.14"}
-            """);
+                {"hello": "3.14"}
+                """
+        );
     }
 
     @Test
@@ -90,21 +94,22 @@ public abstract class FullIonConversionAbstractTest {
     void primitiveTypes() throws Exception {
         this.run(
             """
-            {
-                Int:1,
-                String:"my string1",
-                Float:-0.12e4,
-                Decimal:7.47
-            }
-            """,
+                {
+                    Int:1,
+                    String:"my string1",
+                    Float:-0.12e4,
+                    Decimal:7.47
+                }
+                """,
             """
-           {
-                Int:1,
-                String:"my string1",
-                Float:-0.12e4,
-                Decimal:"7.47"
-            }
-           """);
+                {
+                     Int:1,
+                     String:"my string1",
+                     Float:-0.12e4,
+                     Decimal:"7.47"
+                 }
+                """
+        );
     }
 
     @Test
@@ -118,7 +123,8 @@ public abstract class FullIonConversionAbstractTest {
 
     @Test
     void someData_missingFields() throws Exception {
-        this.run("""
+        this.run(
+            """
                 {id:1, str1:"my string1", labels:["lab1"], data1: {field1: "hey"}}
                 {}
                 {id:2, str1:"my string2", labels:["lab2"], data1: {field1: "heya"}}
@@ -133,7 +139,8 @@ public abstract class FullIonConversionAbstractTest {
 
     @Test
     void someData_missingFields_forFirstRow_requiringFullSearch() throws Exception {
-        this.run("""
+        this.run(
+            """
                 {}
                 {id:1, str1:"my string1", labels:["lab1"], data1: {field1: "hey"}}
                 {id:2, str1:"my string2", labels:["lab2"], data1: {field1: "heya"}}

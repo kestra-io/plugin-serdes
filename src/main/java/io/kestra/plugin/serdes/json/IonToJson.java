@@ -1,5 +1,15 @@
 package io.kestra.plugin.serdes.json;
 
+import java.io.*;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
 import com.amazon.ion.*;
 import com.amazon.ion.system.IonSystemBuilder;
 import com.amazon.ion.system.IonTextWriterBuilder;
@@ -7,6 +17,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.ion.IonFactory;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -18,22 +29,13 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.io.*;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
 
 @SuperBuilder
 @ToString
@@ -140,7 +142,8 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                 if (isNewLine) {
                     flowable = Flux.generate(
                         () -> ionParser,
-                        (parser, sink) -> {
+                        (parser, sink) ->
+                        {
                             try {
                                 if (parser.nextToken() != null) {
                                     var row = jsonObjectMapper.readValue(parser, Object.class);
@@ -160,8 +163,9 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                     );
                 } else {
                     flowable = Flux.generate(
-                        () -> new Object[]{ionParser, new Object[1], new boolean[]{false}, new boolean[]{false}},
-                        (state, sink) -> {
+                        () -> new Object[] { ionParser, new Object[1], new boolean[] { false }, new boolean[] { false } },
+                        (state, sink) ->
+                        {
                             var parser = (com.fasterxml.jackson.core.JsonParser) state[0];
                             var firstRow = (Object[]) state[1];
                             var isFirst = (boolean[]) state[2];
@@ -209,7 +213,8 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                 if (isNewLine) {
                     flowable = Flux.generate(
                         () -> ionReader,
-                        (reader, sink) -> {
+                        (reader, sink) ->
+                        {
                             try {
                                 IonType type = reader.next();
                                 if (type != null) {
@@ -230,8 +235,9 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                     );
                 } else {
                     flowable = Flux.generate(
-                        () -> new Object[]{ionReader, new IonValue[1], new boolean[]{false}, new boolean[]{false}},
-                        (state, sink) -> {
+                        () -> new Object[] { ionReader, new IonValue[1], new boolean[] { false }, new boolean[] { false } },
+                        (state, sink) ->
+                        {
                             var reader = (IonReader) state[0];
                             var firstValue = (IonValue[]) state[1];
                             var isFirst = (boolean[]) state[2];
@@ -436,7 +442,6 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         }
         return result;
     }
-
 
     @Builder
     @Getter
