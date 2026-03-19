@@ -119,11 +119,13 @@ public class InferAvroSchema {
                     inferredType = inferField(fieldFullPath + "_" + fieldName + "_items", fieldName + "_items", list.get(0));
                 }
                 if ("root".equals(fieldName)) {
+                    // Avro requires a RECORD at the top level. Wrap the root array in a record
+                    // with a single "value" field so the schema is valid for DataFileWriter.
+                    var arraySchema = Schema.createArray(inferredType.schema());
+                    var valueField = new Field("value", arraySchema, NULL_DEFAULT_DESCRIPTION, Collections.emptyList());
                     inferredField = new Field(
                         fieldName,
-                        Schema.createArray(inferredType.schema()),
-                        NULL_DEFAULT_DESCRIPTION,
-                        Collections.emptyList()
+                        Schema.createRecord(fieldName, null, "io.kestra.plugin.serdes.avro", false, List.of(valueField))
                     );
                 } else {
                     inferredField = new Field(

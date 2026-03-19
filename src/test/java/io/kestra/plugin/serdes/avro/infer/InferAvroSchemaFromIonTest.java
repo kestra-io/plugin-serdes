@@ -24,12 +24,22 @@ public class InferAvroSchemaFromIonTest {
 
     @Test
     void array_of_strings() throws IOException {
+        // Root arrays are wrapped in a record because Avro requires a RECORD at the top level.
         this.run(
             """
                 ["one", "two", "three"]
                 """,
             """
-                {"type": "array", "items": [ "null", "string" ]}
+                {
+                  "type": "record",
+                  "name": "root",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "type": {"type": "array", "items": ["null", "string"]}
+                    }
+                  ]
+                }
                 """
         );
     }

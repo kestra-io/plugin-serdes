@@ -39,10 +39,20 @@ public class AvroDeserializer {
     private static final LocalTimestampMicrosConversion LOCAL_TIMESTAMP_MICROS_CONVERSION = new LocalTimestampMicrosConversion();
     private static final LocalTimestampMillisConversion LOCAL_TIMESTAMP_MILLIS_CONVERSION = new LocalTimestampMillisConversion();
 
-    public static Map<String, Object> recordDeserializer(GenericRecord record) {
-        return record
-            .getSchema()
-            .getFields()
+    public static Object recordDeserializer(GenericRecord record) {
+        var schema = record.getSchema();
+        var fields = schema.getFields();
+        // Detect the root-array wrapper: a record named "root" with exactly one field "value"
+        // whose type is ARRAY. This wrapper is added by the write path to satisfy Avro's
+        // requirement that the top-level schema be a RECORD. Strip it transparently so the
+        // roundtrip output matches the original input (a bare list, not a map).
+        if ("root".equals(schema.getName())
+                && fields.size() == 1
+                && "value".equals(fields.getFirst().name())
+                && fields.getFirst().schema().getType() == Type.ARRAY) {
+            return AvroDeserializer.objectDeserializer(record.get("value"), fields.getFirst().schema());
+        }
+        return fields
             .stream()
             .collect(
                 LinkedHashMap::new, // preserve schema field order
