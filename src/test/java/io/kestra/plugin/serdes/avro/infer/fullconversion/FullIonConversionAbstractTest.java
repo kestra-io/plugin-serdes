@@ -1,6 +1,5 @@
 package io.kestra.plugin.serdes.avro.infer.fullconversion;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -19,13 +18,16 @@ public abstract class FullIonConversionAbstractTest {
     @Inject
     RunContextFactory runContextFactory;
 
-    @Disabled("not sure our parser handles a root array, rework needed to make this work")
     @Test
     void JSONArray() throws Exception {
-        var input = """
+        this.run(
+            """
             ["one", "two"]
-            """;
-        this.run(input, input);
+            """,
+            """
+            ["one", "two"]
+            """
+        );
     }
 
     @Test

@@ -2,7 +2,6 @@ package io.kestra.plugin.serdes.parquet;
 
 import java.io.*;
 import java.net.URI;
-import java.util.Map;
 import java.util.function.Consumer;
 
 import org.apache.avro.generic.GenericRecord;
@@ -108,7 +107,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
             Writer output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
         ) {
 
-            Flux<Map<String, Object>> flowable = Flux
+            Flux<Object> flowable = Flux
                 .create(this.nextRow(parquetReader), FluxSink.OverflowStrategy.BUFFER)
                 .map(AvroDeserializer::recordDeserializer);
 

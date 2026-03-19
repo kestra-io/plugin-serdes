@@ -110,7 +110,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
                     return Flux.<GenericRecord> empty();
                 });
 
-            Flux<Map<String, Object>> deserialized = flowable.map(record ->
+            Flux<Object> deserialized = flowable.map(record ->
             {
                 try {
                     return AvroDeserializer.recordDeserializer(record);

@@ -191,7 +191,13 @@ public abstract class AbstractAvroConverter extends Task {
         {
             try {
                 if (row instanceof List) {
-                    List<?> casted = (List<?>) row; // Allow Object for flexibility
+                    List<?> casted = (List<?>) row;
+                    var fields = schema.getFields();
+                    // Root Ion array: schema was wrapped in a record with a single array-typed field.
+                    // The entire list is the value of that field, not a positional record.
+                    if (fields.size() == 1 && fields.getFirst().schema().getType() == org.apache.avro.Schema.Type.ARRAY) {
+                        return converter.fromMap(schema, Map.of(fields.getFirst().name(), casted), onBadLines, null);
+                    }
                     return converter.fromArray(schema, casted, onBadLines);
                 } else if (row instanceof Map) {
                     Map<String, Object> mapRow = (Map<String, Object>) row;
