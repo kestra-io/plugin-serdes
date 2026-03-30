@@ -42,7 +42,7 @@ import lombok.experimental.SuperBuilder;
     description = """
         Converts JSON data to the TOON (Token-Oriented Object Notation) format, a deterministic, indentation-based text format that encodes the JSON data model with explicit structure and minimal quoting.
         TOON is efficient for uniform arrays of objects and supports tabular encoding.
-        See https://github.com/toon-format/spec for the full specification (2.0).
+        See https://github.com/toon-format/spec for the full specification (3.0).
         """
 )
 @Plugin(
@@ -174,15 +174,16 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
     }
 
     /**
-     * TOON 2.0 compliant encoder for a JSON data model.
+     * TOON 3.0 compliant encoder for a JSON data model.
      * <p>
      * - Root arrays use headers: [N]: ... or [N]{fields}: ...
      * - Root objects use regular key: value lines.
      * - Root primitives use a single primitive line.
      * - Numbers are emitted in canonical decimal form without exponent.
-     * - Strings follow TOON 2.0 quoting rules.
+     * - Strings follow TOON 3.0 quoting rules.
      * - Arrays of uniform objects are rendered in tabular form when applicable.
      * - Mixed arrays are rendered as list arrays with "- " items.
+     * - v3 §10: tabular arrays as first field of list-item objects use header on hyphen line, rows at depth +2.
      * - No trailing newline is written at the end of the document.
      */
     private static class ToonEncoder {
@@ -420,8 +421,11 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
                 if (!firstValue.isEmpty()) {
                     writeObject(firstValue, indent + 2);
                 }
+            } else if (firstValue.isArray() && isUniformPrimitiveObjectArray(firstValue)) {
+                // v3 §10: Tabular array as first field — header on hyphen line, rows at depth +2
+                writeListItemTabularFirstField(firstKey, firstValue, indent + 1);
             } else if (firstValue.isArray()) {
-                // First field is an array: "- key[N]: ..." or "- key[N]:\n  - ..."
+                // Non-tabular array as first field: "- key[N]: ..." or "- key[N]:\n  - ..."
                 writeListArrayFirstField(firstKey, firstValue, indent + 1);
             } else {
                 // Primitive first field: "- key: value"
@@ -487,7 +491,51 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
                 // "- key[N]:", then nested list items at depth +1 relative to header
                 String header = "- " + key + "[" + size + "]:";
                 writeLine(hyphenIndent, header);
-                writeListArray(array, hyphenIndent + 1, null);
+                for (JsonNode item : array) {
+                    if (item.isObject()) {
+                        writeListObjectItem(item, hyphenIndent);
+                    } else if (item.isArray()) {
+                        writeListArrayItem(item, hyphenIndent);
+                    } else {
+                        String v = formatPrimitive(item);
+                        writeLine(hyphenIndent + 1, "- " + v);
+                    }
+                }
+            }
+        }
+
+        /**
+         * v3 §10: Encode a tabular array as the first field on a list-item hyphen line.
+         * Header on the hyphen line, rows at depth +2 relative to hyphen line.
+         */
+        private void writeListItemTabularFirstField(String key, JsonNode array, int hyphenIndent) throws IOException {
+            int size = array.size();
+            Set<String> fields = new LinkedHashSet<>();
+            array.get(0).properties().forEach(entry -> fields.add(entry.getKey()));
+
+            // Header: "- key[N]{fields}:" on the hyphen line
+            var header = new StringBuilder();
+            header.append("- ").append(key).append("[").append(size).append("]{");
+            boolean first = true;
+            for (String field : fields) {
+                if (!first) header.append(DOCUMENT_DELIMITER);
+                header.append(formatKey(field));
+                first = false;
+            }
+            header.append("}:");
+            writeLine(hyphenIndent, header.toString());
+
+            // Rows at depth +2 relative to hyphen line
+            for (JsonNode row : array) {
+                var rowLine = new StringBuilder();
+                boolean firstCell = true;
+                for (String field : fields) {
+                    if (!firstCell) rowLine.append(DOCUMENT_DELIMITER);
+                    JsonNode cell = row.get(field);
+                    rowLine.append(formatPrimitive(cell == null ? nullNode() : cell));
+                    firstCell = false;
+                }
+                writeLine(hyphenIndent + 2, rowLine.toString());
             }
         }
 

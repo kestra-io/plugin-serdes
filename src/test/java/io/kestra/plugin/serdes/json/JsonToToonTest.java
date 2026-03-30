@@ -20,6 +20,8 @@ import io.kestra.plugin.serdes.SerdesUtils;
 
 import jakarta.inject.Inject;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
@@ -242,6 +244,85 @@ class JsonToToonTest {
             """;
 
         assertThat(result.trim(), is(expected.trim()));
+    }
+
+    @Test
+    void listItemTabularFirstField() throws Exception {
+        String json = """
+            {
+              "items": [
+                {
+                  "users": [
+                    {"id": 1, "name": "Ada"},
+                    {"id": 2, "name": "Bob"}
+                  ],
+                  "status": "active"
+                }
+              ]
+            }
+            """;
+
+        File temp = File.createTempFile("list_tabular_", ".json");
+        try (Writer w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+
+        JsonToToon.Output output = convert(temp);
+        String result = readResult(output.getUri());
+
+        String expected = """
+            items[1]:
+              - users[2]{id,name}:
+                  1,Ada
+                  2,Bob
+                status: active
+            """;
+
+        assertThat(result.trim(), is(expected.trim()));
+    }
+
+    @Test
+    void roundTripListItemTabular() throws Exception {
+        String json = """
+            {
+              "items": [
+                {
+                  "users": [
+                    {"id": 1, "name": "Ada"},
+                    {"id": 2, "name": "Bob"}
+                  ],
+                  "status": "active"
+                },
+                {
+                  "users": [
+                    {"id": 3, "name": "Eve"}
+                  ],
+                  "status": "inactive"
+                }
+              ]
+            }
+            """;
+
+        // JSON -> TOON
+        File jsonFile = File.createTempFile("rt_", ".json");
+        try (Writer w = new FileWriter(jsonFile, StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+        JsonToToon.Output toonOutput = convert(jsonFile);
+
+        // TOON -> JSON
+        ToonToJson toonToJson = ToonToJson.builder()
+            .id(ToonToJson.class.getSimpleName())
+            .type(ToonToJson.class.getName())
+            .from(Property.ofValue(toonOutput.getUri().toString()))
+            .build();
+        ToonToJson.Output jsonOutput = toonToJson.run(
+            TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of())
+        );
+
+        String result = readResult(jsonOutput.getUri());
+        var mapper = new ObjectMapper();
+        assertThat(mapper.readTree(result), is(mapper.readTree(json)));
     }
 
     @Test

@@ -231,6 +231,41 @@ class ToonToJsonTest {
     }
 
     @Test
+    void listItemTabularFirstField() throws Exception {
+        String toon = """
+            items[1]:
+              - users[2]{id,name}:
+                  1,Ada
+                  2,Bob
+                status: active
+            """;
+
+        File temp = File.createTempFile("list_tabular_", ".toon");
+        try (Writer w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        ToonToJson.Output output = convert(temp);
+        String result = readResult(output.getUri());
+
+        String expected = """
+            {
+              "items": [
+                {
+                  "users": [
+                    {"id": 1, "name": "Ada"},
+                    {"id": 2, "name": "Bob"}
+                  ],
+                  "status": "active"
+                }
+              ]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
     void unicodeAndEmoji() throws Exception {
         String toon = """
             message: Hello 世界 👋

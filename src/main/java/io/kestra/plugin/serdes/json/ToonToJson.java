@@ -44,7 +44,7 @@ import lombok.experimental.SuperBuilder;
     title = "Convert a TOON file into JSON.",
     description = """
         Parses a TOON (Token-Oriented Object Notation) document and converts it to JSON.
-        Supports TOON 2.0 features emitted by JsonToToon:
+        Supports TOON 3.0 features emitted by JsonToToon:
         - indentation-based structure
         - primitive arrays (inline)
         - tabular arrays
@@ -168,7 +168,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
     }
 
     /**
-     * TOON 2.0 parser for the subset emitted by JsonToToon.
+     * TOON 3.0 parser for the subset emitted by JsonToToon.
      * <p>
      * Supports:
      * - Objects with "key: value" and "key:" nested forms
@@ -457,7 +457,9 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
                 // "- key[N]: ..." => first field is an array inside an object item
                 Map<String, Object> obj = new LinkedHashMap<>();
-                Object arrayValue = parseArrayFromHeader(size, fields, rest, indentLevel);
+                // v3 §10: tabular rows at depth +2 relative to hyphen line
+                int arrayHeaderIndent = (fields != null) ? indentLevel + 1 : indentLevel;
+                Object arrayValue = parseArrayFromHeader(size, fields, rest, arrayHeaderIndent);
                 obj.put(key, arrayValue);
 
                 // Additional fields of the same object item at depth +1
