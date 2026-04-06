@@ -85,13 +85,14 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
         title = "The name of a supported charset",
         description = "The character set to use for reading and writing the file."
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @NotNull
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Override

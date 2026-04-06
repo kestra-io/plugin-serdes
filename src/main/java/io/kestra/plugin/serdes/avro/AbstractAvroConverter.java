@@ -36,7 +36,7 @@ public abstract class AbstractAvroConverter extends Task {
         description = "If empty, the task will try to infer the schema from the current data; use the 'numberOfRowsToScan' property if needed"
     )
     @AvroSchemaValidation
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     protected String schema;
 
     @Builder.Default
@@ -44,24 +44,28 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Number of rows that will be scanned while inferring. The more rows scanned, the more precise the output schema will be.",
         description = "Only use when the 'schema' property is empty"
     )
+    @PluginProperty(group = "advanced")
     private Property<Integer> numberOfRowsToScan = Property.ofValue(100);
 
     @Builder.Default
     @Schema(
         title = "Values to consider as True"
     )
+    @PluginProperty(group = "advanced")
     protected final Property<List<String>> trueValues = Property.ofValue(Arrays.asList("t", "true", "enabled", "1", "on", "yes"));
 
     @Builder.Default
     @Schema(
         title = "Values to consider as False"
     )
+    @PluginProperty(group = "advanced")
     protected final Property<List<String>> falseValues = Property.ofValue(Arrays.asList("f", "false", "disabled", "0", "off", "no", ""));
 
     @Builder.Default
     @Schema(
         title = "Values to consider as null"
     )
+    @PluginProperty(group = "advanced")
     protected final Property<List<String>> nullValues = Property.ofValue(
         Arrays.asList(
             "",
@@ -84,7 +88,7 @@ public abstract class AbstractAvroConverter extends Task {
     @Schema(
         title = "Format to use when parsing date"
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "processing")
     @DateFormat
     protected final String dateFormat = "yyyy-MM-dd[XXX]";
 
@@ -92,7 +96,7 @@ public abstract class AbstractAvroConverter extends Task {
     @Schema(
         title = "Format to use when parsing time"
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "processing")
     @DateFormat
     protected final String timeFormat = "HH:mm[:ss][.SSSSSS][XXX]";
 
@@ -101,7 +105,7 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Format to use when parsing datetime",
         description = "Default value is yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]"
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "processing")
     @DateFormat
     protected final String datetimeFormat = "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]";
 
@@ -110,6 +114,7 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
         description = "Default value is '.'"
     )
+    @PluginProperty(group = "processing")
     protected final Property<Character> decimalSeparator = Property.ofValue('.');
 
     @Builder.Default
@@ -117,6 +122,7 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Whether to consider a field present in the data but not declared in the schema as an error",
         description = "Default value is false"
     )
+    @PluginProperty(group = "connection")
     protected Property<Boolean> strictSchema = Property.ofValue(Boolean.FALSE);
 
     @Builder.Default
@@ -125,6 +131,7 @@ public abstract class AbstractAvroConverter extends Task {
         description = "If true, we try to infer all fields using `trueValues`, `falseValues`, and `nullValues`." +
             "If false, we infer booleans and nulls only on fields declared in the schema as `null` or `bool`."
     )
+    @PluginProperty(group = "advanced")
     protected Property<Boolean> inferAllFields = Property.ofValue(false);
 
     @Builder.Default
@@ -132,6 +139,7 @@ public abstract class AbstractAvroConverter extends Task {
         title = "Timezone to use when no timezone can be parsed on the source.",
         description = "If null, the timezone defaults to `UTC`. Default value is the system timezone"
     )
+    @PluginProperty(group = "advanced")
     protected final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     @Builder.Default
@@ -139,6 +147,7 @@ public abstract class AbstractAvroConverter extends Task {
         title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
         description = "Can be one of: `FAIL`, `WARN` or `SKIP`."
     )
+    @PluginProperty(group = "advanced")
     protected final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
     protected <E extends Exception> Long convert(Reader inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext)

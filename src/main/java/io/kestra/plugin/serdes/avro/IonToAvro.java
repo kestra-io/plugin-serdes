@@ -110,11 +110,11 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
-    @PluginProperty
+    @PluginProperty(group = "advanced")
     @Schema(
         title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
         description = "Can be one of: `FAIL`, `WARN` or `SKIP`."

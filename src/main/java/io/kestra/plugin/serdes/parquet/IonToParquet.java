@@ -99,7 +99,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
@@ -112,24 +112,28 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
     @Schema(
         title = "Target row group size"
     )
+    @PluginProperty(group = "advanced")
     private Property<Version> parquetVersion = Property.ofValue(Version.V2);
 
     @Builder.Default
     @Schema(
         title = "Target row group size"
     )
+    @PluginProperty(group = "advanced")
     private Property<Long> rowGroupSize = Property.ofValue((long) org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE);
 
     @Builder.Default
     @Schema(
         title = "Target page size"
     )
+    @PluginProperty(group = "advanced")
     private Property<Integer> pageSize = Property.ofValue(ParquetWriter.DEFAULT_PAGE_SIZE);
 
     @Builder.Default
     @Schema(
         title = "Max dictionary page size"
     )
+    @PluginProperty(group = "advanced")
     private Property<Integer> dictionaryPageSize = Property.ofValue(ParquetWriter.DEFAULT_PAGE_SIZE);
 
     static {

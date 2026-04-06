@@ -36,7 +36,7 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
     @Schema(
         title = "ION source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @NotNull
@@ -44,6 +44,7 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
     @Schema(
         title = "The number of rows that will be scanned; the larger the number of rows, the more precise the output schema will be."
     )
+    @PluginProperty(group = "destination")
     private Property<Integer> numberOfRowsToScan = Property.ofValue(100);
 
     @Override

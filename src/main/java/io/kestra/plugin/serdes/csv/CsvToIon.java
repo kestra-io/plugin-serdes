@@ -70,67 +70,78 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "Specifies if the first line should be the header"
     )
+    @PluginProperty(group = "advanced")
     private final Property<Boolean> header = Property.ofValue(true);
 
     @Builder.Default
     @Schema(
         title = "The field separator character"
     )
+    @PluginProperty(group = "destination")
     private final Property<Character> fieldSeparator = Property.ofValue(',');
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
+    @PluginProperty(group = "processing")
     private final Property<Character> textDelimiter = Property.ofValue('"');
 
     @Builder.Default
     @Schema(
         title = "Specifies if empty rows should be skipped"
     )
+    @PluginProperty(group = "advanced")
     private final Property<Boolean> skipEmptyRows = Property.ofValue(false);
 
     @Schema(
         title = "Specifies if an exception should be thrown, if CSV data contains different field count"
     )
     @Deprecated
+    @PluginProperty(group = "deprecated")
     private Property<Boolean> errorOnDifferentFieldCount;
 
     @Builder.Default
     @Schema(
         title = "How to handle bad lines (e.g., a line with too many fields)."
     )
+    @PluginProperty(group = "advanced")
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
     @Builder.Default
     @Schema(
         title = "Number of lines to skip at the start of the file"
     )
+    @PluginProperty(group = "advanced")
     private final Property<Integer> skipRows = Property.ofValue(0);
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Builder.Default
     @Schema(title = "Maximum CSV parser buffer size (bytes)")
+    @PluginProperty(group = "advanced")
     private final Property<Integer> maxBufferSize = Property.ofValue(DEFAULT_MAX_BUFFER_SIZE);
 
     @Builder.Default
     @Schema(title = "Allow extra characters after a closing quote")
+    @PluginProperty(group = "advanced")
     private final Property<Boolean> allowExtraCharsAfterClosingQuote = Property.ofValue(false);
 
     @Builder.Default
     @Schema(title = "Maximum field size (characters)")
+    @PluginProperty(group = "advanced")
     private final Property<Integer> maxFieldSize = Property.ofValue(DEFAULT_MAX_FIELD_SIZE);
 
     @Override

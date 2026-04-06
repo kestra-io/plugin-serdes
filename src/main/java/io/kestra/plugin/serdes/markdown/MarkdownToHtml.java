@@ -69,11 +69,12 @@ import lombok.experimental.SuperBuilder;
 public class MarkdownToHtml extends Task implements RunnableTask<MarkdownToHtml.Output> {
     @NotNull
     @Schema(title = "Source file URI")
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
     @Schema(title = "Charset to use for input/output", description = "Default is UTF-8.")
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Override

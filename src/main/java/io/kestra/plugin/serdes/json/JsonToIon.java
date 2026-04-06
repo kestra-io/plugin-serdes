@@ -98,7 +98,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
@@ -106,6 +106,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Builder.Default
@@ -114,6 +115,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         description = "Whether the file uses newline-delimited JSON.\n" +
             "Warning: if not, the whole file will be loaded into memory and can lead to out-of-memory errors."
     )
+    @PluginProperty(group = "advanced")
     private final Property<Boolean> newLine = Property.ofValue(true);
 
     @Override

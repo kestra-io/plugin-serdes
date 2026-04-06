@@ -80,7 +80,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
@@ -88,6 +88,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Builder.Default
@@ -96,12 +97,14 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         description = "Whether the file uses newline-delimited JSON.\n" +
             "Warning: if not, the whole file will be loaded into memory and can lead to out-of-memory errors."
     )
+    @PluginProperty(group = "advanced")
     private final Property<Boolean> newLine = Property.ofValue(true);
 
     @Builder.Default
     @Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
+    @PluginProperty(group = "execution")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     @Builder.Default
@@ -109,6 +112,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         title = "Should keep Ion annotations in the output JSON",
         description = "If true, Ion annotations will be preserved in the output JSON. Default is false."
     )
+    @PluginProperty(group = "advanced")
     private final Property<Boolean> shouldKeepAnnotations = Property.ofValue(false);
 
     @Override

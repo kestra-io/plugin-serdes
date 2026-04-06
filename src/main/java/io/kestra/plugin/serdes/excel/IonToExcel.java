@@ -113,7 +113,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         description = Data.From.DESCRIPTION,
         anyOf = { String.class, Map.class }
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "main")
     private Object from;
 
     @Schema(
@@ -121,6 +121,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         defaultValue = "UTF-8"
     )
     @Builder.Default
+    @PluginProperty(group = "processing")
     private Property<String> charset = Property.ofValue("UTF-8");
 
     @Schema(
@@ -128,12 +129,14 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         defaultValue = "Sheet"
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<String> sheetsTitle = Property.ofValue("Sheet");
 
     @Schema(
         title = "Whether header should be written as the first line"
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> header = Property.ofValue(true);
 
     @Schema(
@@ -142,6 +145,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
             "removed this options when you have a lots of values."
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> styles = Property.ofValue(true);
 
     @Override

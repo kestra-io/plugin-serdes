@@ -113,31 +113,35 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "Specifies if the first line should be the header"
     )
+    @PluginProperty(group = "advanced")
     private final Property<Boolean> header = Property.ofValue(true);
 
     @Builder.Default
     @Schema(
         title = "The field separator character"
     )
+    @PluginProperty(group = "destination")
     private final Property<Character> fieldSeparator = Property.ofValue(',');
 
     @Builder.Default
     @Schema(
         title = "The text delimiter character"
     )
+    @PluginProperty(group = "processing")
     private final Property<Character> textDelimiter = Property.ofValue('"');
 
     @Builder.Default
     @Schema(
         title = "The character used to separate rows"
     )
+    @PluginProperty(group = "processing")
     private final Property<String> lineDelimiter = Property.ofValue("\n");
 
     @Builder.Default
@@ -145,6 +149,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         title = "Whether fields should always be delimited using the textDelimiter option",
         description = "Deprecated: use `quoteMode` instead for more control. If `quoteMode` is set, this property is ignored."
     )
+    @PluginProperty(group = "processing")
     private final Property<Boolean> alwaysDelimitText = Property.ofValue(false);
 
     @Schema(
@@ -161,6 +166,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Override

@@ -24,6 +24,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SynchronousSink;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @NoArgsConstructor
@@ -78,13 +79,14 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
 
     @NotNull
     @Schema(title = "Source file URI")
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Builder.Default
@@ -92,6 +94,7 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
         title = "Produce JSONL",
         description = "If true, then one JSON per line. If false, then produce array/object."
     )
+    @PluginProperty(group = "advanced")
     private Property<Boolean> jsonl = Property.ofValue(false);
 
     @Override

@@ -72,7 +72,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     static {
