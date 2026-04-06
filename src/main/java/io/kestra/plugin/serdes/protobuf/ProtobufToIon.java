@@ -96,16 +96,17 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
 
     @NotNull
     @Schema(title = "Source file URI", description = "The URI of the input Protobuf file to read.")
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @NotNull
     @Schema(title = "Protobuf Descriptor File", description = "Protobuf descriptor file containing message definitions.")
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> descriptorFile;
 
     @NotNull
     @Schema(title = "Fully qualified Protobuf message type name", description = "For example: `com.company.Product`.")
+    @PluginProperty(group = "main")
     private Property<String> typeName;
 
     @Builder.Default
@@ -113,10 +114,12 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
         If true, the input file is expected to contain multiple length-delimited Protobuf messages.
         If false, it will be parsed as a single Protobuf message.
         """)
+    @PluginProperty(group = "processing")
     private final Property<Boolean> delimited = Property.ofValue(false);
 
     @Builder.Default
     @Schema(title = "Whether to error on unknown fields", description = "If true, an error will be thrown if the input contains unknown fields.")
+    @PluginProperty(group = "reliability")
     private final Property<Boolean> errorOnUnknownFields = Property.ofValue(false);
 
     @Override

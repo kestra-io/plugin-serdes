@@ -85,7 +85,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
@@ -93,6 +93,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @NotNull
@@ -100,12 +101,14 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
     @Schema(
         title = "Xml root name"
     )
+    @PluginProperty(group = "advanced")
     private final Property<String> rootName = Property.ofValue("items");
 
     @Builder.Default
     @Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
+    @PluginProperty(group = "execution")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     @Override

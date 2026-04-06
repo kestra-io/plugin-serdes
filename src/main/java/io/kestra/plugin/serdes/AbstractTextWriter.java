@@ -27,7 +27,7 @@ public abstract class AbstractTextWriter extends Task {
     @Schema(
         title = "Format to use for date"
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "processing")
     @DateFormat
     private final String dateFormat = "yyyy-MM-dd";
 
@@ -35,7 +35,7 @@ public abstract class AbstractTextWriter extends Task {
     @Schema(
         title = "Format to use for time"
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "processing")
     @DateFormat
     private final String timeFormat = "HH:mm:ss[XXX]";
 
@@ -43,7 +43,7 @@ public abstract class AbstractTextWriter extends Task {
     @Schema(
         title = "Format to use for zoned datetime"
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "processing")
     @DateFormat
     private final String dateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS[XXX]";
 
@@ -51,6 +51,7 @@ public abstract class AbstractTextWriter extends Task {
     @Schema(
         title = "Timezone to use when no timezone can be parsed on the source."
     )
+    @PluginProperty(group = "advanced")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     @Getter(AccessLevel.NONE)

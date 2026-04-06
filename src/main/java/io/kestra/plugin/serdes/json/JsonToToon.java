@@ -106,7 +106,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
 
     @NotNull
     @Schema(title = "Source file URI")
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
@@ -114,6 +114,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Override

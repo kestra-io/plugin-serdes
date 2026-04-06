@@ -97,7 +97,7 @@ public class JsonToYaml extends Task implements RunnableTask<JsonToYaml.Output> 
     private static final ObjectMapper YAML_MAPPER = JacksonMapper.ofYaml().configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
 
     @NotNull
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     @Schema(title = "Source file URI")
     private Property<String> from;
 
@@ -105,6 +105,7 @@ public class JsonToYaml extends Task implements RunnableTask<JsonToYaml.Output> 
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Builder.Default
@@ -112,6 +113,7 @@ public class JsonToYaml extends Task implements RunnableTask<JsonToYaml.Output> 
         title = "Input is JSONL (newline-delimited JSON)",
         description = "If true, each line is parsed as a separate JSON object and output as an element in a YAML list."
     )
+    @PluginProperty(group = "advanced")
     private Property<Boolean> jsonl = Property.ofValue(false);
 
     @Override

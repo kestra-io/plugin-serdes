@@ -64,13 +64,14 @@ public class IonToYaml extends Task implements RunnableTask<IonToYaml.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Override

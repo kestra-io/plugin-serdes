@@ -72,7 +72,7 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
     private static final ObjectMapper YAML_MAPPER = JacksonMapper.ofYaml();
 
     @NotNull
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     @Schema(title = "Source file URI")
     private Property<String> from;
 
@@ -80,6 +80,7 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
     @Schema(
         title = "The name of a supported charset"
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Override

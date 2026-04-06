@@ -72,7 +72,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
@@ -80,6 +80,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         title = "The name of a supported charset",
         description = "Default value is UTF-8."
     )
+    @PluginProperty(group = "processing")
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Schema(
@@ -89,11 +90,13 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             (e.g. `/catalog/book`). Each matching element is written as a separate ION record.
             When not set, the entire XML file is parsed into a single ION record."""
     )
+    @PluginProperty(group = "main")
     private Property<String> query;
 
     @Schema(
         title = "XML parser configuration."
     )
+    @PluginProperty(group = "advanced")
     private ParserConfiguration parserConfiguration;
 
     @Override

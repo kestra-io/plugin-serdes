@@ -69,13 +69,14 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
     @Schema(
         title = "Source file URI"
     )
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Builder.Default
     @Schema(
         title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)."
     )
+    @PluginProperty(group = "advanced")
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
     @Override

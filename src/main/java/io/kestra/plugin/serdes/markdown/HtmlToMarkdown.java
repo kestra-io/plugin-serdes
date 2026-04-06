@@ -94,19 +94,21 @@ import static com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter.SETEX
 public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.Output> {
     @NotNull
     @Schema(title = "Source file URI")
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Schema(
         title = "List of HTML tags to ignore during conversion",
         description = "Tags specified in this list will be skipped during the conversion process. Common tags to ignore include 'script', 'style', 'nav', etc."
     )
+    @PluginProperty(group = "advanced")
     private Property<List<String>> ignoreTags;
 
     @Schema(
         title = "Base URI for resolving relative links",
         description = "When provided, relative URLs in the HTML (e.g., href and src attributes) will be resolved to absolute URLs using this base URI."
     )
+    @PluginProperty(group = "advanced")
     private Property<String> baseUri;
 
     @Override
