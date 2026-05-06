@@ -3,7 +3,7 @@ namespace: sanitychecks.plugin-serdes
 
 tasks:
   - id: for_each
-    type: io.kestra.plugin.core.flow.ForEach
+    type: io.kestra.plugin.core.flow.Loop
     values:
       - avro
       - csv
@@ -13,5 +13,5 @@ tasks:
     tasks:
       - id: subflow
         type: io.kestra.plugin.core.flow.Subflow
-        flowId: "{{taskrun.value}}"
+        flowId: "{{item.value}}"
         namespace: "{{ flow.namespace }}"
