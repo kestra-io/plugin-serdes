@@ -35,7 +35,11 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a CSV file into ION."
+    title = "Convert a CSV file to the Amazon Ion format.",
+    description = """
+        Supports configurable field separator, text delimiter, charset, and \
+        header detection. The value `\\N` is treated as null in any field. \
+        Use `onBadLines` to control error handling for malformed rows."""
 )
 @Plugin(
     examples = {

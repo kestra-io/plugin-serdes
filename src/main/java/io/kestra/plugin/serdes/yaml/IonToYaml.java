@@ -29,7 +29,11 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file into YAML format."
+    title = "Convert an Ion file to the YAML format.",
+    description = """
+        A single Ion record is written as a plain YAML document; multiple \
+        records are written as a multi-document YAML stream separated by \
+        `---` markers."""
 )
 @Plugin(
     examples = {
@@ -126,6 +130,7 @@ public class IonToYaml extends Task implements RunnableTask<IonToYaml.Output> {
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
+        @Schema(title = "URI of the output YAML file")
         private final URI uri;
     }
 }

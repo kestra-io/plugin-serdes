@@ -41,23 +41,25 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a JSON file into ION.",
+    title = "Convert a JSON file to the Amazon Ion format.",
     description = """
-        We support one JSON dictionary/map per line as well as a JSON file in array format.
+        Converts a JSON file to Amazon Ion, Kestra's internal binary format used \
+        for passing data between tasks.
 
-        Here is how a sample JSON file content might look like:
-        ```
-        {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
-        {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
-        {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
+        Two input formats are supported: one JSON object per line (JSONL), \
+        or a JSON array. Examples of each:
+
+        ```json
+        {"id": 1, "name": "Widget A", "category": "Electronics"}
+        {"id": 2, "name": "Widget B", "category": "Household"}
+        {"id": 3, "name": "Widget C", "category": "Furniture"}
         ```
 
-        Here is how a sample JSON file in array format might look:
-        ```
+        ```json
         [
-            {"product_id":"1","product_name":"streamline turn-key systems","product_category":"Electronics","brand":"gomez"},
-            {"product_id":"2","product_name":"morph viral applications","product_category":"Household","brand":"wolfe"},
-            {"product_id":"3","product_name":"expedite front-end schemas","product_category":"Household","brand":"davis-martinez"}
+          {"id": 1, "name": "Widget A", "category": "Electronics"},
+          {"id": 2, "name": "Widget B", "category": "Household"},
+          {"id": 3, "name": "Widget C", "category": "Furniture"}
         ]
         ```
         """

@@ -44,7 +44,11 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file into Excel."
+    title = "Convert an Ion file to the Excel format.",
+    description = """
+        Accepts a single Ion file URI or a map of sheet names to Ion file URIs \
+        to write multiple sheets into one workbook. Dates and temporal values \
+        are formatted automatically when `styles` is enabled."""
 )
 @Plugin(
     examples = {
@@ -141,8 +145,8 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
     @Schema(
         title = "Whether styles should be applied to format values",
-        description = "Excel is limited to 64000 styles per document, and styles are applied on every date, " +
-            "removed this options when you have a lots of values."
+        description = "Excel is limited to 64,000 styles per document. Disable this option when writing " +
+            "many date values to avoid exceeding that limit."
     )
     @Builder.Default
     @PluginProperty(group = "advanced")

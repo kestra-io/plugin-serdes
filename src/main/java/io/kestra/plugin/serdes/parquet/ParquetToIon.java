@@ -40,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a Parquet file into ION."
+    title = "Convert a Parquet file to the Amazon Ion format."
 )
 @Plugin(
     examples = {

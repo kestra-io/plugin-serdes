@@ -32,8 +32,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a Markdown file into plain text.",
-    description = "Removes Markdown formatting and outputs plain text, using CommonMark parser."
+    title = "Convert a Markdown file into plain text."
 )
 @Plugin(
     examples = {

@@ -42,7 +42,12 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file into Parquet."
+    title = "Convert an Ion file to the Parquet format.",
+    description = """
+        An Avro schema is required to define column types; if none is provided, \
+        one is inferred by scanning up to `numberOfRowsToScan` rows. Supports \
+        configurable compression (default: `GZIP`), Parquet format version, \
+        row group size, page size, and dictionary page size."""
 )
 @Plugin(
     examples = {
@@ -104,13 +109,13 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
 
     @Builder.Default
     @Schema(
-        title = "The compression to used"
+        title = "Compression codec"
     )
     Property<CompressionCodec> compressionCodec = Property.ofValue(CompressionCodec.GZIP);
 
     @Builder.Default
     @Schema(
-        title = "Target row group size"
+        title = "Parquet format version"
     )
     @PluginProperty(group = "advanced")
     private Property<Version> parquetVersion = Property.ofValue(Version.V2);
