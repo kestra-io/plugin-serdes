@@ -32,7 +32,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a Markdown file into plain text.",
+    title = "Convert a Markdown file into plain text."
 )
 @Plugin(
     examples = {
