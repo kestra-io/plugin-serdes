@@ -40,10 +40,11 @@ import lombok.experimental.SuperBuilder;
 @Schema(
     title = "Convert a JSON file into TOON.",
     description = """
-        Converts JSON data to the TOON (Token-Oriented Object Notation) format, a deterministic, indentation-based text format that encodes the JSON data model with explicit structure and minimal quoting.
-        TOON is efficient for uniform arrays of objects and supports tabular encoding.
-        See https://github.com/toon-format/spec for the full specification (3.0).
-        """
+        Converts JSON data to TOON (Token-Oriented Object Notation), a \
+        deterministic, indentation-based text format that encodes the JSON \
+        data model with explicit structure and minimal quoting. TOON is \
+        efficient for uniform arrays of objects and supports tabular encoding. \
+        See the [TOON specification](https://github.com/toon-format/spec) for details."""
 )
 @Plugin(
     examples = {

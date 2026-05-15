@@ -40,7 +40,11 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Excel file into ION."
+    title = "Convert an Excel file to the Amazon Ion format.",
+    description = """
+        Reads Excel (.xlsx) files in streaming mode. Each sheet is written to \
+        a separate Ion file keyed by sheet name in the output map. \
+        Supports configurable value rendering and date/time output format."""
 )
 @Plugin(
     examples = {
@@ -97,7 +101,8 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
     @Schema(
         title = "How dates, times, and durations should be represented in the output",
-        description = "Possible values: SERIAL_NUMBER, FORMATTED_STRING"
+        description = "Possible values: `UNFORMATTED_VALUE` (default — dates returned as ISO date strings), " +
+            "`SERIAL_NUMBER` (Excel numeric serial date), or `FORMATTED_STRING` (locale-formatted string)."
     )
     @Builder.Default
     @PluginProperty(group = "advanced")

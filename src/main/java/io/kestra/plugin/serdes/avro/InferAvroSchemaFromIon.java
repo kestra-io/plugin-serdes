@@ -26,7 +26,12 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Try to infer an Avro schema from a ION file."
+    title = "Infer an Avro schema from an Ion file.",
+    description = """
+        Scans up to `numberOfRowsToScan` rows of an Ion file and infers a \
+        compatible Avro schema, writing the result as an `.avsc` file in \
+        Kestra's internal storage. The output URI can be passed directly to \
+        `IonToAvro` or `IonToParquet` as a schema reference."""
 )
 @Plugin(
     aliases = "io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon"

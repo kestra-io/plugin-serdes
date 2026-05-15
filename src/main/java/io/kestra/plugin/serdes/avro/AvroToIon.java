@@ -38,7 +38,12 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Avro file into ION with configurable error handling."
+    title = "Convert an Avro file to the Amazon Ion format.",
+    description = """
+        Validates field types and null constraints against the embedded Avro \
+        schema during deserialization. Use `onBadLines` to control whether \
+        type mismatches or null violations fail the task (`ERROR`), log a \
+        warning (`WARN`), or are silently skipped (`SKIP`)."""
 )
 @Plugin(
     examples = {

@@ -145,7 +145,7 @@ public abstract class AbstractAvroConverter extends Task {
     @Builder.Default
     @Schema(
         title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
-        description = "Can be one of: `FAIL`, `WARN` or `SKIP`."
+        description = "Can be `ERROR`, `WARN`, or `SKIP`."
     )
     @PluginProperty(group = "advanced")
     protected final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
