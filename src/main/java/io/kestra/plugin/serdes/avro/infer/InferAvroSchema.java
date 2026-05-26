@@ -1,8 +1,8 @@
 package io.kestra.plugin.serdes.avro.infer;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Reader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
@@ -46,7 +46,7 @@ public class InferAvroSchema {
      * @param output where the resulting Avro schema will be written
      * @throws IllegalStateException if the input stream is empty or contains no valid records
      */
-    public void inferAvroSchemaFromIon(Reader inputStream, OutputStream output) {
+    public void inferAvroSchemaFromIon(InputStream inputStream, OutputStream output) {
         Mono<Schema> inferedSchema = null;
         try {
             inferedSchema = FileSerde.readAll(inputStream)

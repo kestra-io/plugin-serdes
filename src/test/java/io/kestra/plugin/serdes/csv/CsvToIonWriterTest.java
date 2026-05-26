@@ -102,7 +102,7 @@ class CsvToIonWriterTest {
 
         List<Object> rows;
         try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
-            rows = FileSerde.readAll(new InputStreamReader(in, StandardCharsets.UTF_8)).collectList().block();
+            rows = FileSerde.readAll(in).collectList().block();
         }
 
         assertThat(rows, is(notNullValue()));

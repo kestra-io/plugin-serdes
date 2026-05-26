@@ -140,7 +140,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         var schemaParser = new org.apache.avro.Schema.Parser();
         org.apache.avro.Schema schema;
         if (this.schema == null) {
-            try (var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(rFrom))) {
+            try (var inputStreamForInfer = runContext.storage().getFile(rFrom)) {
                 var schemaOutputStream = new ByteArrayOutputStream();
                 new InferAvroSchema(
                     runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
@@ -160,7 +160,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
 
         try (
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom)), FileSerde.BUFFER_SIZE);
+            InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(rFrom), FileSerde.BUFFER_SIZE);
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE);
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)

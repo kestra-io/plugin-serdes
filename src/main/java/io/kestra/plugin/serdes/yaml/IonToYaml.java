@@ -89,11 +89,11 @@ public class IonToYaml extends Task implements RunnableTask<IonToYaml.Output> {
         long count = 0;
 
         try (
-            BufferedReader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom)), FileSerde.BUFFER_SIZE);
+            InputStream is = new BufferedInputStream(runContext.storage().getFile(rFrom), FileSerde.BUFFER_SIZE);
             BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile, rCharset), FileSerde.BUFFER_SIZE)
         ) {
 
-            Flux<Object> flux = FileSerde.readAll(reader);
+            Flux<Object> flux = FileSerde.readAll(is);
             var it = flux.toIterable().iterator();
 
             if (it.hasNext()) {

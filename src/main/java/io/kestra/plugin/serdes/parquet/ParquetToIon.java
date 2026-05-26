@@ -104,7 +104,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
 
         try (
             org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader = parquetReaderBuilder.build();
-            Writer output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
 
             Flux<Object> flowable = Flux

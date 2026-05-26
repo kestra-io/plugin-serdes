@@ -1,7 +1,7 @@
 package io.kestra.plugin.serdes.avro;
 
 import java.io.IOException;
-import java.io.Reader;
+import java.io.InputStream;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.function.Function;
@@ -150,7 +150,7 @@ public abstract class AbstractAvroConverter extends Task {
     @PluginProperty(group = "advanced")
     protected final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
-    protected <E extends Exception> Long convert(Reader inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext)
+    protected <E extends Exception> Long convert(InputStream inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext)
         throws IOException, IllegalVariableEvaluationException {
         OnBadLines rOnBadLines = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
         AvroConverter converter = AvroConverter.builder()
