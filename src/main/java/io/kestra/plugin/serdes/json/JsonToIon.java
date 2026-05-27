@@ -2,7 +2,6 @@ package io.kestra.plugin.serdes.json;
 
 import java.io.*;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.TimeZone;
@@ -133,11 +132,11 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
 
         try (
             BufferedReader input = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from), renderedCharset), FileSerde.BUFFER_SIZE);
-            Writer writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(renderedCharset)), FileSerde.BUFFER_SIZE)
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             Flux<Object> flowable = Flux
                 .create(this.nextRow(input, renderedNewLine), FluxSink.OverflowStrategy.BUFFER);
-            Mono<Long> count = FileSerde.writeAll(writer, flowable);
+            Mono<Long> count = FileSerde.writeAll(output, flowable);
 
             // metrics & finalize
             Long lineCount = count.block();

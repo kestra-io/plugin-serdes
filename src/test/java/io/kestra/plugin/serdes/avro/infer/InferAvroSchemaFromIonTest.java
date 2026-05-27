@@ -3,7 +3,6 @@ package io.kestra.plugin.serdes.avro.infer;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 
 import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
@@ -171,7 +170,7 @@ public class InferAvroSchemaFromIonTest {
 
         // when
         new InferAvroSchema().inferAvroSchemaFromIon(
-            new InputStreamReader(new ByteArrayInputStream(input.getBytes())),
+            new ByteArrayInputStream(input.getBytes()),
             output
         );
 

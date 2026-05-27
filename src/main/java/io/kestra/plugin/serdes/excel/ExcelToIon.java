@@ -1,8 +1,8 @@
 package io.kestra.plugin.serdes.excel;
 
-import java.io.BufferedWriter;
+import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.time.ZoneId;
@@ -332,7 +332,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
     private File store(RunContext runContext, Collection<Object> values) throws IOException {
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
-        try (var output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)) {
+        try (var output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)) {
             var flux = Flux.fromIterable(values);
             FileSerde.writeAll(output, flux).block();
         }

@@ -93,7 +93,7 @@ class ParquetToIonTest {
             ParquetToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
             List<Map<String, Object>> result = new ArrayList<>();
-            FileSerde.reader(new BufferedReader(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, readerOutput.getUri()))), r -> result.add((Map<String, Object>) r));
+            FileSerde.read(storageInterface.get(TenantService.MAIN_TENANT, null, readerOutput.getUri()), r -> result.add((Map<String, Object>) r));
 
             assertThat(result.size(), is(1));
             assertThat(result.get(0).get("String"), is("string"));

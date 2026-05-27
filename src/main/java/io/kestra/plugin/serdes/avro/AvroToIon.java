@@ -95,7 +95,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         try (
             InputStream in = runContext.storage().getFile(rFrom);
             DataFileStream<GenericRecord> dataFileStream = new DataFileStream<>(in, datumReader);
-            BufferedWriter output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
+            BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             org.apache.avro.Schema avroSchema = dataFileStream.getSchema();
 

@@ -23,6 +23,7 @@ import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.serdes.avro.AbstractAvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverter;
@@ -164,7 +165,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         var schemaParser = new org.apache.avro.Schema.Parser();
         org.apache.avro.Schema schema;
         if (this.schema == null) {
-            try (var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from))) {
+            try (var inputStreamForInfer = runContext.storage().getFile(from)) {
                 var schemaOutputStream = new ByteArrayOutputStream();
                 new InferAvroSchema(
                     runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
@@ -193,7 +194,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         // convert
         try (
             org.apache.parquet.hadoop.ParquetWriter<GenericData.Record> writer = parquetWriterBuilder.build();
-            Reader inputStream = new InputStreamReader(runContext.storage().getFile(from))
+            InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE)
         ) {
             Long lineCount = this.convert(inputStream, schema, writer::write, runContext);
 
