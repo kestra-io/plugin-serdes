@@ -40,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a Parquet file into ION."
+    title = "Convert a Parquet file to the Amazon Ion format."
 )
 @Plugin(
     examples = {
@@ -104,7 +104,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
 
         try (
             org.apache.parquet.hadoop.ParquetReader<GenericRecord> parquetReader = parquetReaderBuilder.build();
-            Writer output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
 
             Flux<Object> flowable = Flux

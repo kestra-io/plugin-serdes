@@ -35,7 +35,9 @@ import static com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter.SETEX
 @NoArgsConstructor
 @Schema(
     title = "Convert an HTML file from Kestra internal storage into Markdown format.",
-    description = "This task converts HTML content into Markdown, which is essential for LLM processing, documentation automation, and data cleaning pipelines. HTML is often too verbose for Large Language Models (LLMs) and consumes unnecessary tokens. This task allows you to build clean RAG (Retrieval-Augmented Generation) pipelines directly within Kestra."
+    description = """
+        Useful for LLM processing and RAG pipelines where HTML is too verbose \
+        — Markdown conveys the same structure with significantly fewer tokens."""
 )
 @Plugin(
     examples = {

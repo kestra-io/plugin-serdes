@@ -172,11 +172,7 @@ class XmlToIonWriterTest {
         // Read back ION records
         var records = new java.util.ArrayList<>();
         try (
-            var inputStream = new BufferedReader(
-                new InputStreamReader(
-                    runContextFactory.of().storage().getFile(readerOutput.getUri())
-                )
-            )
+            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
         ) {
             FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
         }
@@ -220,11 +216,7 @@ class XmlToIonWriterTest {
         // Read ION records
         var records = new java.util.ArrayList<>();
         try (
-            var inputStream = new BufferedReader(
-                new InputStreamReader(
-                    runContextFactory.of().storage().getFile(readerOutput.getUri())
-                )
-            )
+            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
         ) {
             FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
         }

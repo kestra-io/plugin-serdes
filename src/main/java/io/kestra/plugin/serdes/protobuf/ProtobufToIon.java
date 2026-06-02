@@ -2,7 +2,6 @@ package io.kestra.plugin.serdes.protobuf;
 
 import java.io.*;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.TimeZone;
 import java.util.function.Consumer;
@@ -145,8 +144,8 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
 
         try (
             InputStream inputStream = runContext.storage().getFile(rFrom);
-            Writer writer = new BufferedWriter(
-                new FileWriter(tempFile, StandardCharsets.UTF_8),
+            OutputStream writer = new BufferedOutputStream(
+                new FileOutputStream(tempFile),
                 FileSerde.BUFFER_SIZE
             )
         ) {

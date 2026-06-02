@@ -23,6 +23,7 @@ import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.serdes.avro.AbstractAvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverter;
@@ -42,7 +43,12 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file into Parquet."
+    title = "Convert an Ion file to the Parquet format.",
+    description = """
+        An Avro schema is required to define column types; if none is provided, \
+        one is inferred by scanning up to `numberOfRowsToScan` rows. Supports \
+        configurable compression (default: `GZIP`), Parquet format version, \
+        row group size, page size, and dictionary page size."""
 )
 @Plugin(
     examples = {
@@ -104,13 +110,13 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
 
     @Builder.Default
     @Schema(
-        title = "The compression to used"
+        title = "Compression codec"
     )
     Property<CompressionCodec> compressionCodec = Property.ofValue(CompressionCodec.GZIP);
 
     @Builder.Default
     @Schema(
-        title = "Target row group size"
+        title = "Parquet format version"
     )
     @PluginProperty(group = "advanced")
     private Property<Version> parquetVersion = Property.ofValue(Version.V2);
@@ -159,7 +165,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         var schemaParser = new org.apache.avro.Schema.Parser();
         org.apache.avro.Schema schema;
         if (this.schema == null) {
-            try (var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(from))) {
+            try (var inputStreamForInfer = runContext.storage().getFile(from)) {
                 var schemaOutputStream = new ByteArrayOutputStream();
                 new InferAvroSchema(
                     runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
@@ -188,7 +194,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         // convert
         try (
             org.apache.parquet.hadoop.ParquetWriter<GenericData.Record> writer = parquetWriterBuilder.build();
-            Reader inputStream = new InputStreamReader(runContext.storage().getFile(from))
+            InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE)
         ) {
             Long lineCount = this.convert(inputStream, schema, writer::write, runContext);
 

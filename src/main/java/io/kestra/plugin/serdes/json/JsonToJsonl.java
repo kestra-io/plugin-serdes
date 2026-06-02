@@ -33,7 +33,11 @@ import lombok.experimental.SuperBuilder;
 @ToString
 @EqualsAndHashCode
 @Schema(
-    title = "Convert a JSON file into JSONL."
+    title = "Convert a JSON file to JSONL.",
+    description = """
+        Uses a streaming parser to avoid loading the full file into memory. \
+        Accepts a JSON array or a sequence of JSON objects. Useful for \
+        splitting a JSON array before passing data to `ForEachItem`."""
 )
 @Plugin(
     examples = {
@@ -75,6 +79,7 @@ import lombok.experimental.SuperBuilder;
     metrics = {
         @Metric(
             name = "records",
+            description = "Number of records converted",
             type = Counter.TYPE
         )
     }

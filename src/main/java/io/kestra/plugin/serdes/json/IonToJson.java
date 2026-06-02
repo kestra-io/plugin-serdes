@@ -44,13 +44,17 @@ import reactor.core.publisher.Mono;
 @NoArgsConstructor
 @Schema(
     title = "Convert an ION file into a JSONL file.",
-    description = "JSONL refers to newline-delimited JSON."
+    description = """
+        Outputs one JSON line per Ion record by default; set `newLine` to false \
+        to produce a JSON array instead. Ion timestamps use the configured \
+        `timeZoneId`. Set `shouldKeepAnnotations` to true to preserve Ion \
+        type annotations as `ion_annotations` fields in the output."""
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
-            title = "Download a CSV file and convert it to a JSON format.",
+            title = "Convert an Ion file to newline-delimited JSON (JSONL).",
             code = """
                 id: ion_to_json
                 namespace: company.team

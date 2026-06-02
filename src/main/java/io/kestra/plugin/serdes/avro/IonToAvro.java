@@ -37,13 +37,18 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file into Avro."
+    title = "Convert an Ion file to the Avro format.",
+    description = """
+        Converts an Amazon Ion file to Avro format using a JSON Avro schema. \
+        If no schema is provided, one is inferred by scanning up to \
+        `numberOfRowsToScan` rows. Use `onBadLines` to control whether records \
+        that fail validation cause an error, log a warning, or are silently skipped."""
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
-            title = "Convert a CSV file to the Avro format.",
+            title = "Convert a CSV dataset to the Avro format via Ion.",
             code = """
                 id: divvy_tripdata
                 namespace: company.team
@@ -117,7 +122,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @PluginProperty(group = "advanced")
     @Schema(
         title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
-        description = "Can be one of: `FAIL`, `WARN` or `SKIP`."
+        description = "Can be `ERROR`, `WARN`, or `SKIP`."
     )
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
 
@@ -135,7 +140,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         var schemaParser = new org.apache.avro.Schema.Parser();
         org.apache.avro.Schema schema;
         if (this.schema == null) {
-            try (var inputStreamForInfer = new InputStreamReader(runContext.storage().getFile(rFrom))) {
+            try (var inputStreamForInfer = runContext.storage().getFile(rFrom)) {
                 var schemaOutputStream = new ByteArrayOutputStream();
                 new InferAvroSchema(
                     runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
@@ -155,7 +160,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
 
         try (
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom)), FileSerde.BUFFER_SIZE);
+            InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(rFrom), FileSerde.BUFFER_SIZE);
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE);
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)

@@ -37,7 +37,11 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file into CSV."
+    title = "Convert an Ion file to the CSV format.",
+    description = """
+        Supports configurable field separator, text delimiter, and line \
+        delimiter. Use `quoteMode` to control field quoting; \
+        `alwaysDelimitText` is deprecated in favor of `quoteMode`."""
 )
 @Plugin(
     examples = {
@@ -181,13 +185,13 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         this.init(runContext);
 
         try (
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom)), FileSerde.BUFFER_SIZE);
+            InputStream is = new BufferedInputStream(runContext.storage().getFile(rFrom), FileSerde.BUFFER_SIZE);
             Writer fileWriter = new BufferedWriter(new FileWriter(tempFile, Charset.forName(runContext.render(this.charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
             CsvWriter csvWriter = this.csvWriter(fileWriter, runContext)
         ) {
 
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
-            Flux<Object> flowable = FileSerde.readAll(inputStream)
+            Flux<Object> flowable = FileSerde.readAll(is)
                 .doOnNext(new Consumer<>() {
                     private boolean first = false;
 

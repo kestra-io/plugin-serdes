@@ -35,7 +35,11 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a CSV file into ION."
+    title = "Convert a CSV file to the Amazon Ion format.",
+    description = """
+        Supports configurable field separator, text delimiter, charset, and \
+        header detection. The value `\\N` is treated as null in any field. \
+        Use `onBadLines` to control error handling for malformed rows."""
 )
 @Plugin(
     examples = {
@@ -161,7 +165,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 FileSerde.BUFFER_SIZE
             );
             CsvReader<CsvRecord> csvReader = this.csvReader(reader, runContext);
-            Writer output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)
+            OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
             var rSkipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();

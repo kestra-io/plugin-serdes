@@ -43,15 +43,10 @@ import lombok.experimental.SuperBuilder;
 @Schema(
     title = "Convert a TOON file into JSON.",
     description = """
-        Parses a TOON (Token-Oriented Object Notation) document and converts it to JSON.
-        Supports TOON 3.0 features emitted by JsonToToon:
-        - indentation-based structure
-        - primitive arrays (inline)
-        - tabular arrays
-        - list arrays
-        - objects and arrays as list items
-        - canonical primitives (true/false/null/numbers)
-        """
+        Parses TOON (Token-Oriented Object Notation) and converts it to JSON. \
+        Supports all TOON 3.0 structures produced by `JsonToToon`: tabular \
+        arrays, inline primitive arrays, nested objects, and canonical \
+        primitives."""
 )
 @Plugin(
     examples = {

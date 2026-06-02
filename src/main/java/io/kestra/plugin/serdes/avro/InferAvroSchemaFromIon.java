@@ -1,9 +1,8 @@
 package io.kestra.plugin.serdes.avro;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.FileOutputStream;
-import java.io.InputStreamReader;
 import java.net.URI;
 
 import io.kestra.core.models.annotations.Plugin;
@@ -26,7 +25,12 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Try to infer an Avro schema from a ION file."
+    title = "Infer an Avro schema from an Ion file.",
+    description = """
+        Scans up to `numberOfRowsToScan` rows of an Ion file and infers a \
+        compatible Avro schema, writing the result as an `.avsc` file in \
+        Kestra's internal storage. The output URI can be passed directly to \
+        `IonToAvro` or `IonToParquet` as a schema reference."""
 )
 @Plugin(
     aliases = "io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon"
@@ -54,7 +58,7 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
         var from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         try (
-            var inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            var inputStream = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE);
             var output = new BufferedOutputStream(new FileOutputStream(tempAvroSchemaFile), FileSerde.BUFFER_SIZE);
         ) {
             new InferAvroSchema(

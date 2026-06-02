@@ -33,7 +33,7 @@ import reactor.core.publisher.Mono;
 @EqualsAndHashCode
 @Schema(
     title = "Convert a YAML file into ION.",
-    description = "Converts YAML documents into Amazon Ion. Each YAML document becomes one Ion value."
+    description = "Each YAML document in the file — separated by `---` — becomes a separate Ion record."
 )
 @Plugin(
     examples = {
