@@ -38,9 +38,9 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Ion file to the XML format.",
+    title = "Convert an ION file to the XML format.",
     description = """
-        Each Ion record becomes a child element wrapped under a configurable \
+        Each ION record becomes a child element wrapped under a configurable \
         root element (default: `items`). The full record set is loaded into \
         memory during conversion; for very large datasets, prefer \
         `IonToParquet` or `IonToJson` instead."""

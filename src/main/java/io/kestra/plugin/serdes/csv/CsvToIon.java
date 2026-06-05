@@ -35,7 +35,7 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a CSV file to the Amazon Ion format.",
+    title = "Convert a CSV file to the Amazon ION format.",
     description = """
         Supports configurable field separator, text delimiter, charset, and \
         header detection. The value `\\N` is treated as null in any field. \
@@ -45,7 +45,7 @@ import reactor.core.publisher.Mono;
     examples = {
         @Example(
             full = true,
-            title = "Convert a CSV file to the Amazon Ion format.",
+            title = "Convert a CSV file to the Amazon ION format.",
             code = """
                 id: csv_to_ion
                 namespace: company.team

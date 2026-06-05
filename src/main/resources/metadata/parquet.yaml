@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.parquet
 name: "parquet"
 title: "Parquet"
-description: "Tasks that convert between Parquet and Ion."
-body: "Provide Parquet files and optional schemas to convert to Ion, or supply Ion data to write Parquet with compression and schema controls for analytics pipelines."
+description: "Tasks that convert between Parquet and ION."
+body: "Provide Parquet files and optional schemas to convert to ION, or supply ION data to write Parquet with compression and schema controls for analytics pipelines."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

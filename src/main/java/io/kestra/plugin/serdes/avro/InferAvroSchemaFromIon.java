@@ -25,9 +25,9 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Infer an Avro schema from an Ion file.",
+    title = "Infer an Avro schema from an ION file.",
     description = """
-        Scans up to `numberOfRowsToScan` rows of an Ion file and infers a \
+        Scans up to `numberOfRowsToScan` rows of an ION file and infers a \
         compatible Avro schema, writing the result as an `.avsc` file in \
         Kestra's internal storage. The output URI can be passed directly to \
         `IonToAvro` or `IonToParquet` as a schema reference."""

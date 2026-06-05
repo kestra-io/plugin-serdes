@@ -40,13 +40,13 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a Parquet file to the Amazon Ion format."
+    title = "Convert a Parquet file to the Amazon ION format."
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
-            title = "Convert a parquet file to the Amazon Ion format.",
+            title = "Convert a parquet file to the Amazon ION format.",
             code = """
                 id: parquet_to_ion
                 namespace: company.team
@@ -87,7 +87,7 @@ public class ParquetToIon extends Task implements RunnableTask<ParquetToIon.Outp
         // reader
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-        // New ion file
+        // New ION file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         // Parquet file
