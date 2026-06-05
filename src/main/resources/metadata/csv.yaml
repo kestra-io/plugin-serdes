@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.csv
 name: "csv"
 title: "CSV"
-description: "Tasks that convert between CSV and Ion."
-body: "Provide CSV input with delimiter/quote/header options to convert to Ion, or supply Ion data to emit CSV, handling bad lines and encoding settings as needed."
+description: "Tasks that convert between CSV and ION."
+body: "Provide CSV input with delimiter/quote/header options to convert to ION, or supply ION data to emit CSV, handling bad lines and encoding settings as needed."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

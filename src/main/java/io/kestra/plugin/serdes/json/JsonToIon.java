@@ -40,9 +40,9 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a JSON file to the Amazon Ion format.",
+    title = "Convert a JSON file to the Amazon ION format.",
     description = """
-        Converts a JSON file to Amazon Ion, Kestra's internal binary format used \
+        Converts a JSON file to Amazon ION, Kestra's internal binary format used \
         for passing data between tasks.
 
         Two input formats are supported: one JSON object per line (JSONL), \
@@ -67,7 +67,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     examples = {
         @Example(
             full = true,
-            title = "Convert a JSON file to the Amazon Ion format.",
+            title = "Convert a JSON file to the Amazon ION format.",
             code = """
                 id: json_to_ion
                 namespace: company.team

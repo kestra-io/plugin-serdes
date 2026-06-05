@@ -37,9 +37,9 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Ion file to the Avro format.",
+    title = "Convert an ION file to the Avro format.",
     description = """
-        Converts an Amazon Ion file to Avro format using a JSON Avro schema. \
+        Converts an Amazon ION file to Avro format using a JSON Avro schema. \
         If no schema is provided, one is inferred by scanning up to \
         `numberOfRowsToScan` rows. Use `onBadLines` to control whether records \
         that fail validation cause an error, log a warning, or are silently skipped."""
@@ -48,7 +48,7 @@ import lombok.experimental.SuperBuilder;
     examples = {
         @Example(
             full = true,
-            title = "Convert a CSV dataset to the Avro format via Ion.",
+            title = "Convert a CSV dataset to the Avro format via ION.",
             code = """
                 id: divvy_tripdata
                 namespace: company.team

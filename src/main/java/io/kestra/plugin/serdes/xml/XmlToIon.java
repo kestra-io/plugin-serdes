@@ -40,18 +40,18 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an XML file to the Amazon Ion format.",
+    title = "Convert an XML file to the Amazon ION format.",
     description = """
-        Without a `query`, the entire file is parsed into a single Ion record. \
+        Without a `query`, the entire file is parsed into a single ION record. \
         When `query` is set (e.g., `/catalog/book`), uses StAX streaming to \
-        extract each matching element as a separate Ion record — suitable for \
+        extract each matching element as a separate ION record — suitable for \
         large files. External entity resolution is disabled for security."""
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
-            title = "Convert an XML file to the Amazon Ion format.",
+            title = "Convert an XML file to the Amazon ION format.",
             code = """
                 id: xml_to_ion
                 namespace: company.team

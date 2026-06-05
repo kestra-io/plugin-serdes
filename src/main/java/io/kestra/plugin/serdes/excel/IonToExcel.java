@@ -44,9 +44,9 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Ion file to the Excel format.",
+    title = "Convert an ION file to the Excel format.",
     description = """
-        Accepts a single Ion file URI or a map of sheet names to Ion file URIs \
+        Accepts a single ION file URI or a map of sheet names to ION file URIs \
         to write multiple sheets into one workbook. Dates and temporal values \
         are formatted automatically when `styles` is enabled."""
 )
