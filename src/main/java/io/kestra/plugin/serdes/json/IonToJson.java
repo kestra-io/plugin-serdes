@@ -137,7 +137,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         var rKeepAnnotations = runContext.render(this.shouldKeepAnnotations).as(Boolean.class).orElse(false);
 
         try (
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE);
             Writer fileWriter = new BufferedWriter(new FileWriter(tempFile, outputCharset), FileSerde.BUFFER_SIZE);
             JsonGenerator jsonGenerator = jsonObjectMapper.createGenerator(fileWriter)
         ) {
