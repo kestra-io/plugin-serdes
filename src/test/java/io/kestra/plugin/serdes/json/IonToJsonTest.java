@@ -1,10 +1,10 @@
 package io.kestra.plugin.serdes.json;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -16,14 +16,18 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
 
 import jakarta.inject.Inject;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
+import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @KestraTest
@@ -94,6 +98,57 @@ public class IonToJsonTest {
 
         var output = task.run(runContext);
         assertThat(storageInterface.exists(MAIN_TENANT, null, output.getUri()), is(true));
+    }
+
+    @Test
+    void should_parse_binary_ion_correctly() throws Exception {
+        // FileSerde.write produces binary ION (BVM E0 01 00 EA prefix).
+        // The old Reader-based path would corrupt this via UTF-8 decoding.
+        var tempFile = File.createTempFile("ion_binary_", ".ion");
+        try (var output = new FileOutputStream(tempFile)) {
+            List.of(
+                ImmutableMap.of("id", 1, "name", "alice"),
+                ImmutableMap.of("id", 2, "name", "bob")
+            ).forEach(throwConsumer(row -> FileSerde.write(output, row)));
+        }
+
+        URI uri = storageInterface.put(MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+        Map<String, Object> variables = ImmutableMap.of("file", uri.toString());
+        var runContext = runContextFactory.of(variables);
+
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .build();
+        var output = task.run(runContext);
+
+        assertThat(storageInterface.exists(MAIN_TENANT, null, output.getUri()), is(true));
+        try (var stream = storageInterface.get(MAIN_TENANT, null, output.getUri())) {
+            var result = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            assertThat(result, containsString("\"id\""));
+            assertThat(result, containsString("\"alice\""));
+            assertThat(result, containsString("\"bob\""));
+        }
+    }
+
+    @Test
+    void should_handle_empty_binary_ion_without_throwing() throws Exception {
+        // An empty binary ION file (just the BVM, no records) must produce an empty output.
+        var tempFile = File.createTempFile("ion_empty_", ".ion");
+        try (var output = new FileOutputStream(tempFile)) {
+            // write nothing: empty file
+        }
+
+        URI uri = storageInterface.put(MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+        Map<String, Object> variables = ImmutableMap.of("file", uri.toString());
+        var runContext = runContextFactory.of(variables);
+
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .build();
+
+        assertDoesNotThrow(() -> task.run(runContext));
     }
 
     private RunContext getRunContext(String ionContent) {
