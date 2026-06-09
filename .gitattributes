@@ -1,1 +1,12 @@
+# Match the .editorconfig
+*           text=auto eol=lf
+
+# Scripts
+*.bat       text eol=crlf
+*.sh        text eol=lf
+
+# Gradle wrapper
+/gradlew    text eol=lf
+
+# Legacy attributes
 *.csv binary

@@ -45,16 +45,16 @@ import reactor.core.publisher.Mono;
 @Schema(
     title = "Convert an ION file into a JSONL file.",
     description = """
-        Outputs one JSON line per Ion record by default; set `newLine` to false \
-        to produce a JSON array instead. Ion timestamps use the configured \
-        `timeZoneId`. Set `shouldKeepAnnotations` to true to preserve Ion \
+        Outputs one JSON line per ION record by default; set `newLine` to false \
+        to produce a JSON array instead. ION timestamps use the configured \
+        `timeZoneId`. Set `shouldKeepAnnotations` to true to preserve ION \
         type annotations as `ion_annotations` fields in the output."""
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
-            title = "Convert an Ion file to newline-delimited JSON (JSONL).",
+            title = "Convert an ION file to newline-delimited JSON (JSONL).",
             code = """
                 id: ion_to_json
                 namespace: company.team
@@ -113,8 +113,8 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Should keep Ion annotations in the output JSON",
-        description = "If true, Ion annotations will be preserved in the output JSON. Default is false."
+        title = "Should keep ION annotations in the output JSON",
+        description = "If true, ION annotations will be preserved in the output JSON. Default is false."
     )
     @PluginProperty(group = "advanced")
     private final Property<Boolean> shouldKeepAnnotations = Property.ofValue(false);

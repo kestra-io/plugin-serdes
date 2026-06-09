@@ -27,7 +27,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
         var ionInputStream = IOUtils.toInputStream(ionInput, StandardCharsets.UTF_8);
         var inputIonFileUri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), ionInputStream);
 
-        // infer Avro schema from Ion
+        // infer Avro schema from ION
         var inferAvroSchemaFromIon = InferAvroSchemaFromIon.builder()
             .id(InferAvroSchemaFromIon.class.getSimpleName())
             .type(InferAvroSchemaFromIon.class.getName())
@@ -35,7 +35,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
             .build();
         var inferAvroSchemaFromIonOutput = inferAvroSchemaFromIon.run(TestsUtils.mockRunContext(runContextFactory, inferAvroSchemaFromIon, ImmutableMap.of()));
 
-        // convert Ion to Avro using inferred schema
+        // convert ION to Avro using inferred schema
         var ionToAvro = IonToAvro.builder()
             .id(IonToAvro.class.getSimpleName())
             .type(IonToAvro.class.getName())
@@ -46,7 +46,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
             .build();
         var ionToAvroOutput = ionToAvro.run(TestsUtils.mockRunContext(runContextFactory, ionToAvro, ImmutableMap.of()));
 
-        // convert back Avro into Ion
+        // convert back Avro into ION
         var avroToIon = AvroToIon.builder()
             .id(AvroToIon.class.getSimpleName())
             .type(AvroToIon.class.getName())
@@ -54,7 +54,7 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
             .build();
         var avroToIonOutput = avroToIon.run(TestsUtils.mockRunContext(runContextFactory, avroToIon, ImmutableMap.of()));
 
-        // compare original Ion with generated after conversions
+        // compare original ION with generated after conversions
         var ion = IonSystemBuilder.standard().build();
         assertThat(
             ImmutableList.copyOf(

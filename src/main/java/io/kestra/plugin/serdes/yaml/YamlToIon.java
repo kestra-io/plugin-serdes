@@ -33,13 +33,13 @@ import reactor.core.publisher.Mono;
 @EqualsAndHashCode
 @Schema(
     title = "Convert a YAML file into ION.",
-    description = "Each YAML document in the file — separated by `---` — becomes a separate Ion record."
+    description = "Each YAML document in the file — separated by `---` — becomes a separate ION record."
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
-            title = "Convert YAML to Ion",
+            title = "Convert YAML to ION",
             code = """
                 id: yaml_to_ion
                 namespace: company.team
