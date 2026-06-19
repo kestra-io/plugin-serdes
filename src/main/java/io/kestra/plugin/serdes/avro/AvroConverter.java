@@ -95,17 +95,17 @@ public class AvroConverter {
     @EqualsAndHashCode.Exclude
     @ToString.Exclude
     @Getter(AccessLevel.NONE)
-    private DateTimeFormatter dateFormatter;
+    private volatile DateTimeFormatter dateFormatter;
 
     @EqualsAndHashCode.Exclude
     @ToString.Exclude
     @Getter(AccessLevel.NONE)
-    private DateTimeFormatter timeFormatter;
+    private volatile DateTimeFormatter timeFormatter;
 
     @EqualsAndHashCode.Exclude
     @ToString.Exclude
     @Getter(AccessLevel.NONE)
-    private DateTimeFormatter datetimeFormatter;
+    private volatile DateTimeFormatter datetimeFormatter;
 
     private static final ObjectMapper TRIM_MAPPER = JacksonMapper.ofJson().copy()
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
