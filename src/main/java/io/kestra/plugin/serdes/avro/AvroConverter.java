@@ -92,6 +92,26 @@ public class AvroConverter {
     @Builder.Default
     protected final OnBadLines onBadLines = OnBadLines.ERROR;
 
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    @Getter(AccessLevel.NONE)
+    private volatile DateTimeFormatter dateFormatter;
+
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    @Getter(AccessLevel.NONE)
+    private volatile DateTimeFormatter timeFormatter;
+
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    @Getter(AccessLevel.NONE)
+    private volatile DateTimeFormatter datetimeFormatter;
+
+    private static final ObjectMapper TRIM_MAPPER = JacksonMapper.ofJson().copy()
+        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+        .setSerializationInclusion(JsonInclude.Include.ALWAYS)
+        .setTimeZone(TimeZone.getDefault());
+
     private static final GenericData GENERIC_DATA = new GenericData();
 
     static {
@@ -308,7 +328,7 @@ public class AvroConverter {
 
     protected LocalDate logicalDate(Object data) {
         if (data instanceof String) {
-            return LocalDate.parse((String) data, DateTimeFormatter.ofPattern(this.getDateFormat()));
+            return LocalDate.parse((String) data, dateFormatter());
         } else if (data instanceof Date) {
             Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(this.zoneId()));
             calendar.setTime((Date) data);
@@ -333,7 +353,7 @@ public class AvroConverter {
 
     protected LocalTime logicalTimeMillis(Object data) {
         if (data instanceof String) {
-            return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(this.getTimeFormat()));
+            return LocalTime.parse((String) data, timeFormatter());
         }
 
         return convertJavaTime(data);
@@ -341,7 +361,7 @@ public class AvroConverter {
 
     protected LocalTime logicalTimeMicros(Object data) {
         if (data instanceof String) {
-            return LocalTime.parse((String) data, DateTimeFormatter.ofPattern(this.getTimeFormat()));
+            return LocalTime.parse((String) data, timeFormatter());
         }
 
         return convertJavaTime(data);
@@ -392,10 +412,10 @@ public class AvroConverter {
 
     protected Instant parseDateTime(String data) {
         try {
-            return ZonedDateTime.parse(data, DateTimeFormatter.ofPattern(this.getDatetimeFormat()))
+            return ZonedDateTime.parse(data, datetimeFormatter())
                 .toInstant();
         } catch (DateTimeParseException e) {
-            LocalDateTime localDateTime = LocalDateTime.parse(data, DateTimeFormatter.ofPattern(this.getDatetimeFormat()));
+            LocalDateTime localDateTime = LocalDateTime.parse(data, datetimeFormatter());
 
             if (this.getTimeZoneId() != null) {
                 return localDateTime.atZone(ZoneId.of(this.getTimeZoneId())).toInstant();
@@ -571,17 +591,33 @@ public class AvroConverter {
         return list.stream().anyMatch(s -> s.equalsIgnoreCase(data));
     }
 
+    private DateTimeFormatter dateFormatter() {
+        if (dateFormatter == null) {
+            dateFormatter = DateTimeFormatter.ofPattern(this.getDateFormat());
+        }
+        return dateFormatter;
+    }
+
+    private DateTimeFormatter timeFormatter() {
+        if (timeFormatter == null) {
+            timeFormatter = DateTimeFormatter.ofPattern(this.getTimeFormat());
+        }
+        return timeFormatter;
+    }
+
+    private DateTimeFormatter datetimeFormatter() {
+        if (datetimeFormatter == null) {
+            datetimeFormatter = DateTimeFormatter.ofPattern(this.getDatetimeFormat());
+        }
+        return datetimeFormatter;
+    }
+
     protected ZoneId zoneId() {
         return this.getTimeZoneId() != null ? ZoneId.of(this.getTimeZoneId()) : ZoneOffset.UTC;
     }
 
     protected static String trimExceptionMessage(Object data) throws JsonProcessingException {
-        ObjectMapper mapper = JacksonMapper.ofJson().copy()
-            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-            .setSerializationInclusion(JsonInclude.Include.ALWAYS)
-            .setTimeZone(TimeZone.getDefault());
-
-        String s = mapper.writeValueAsString(data);
+        String s = TRIM_MAPPER.writeValueAsString(data);
 
         if (s.length() > 250) {
             s = s.substring(0, 250) + " ...";
