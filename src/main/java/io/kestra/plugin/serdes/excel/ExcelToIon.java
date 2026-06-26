@@ -40,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Excel file to the Amazon ION format.",
+    title = "Convert an Excel file to the Amazon ION format",
     description = """
         Reads Excel (.xlsx) files in streaming mode. Each sheet is written to \
         a separate ION file keyed by sheet name in the output map. \

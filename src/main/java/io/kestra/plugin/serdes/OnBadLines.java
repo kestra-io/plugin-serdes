@@ -2,7 +2,7 @@ package io.kestra.plugin.serdes;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(title = "How to handle bad lines (e.g., a line with too many fields).")
+@Schema(title = "How to handle bad lines (e.g., a line with too many fields)")
 public enum OnBadLines {
     /**
      * Throw an exception when a bad line is encountered.

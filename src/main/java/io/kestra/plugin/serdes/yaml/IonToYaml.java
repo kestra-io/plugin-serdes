@@ -29,7 +29,7 @@ import reactor.core.publisher.Flux;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Ion file to the YAML format.",
+    title = "Convert an Ion file to the YAML format",
     description = """
         A single Ion record is written as a plain YAML document; multiple \
         records are written as a multi-document YAML stream separated by \

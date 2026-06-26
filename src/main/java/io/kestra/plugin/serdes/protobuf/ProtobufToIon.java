@@ -43,7 +43,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Schema(title = "Convert a Protobuf file into Amazon ION.", description = """
+@Schema(title = "Convert a Protobuf file into Amazon ION", description = """
     The plugin reads one or more Protobuf messages from a binary file or stream,
     decodes them using a provided descriptor and message type name, and then serializes
     the result as ION data based on [ProtoJSON Format](https://protobuf.dev/programming-guides/json/).

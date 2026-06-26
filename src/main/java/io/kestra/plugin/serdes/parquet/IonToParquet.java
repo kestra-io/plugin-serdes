@@ -43,7 +43,7 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Ion file to the Parquet format.",
+    title = "Convert an Ion file to the Parquet format",
     description = """
         An Avro schema is required to define column types; if none is provided, \
         one is inferred by scanning up to `numberOfRowsToScan` rows. Supports \

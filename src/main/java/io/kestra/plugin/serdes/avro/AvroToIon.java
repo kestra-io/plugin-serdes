@@ -38,7 +38,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Avro file to the Amazon Ion format.",
+    title = "Convert an Avro file to the Amazon Ion format",
     description = """
         Validates field types and null constraints against the embedded Avro \
         schema during deserialization. Use `onBadLines` to control whether \
@@ -79,7 +79,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
 
     @Builder.Default
     @Schema(
-        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)."
+        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)"
     )
     @PluginProperty(group = "advanced")
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);

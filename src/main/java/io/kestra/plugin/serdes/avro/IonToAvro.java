@@ -37,7 +37,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file to the Avro format.",
+    title = "Convert an ION file to the Avro format",
     description = """
         Converts an Amazon ION file to Avro format using a JSON Avro schema. \
         If no schema is provided, one is inferred by scanning up to \
@@ -121,7 +121,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @Builder.Default
     @PluginProperty(group = "advanced")
     @Schema(
-        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
+        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)",
         description = "Can be `ERROR`, `WARN`, or `SKIP`."
     )
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);

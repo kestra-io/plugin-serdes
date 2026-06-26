@@ -40,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an XML file to the Amazon ION format.",
+    title = "Convert an XML file to the Amazon ION format",
     description = """
         Without a `query`, the entire file is parsed into a single ION record. \
         When `query` is set (e.g., `/catalog/book`), uses StAX streaming to \
@@ -89,7 +89,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Schema(
-        title = "Path selector to stream matching elements from the XML file.",
+        title = "Path selector to stream matching elements from the XML file",
         description = """
             When set, uses StAX streaming to extract elements matching the given path
             (e.g. `/catalog/book`). Each matching element is written as a separate ION record.
@@ -99,7 +99,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     private Property<String> query;
 
     @Schema(
-        title = "XML parser configuration."
+        title = "XML parser configuration"
     )
     @PluginProperty(group = "advanced")
     private ParserConfiguration parserConfiguration;
@@ -402,10 +402,10 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
 
     @Builder
     @Data
-    @Schema(title = "XML parser configuration.")
+    @Schema(title = "XML parser configuration")
     public static class ParserConfiguration {
         @Schema(
-            title = "List of XML tags that must be parsed as lists."
+            title = "List of XML tags that must be parsed as lists"
         )
         private Property<List<String>> forceList;
     }
