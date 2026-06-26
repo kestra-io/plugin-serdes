@@ -1,12 +1,13 @@
 plugins {
-    id 'io.kestra.gradle.spotless-conventions' version '1.1.0'
-    id "com.vanniktech.maven.publish" version "0.36.0"
-    id "io.kestra.gradle.inject-bom-versions" version "1.1.0"
+    id 'io.kestra.gradle.repository-conventions' version '1.2.3'
+    id 'io.kestra.gradle.spotless-conventions' version '1.2.4'
+    id "com.vanniktech.maven.publish" version "0.37.0"
+    id "io.kestra.gradle.inject-bom-versions" version "1.2.4"
     id 'java-library'
     id "idea"
     id 'jacoco'
     id "com.adarshr.test-logger" version "4.0.0"
-    id "com.gradleup.shadow" version "9.4.1"
+    id "com.gradleup.shadow" version "9.4.2"
     id 'signing'
     id "com.github.ben-manes.versions" version "0.54.0"
     id 'net.researchgate.release' version '3.1.0'
@@ -88,7 +89,7 @@ dependencies {
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
 
-    implementation "org.commonmark:commonmark:0.28.0" // for Markdown
+    implementation "org.commonmark:commonmark:0.29.0" // for Markdown
     implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
     implementation "com.vladsch.flexmark:flexmark-html2md-converter:0.64.8" // for HTML to Markdown conversion
     implementation "org.jsoup:jsoup:1.22.2" // for HTML parsing (required by flexmark-html2md-converter)
