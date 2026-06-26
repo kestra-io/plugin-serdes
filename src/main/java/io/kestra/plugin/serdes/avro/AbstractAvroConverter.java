@@ -41,7 +41,7 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "Number of rows that will be scanned while inferring. The more rows scanned, the more precise the output schema will be.",
+        title = "Number of rows that will be scanned while inferring. The more rows scanned, the more precise the output schema will be",
         description = "Only use when the 'schema' property is empty"
     )
     @PluginProperty(group = "advanced")
@@ -111,7 +111,7 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
+        title = "Character to recognize as decimal point (e.g. use ‘,’ for European data)",
         description = "Default value is '.'"
     )
     @PluginProperty(group = "processing")
@@ -136,7 +136,7 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "Timezone to use when no timezone can be parsed on the source.",
+        title = "Timezone to use when no timezone can be parsed on the source",
         description = "If null, the timezone defaults to `UTC`. Default value is the system timezone"
     )
     @PluginProperty(group = "advanced")
@@ -144,7 +144,7 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
+        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)",
         description = "Can be `ERROR`, `WARN`, or `SKIP`."
     )
     @PluginProperty(group = "advanced")

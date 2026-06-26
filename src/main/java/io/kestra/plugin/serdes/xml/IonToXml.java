@@ -38,7 +38,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file to the XML format.",
+    title = "Convert an ION file to the XML format",
     description = """
         Each ION record becomes a child element wrapped under a configurable \
         root element (default: `items`). The full record set is loaded into \
@@ -111,7 +111,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Timezone to use when no timezone can be parsed on the source."
+        title = "Timezone to use when no timezone can be parsed on the source"
     )
     @PluginProperty(group = "execution")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());

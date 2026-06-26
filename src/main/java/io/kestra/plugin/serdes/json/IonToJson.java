@@ -43,7 +43,7 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file into a JSONL file.",
+    title = "Convert an ION file into a JSONL file",
     description = """
         Outputs one JSON line per ION record by default; set `newLine` to false \
         to produce a JSON array instead. ION timestamps use the configured \
@@ -106,7 +106,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Timezone to use when no timezone can be parsed on the source."
+        title = "Timezone to use when no timezone can be parsed on the source"
     )
     @PluginProperty(group = "execution")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());

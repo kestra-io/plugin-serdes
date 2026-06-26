@@ -37,7 +37,7 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file to the CSV format.",
+    title = "Convert an ION file to the CSV format",
     description = """
         Supports configurable field separator, text delimiter, and line \
         delimiter. Use `quoteMode` to control field quoting; \

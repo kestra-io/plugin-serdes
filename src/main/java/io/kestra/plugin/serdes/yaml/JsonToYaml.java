@@ -40,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @ToString
 @EqualsAndHashCode
 @Schema(
-    title = "Convert a JSON or JSONL file to YAML.",
+    title = "Convert a JSON or JSONL file to YAML",
     description = """
         A single JSON object becomes a plain YAML document; a JSON array or \
         JSONL stream becomes a multi-document YAML stream with `---` separators. \

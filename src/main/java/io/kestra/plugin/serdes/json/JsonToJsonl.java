@@ -33,7 +33,7 @@ import lombok.experimental.SuperBuilder;
 @ToString
 @EqualsAndHashCode
 @Schema(
-    title = "Convert a JSON file to JSONL.",
+    title = "Convert a JSON file to JSONL",
     description = """
         Uses a streaming parser to avoid loading the full file into memory. \
         Accepts a JSON array or a sequence of JSON objects. Useful for \

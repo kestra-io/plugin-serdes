@@ -38,7 +38,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a JSON file into TOON.",
+    title = "Convert a JSON file into TOON",
     description = """
         Converts JSON data to TOON (Token-Oriented Object Notation), a \
         deterministic, indentation-based text format that encodes the JSON \

@@ -40,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a JSON file to the Amazon ION format.",
+    title = "Convert a JSON file to the Amazon ION format",
     description = """
         Converts a JSON file to Amazon ION, Kestra's internal binary format used \
         for passing data between tasks.

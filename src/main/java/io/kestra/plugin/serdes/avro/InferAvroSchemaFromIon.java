@@ -5,6 +5,7 @@ import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.net.URI;
 
+import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
@@ -25,7 +26,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Infer an Avro schema from an ION file.",
+    title = "Infer an Avro schema from an ION file",
     description = """
         Scans up to `numberOfRowsToScan` rows of an ION file and infers a \
         compatible Avro schema, writing the result as an `.avsc` file in \
@@ -33,7 +34,23 @@ import lombok.experimental.SuperBuilder;
         `IonToAvro` or `IonToParquet` as a schema reference."""
 )
 @Plugin(
-    aliases = "io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon"
+    aliases = "io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon",
+    examples = {
+        @Example(
+            title = "Infer an Avro schema from an ION file",
+            full = true,
+            code = """
+                id: infer_avro_schema
+                namespace: company.team
+
+                tasks:
+                  - id: infer
+                    type: io.kestra.plugin.serdes.avro.InferAvroSchemaFromIon
+                    from: "{{ outputs.previous_task.uri }}"
+                    numberOfRowsToScan: 100
+                """
+        )
+    }
 )
 public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAvroSchemaFromIon.Output> {
     @NotNull
@@ -46,7 +63,7 @@ public class InferAvroSchemaFromIon extends Task implements RunnableTask<InferAv
     @NotNull
     @Builder.Default
     @Schema(
-        title = "The number of rows that will be scanned; the larger the number of rows, the more precise the output schema will be."
+        title = "The number of rows that will be scanned; the larger the number of rows, the more precise the output schema will be"
     )
     @PluginProperty(group = "destination")
     private Property<Integer> numberOfRowsToScan = Property.ofValue(100);

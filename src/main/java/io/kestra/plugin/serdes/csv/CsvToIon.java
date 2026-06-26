@@ -35,7 +35,7 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a CSV file to the Amazon ION format.",
+    title = "Convert a CSV file to the Amazon ION format",
     description = """
         Supports configurable field separator, text delimiter, charset, and \
         header detection. The value `\\N` is treated as null in any field. \
@@ -114,7 +114,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     @Builder.Default
     @Schema(
-        title = "How to handle bad lines (e.g., a line with too many fields)."
+        title = "How to handle bad lines (e.g., a line with too many fields)"
     )
     @PluginProperty(group = "advanced")
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);

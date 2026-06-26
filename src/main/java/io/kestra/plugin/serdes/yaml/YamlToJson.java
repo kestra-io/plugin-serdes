@@ -32,7 +32,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 @ToString
 @EqualsAndHashCode
 @Schema(
-    title = "Convert a YAML file into JSON or JSONL.",
+    title = "Convert a YAML file into JSON or JSONL",
     description = """
         If `jsonl = true`, each YAML document (`---`) becomes one JSON line.
         If `jsonl = false`, output becomes:
