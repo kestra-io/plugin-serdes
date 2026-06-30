@@ -161,7 +161,7 @@ public abstract class AbstractAvroConverter extends Task {
         if (Boolean.TRUE.equals(rInferAllFields)) {
             return Integer.MAX_VALUE;
         }
-        return runContext.render(this.numberOfRowsToScan).as(Integer.class).orElse(100);
+        return runContext.render(this.numberOfRowsToScan).as(Integer.class).orElseThrow();
     }
 
     protected <E extends Exception> Long convert(InputStream inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext)
