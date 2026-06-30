@@ -5,9 +5,12 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
@@ -159,6 +162,51 @@ class IonToAvroTest {
                 .build();
             writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
         }
+    }
+
+    @Test
+    void inferAllFieldsTrueScansAllRowsForDateField() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_infer_all_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            // Rows 1–100: date field is null
+            IntStream.rangeClosed(1, 100).boxed()
+                .forEach(throwConsumer(i ->
+                {
+                    var row = new HashMap<String, Object>();
+                    row.put("id", i);
+                    row.put("event_date", null);
+                    FileSerde.write(output, row);
+                }));
+            // Rows 101–110: date field is non-null
+            IntStream.rangeClosed(101, 110).boxed()
+                .forEach(
+                    throwConsumer(
+                        i -> FileSerde.write(
+                            output,
+                            Map.of("id", i, "event_date", LocalDate.of(2024, 1, i - 100))
+                        )
+                    )
+                );
+        }
+
+        URI uri = storageInterface.put(
+            TenantService.MAIN_TENANT, null,
+            URI.create("/" + IdUtils.create() + ".ion"),
+            new FileInputStream(tempFile)
+        );
+
+        IonToAvro writer = IonToAvro.builder()
+            .id(IdUtils.create())
+            .type(IonToAvro.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(null)
+            .inferAllFields(Property.ofValue(true))
+            .build();
+
+        // Must succeed: all rows are scanned so event_date is typed correctly (not NULL)
+        IonToAvro.Output output = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        assertThat(avroSize(storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())), is(110));
     }
 
     @Test
