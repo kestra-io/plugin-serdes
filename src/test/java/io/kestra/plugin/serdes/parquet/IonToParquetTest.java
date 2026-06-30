@@ -89,6 +89,8 @@ class IonToParquetTest {
 
             assertThat(result.size(), is(1));
             assertThat(result.get(0).get("String"), is("string"));
+            assertThat(writerOutput.getSize(), is(1L));
+            assertThat(readerOutput.getSize(), is(1L));
         }
     }
 

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.kestra.core.models.annotations.*;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.*;
@@ -24,7 +25,6 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SynchronousSink;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @NoArgsConstructor
@@ -157,6 +157,7 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
 
         return Output.builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(count)
             .build();
     }
 
@@ -214,5 +215,8 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of the output file")
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

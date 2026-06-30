@@ -154,6 +154,7 @@ public class JsonToYaml extends Task implements RunnableTask<JsonToYaml.Output> 
 
             return Output.builder()
                 .uri(runContext.storage().putFile(tmp))
+                .size(count)
                 .build();
         }
     }
@@ -193,5 +194,8 @@ public class JsonToYaml extends Task implements RunnableTask<JsonToYaml.Output> 
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of the output file")
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

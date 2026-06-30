@@ -158,6 +158,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         }
 
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
+        Long lineCount = null;
 
         try (
             InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(rFrom), FileSerde.BUFFER_SIZE);
@@ -165,7 +166,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
-            Long lineCount = this.convert(inputStream, schema, record ->
+            lineCount = this.convert(inputStream, schema, record ->
             {
                 try {
                     dataFileWriter.append(record);
@@ -191,6 +192,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
             .build();
     }
 
@@ -201,5 +203,8 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             title = "URI of a temporary result file"
         )
         private URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

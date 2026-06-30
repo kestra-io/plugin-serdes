@@ -99,6 +99,8 @@ class ParquetToIonTest {
             assertThat(result.get(0).get("String"), is("string"));
             assertThat(result.get(0).get("ZonedDateTime"), instanceOf(LocalDateTime.class));
             assertThat(result.get(0).get("ZonedDateTime"), is(LocalDateTime.parse("2021-08-02T10:00:00")));
+            assertThat(writerOutput.getSize(), is(1L));
+            assertThat(readerOutput.getSize(), is(1L));
         }
     }
 

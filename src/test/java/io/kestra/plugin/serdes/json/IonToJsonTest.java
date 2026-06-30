@@ -56,6 +56,7 @@ public class IonToJsonTest {
         var output = task.run(runContext);
 
         assertEquality(expectedJsonWithoutAnnotation, output.getUri());
+        assertThat(output.getSize(), is(1L));
     }
 
     @Test

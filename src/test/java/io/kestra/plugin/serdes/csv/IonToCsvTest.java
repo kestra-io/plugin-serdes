@@ -88,6 +88,7 @@ class IonToCsvTest {
             assertThat(out, containsString("string;int"));
             assertThat(out, containsString("3.2;" + ZonedDateTime.now().getYear()));
             assertThat(out, containsString("3.4;" + ZonedDateTime.now().getYear()));
+            assertThat(writerRunOutput.getSize(), is(2L));
         }
     }
 

@@ -177,6 +177,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
     public Output run(RunContext runContext) throws Exception {
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".csv").toFile();
+        Long lineCount = null;
 
         // reader
         URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
@@ -226,13 +227,14 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
 
             // metrics & finalize
             Mono<Long> count = flowable.count();
-            Long lineCount = count.block();
+            lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
         }
 
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
             .build();
     }
 
@@ -243,6 +245,9 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
             title = "URI of a temporary result file"
         )
         private URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     private CsvWriter csvWriter(Writer writer, RunContext runContext) throws IllegalVariableEvaluationException {

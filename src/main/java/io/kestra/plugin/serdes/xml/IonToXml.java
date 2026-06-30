@@ -120,6 +120,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
     public IonToXml.Output run(RunContext runContext) throws Exception {
         File tempFile = runContext.workingDir().createTempFile(".xml").toFile();
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        long count = 0;
 
         try (
             Writer outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(runContext.render(charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
@@ -142,7 +143,8 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
             List<Object> list = FileSerde.readAll(is).collectList().block();
             if (list != null) {
                 outfile.write(objectWriter.writeValueAsString(list));
-                runContext.metric(Counter.of("records", list.size()));
+                count = list.size();
+                runContext.metric(Counter.of("records", count));
             }
 
             outfile.flush();
@@ -151,6 +153,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
         return IonToXml.Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(count)
             .build();
     }
 
@@ -161,5 +164,8 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
             title = "URI of a temporary result file"
         )
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

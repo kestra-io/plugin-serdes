@@ -126,6 +126,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
 
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+        Long lineCount = null;
 
         var renderedCharset = runContext.render(this.charset).as(String.class).orElseThrow();
         var renderedNewLine = runContext.render(this.newLine).as(Boolean.class).orElseThrow();
@@ -139,13 +140,14 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
             Mono<Long> count = FileSerde.writeAll(output, flowable);
 
             // metrics & finalize
-            Long lineCount = count.block();
+            lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
         }
 
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
             .build();
     }
 
@@ -156,6 +158,9 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
             title = "URI of a temporary result file"
         )
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     private Consumer<FluxSink<Object>> nextRow(BufferedReader inputStream, boolean newLine) throws IOException {

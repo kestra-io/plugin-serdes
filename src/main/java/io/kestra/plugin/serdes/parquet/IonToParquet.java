@@ -192,11 +192,12 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
             .withSchema(schema);
 
         // convert
+        Long lineCount = null;
         try (
             org.apache.parquet.hadoop.ParquetWriter<GenericData.Record> writer = parquetWriterBuilder.build();
             InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE)
         ) {
-            Long lineCount = this.convert(inputStream, schema, writer::write, runContext);
+            lineCount = this.convert(inputStream, schema, writer::write, runContext);
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));
@@ -205,6 +206,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
             .build();
     }
 
@@ -215,6 +217,9 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
             title = "URI of a temporary result file"
         )
         private URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     public enum CompressionCodec {

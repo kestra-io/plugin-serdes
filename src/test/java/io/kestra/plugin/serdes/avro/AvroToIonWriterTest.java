@@ -72,22 +72,23 @@ public class AvroToIonWriterTest {
 
         IonToAvro.Output run = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-        assertThat(
-            IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri())),
-            is(
-                IonToAvroTest.avroSize(
-                    new FileInputStream(
-                        new File(
-                            Objects.requireNonNull(
-                                IonToAvroTest.class.getClassLoader()
-                                    .getResource(file)
-                            )
-                                .toURI()
-                        )
+        int recordCount = IonToAvroTest.avroSize(
+            new FileInputStream(
+                new File(
+                    Objects.requireNonNull(
+                        IonToAvroTest.class.getClassLoader()
+                            .getResource(file)
                     )
+                        .toURI()
                 )
             )
         );
+        assertThat(
+            IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri())),
+            is(recordCount)
+        );
+        assertThat(readerRunOutput.getSize(), is((long) recordCount));
+        assertThat(run.getSize(), is((long) recordCount));
     }
 
 }
