@@ -25,6 +25,7 @@ import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -216,10 +217,6 @@ class IonToParquetTest {
         }
     }
 
-    /**
-     * Verifies that inferAllFields=true scans all rows, so a date field that is null in the first 100
-     * rows is not permanently typed as NULL when non-null values appear from row 101 onward.
-     */
     @SuppressWarnings("unchecked")
     @Test
     void inferAllFieldsTrueScansAllRowsForDateField() throws Exception {
@@ -279,10 +276,6 @@ class IonToParquetTest {
         assertThat(result.stream().filter(r -> r.get("event_date") != null).count(), greaterThan(0L));
     }
 
-    /**
-     * Verifies that inferAllFields=false (default) limits schema inference to numberOfRowsToScan rows,
-     * causing a type conflict when a date field is null in those rows but non-null later.
-     */
     @Test
     void inferAllFieldsFalseFailsWhenDateFieldNullInFirstRows() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_infer_limited_", ".ion");
@@ -324,9 +317,14 @@ class IonToParquetTest {
             .build();
 
         // Must throw: event_date was inferred as NULL but row 101 has a real date value
-        assertThrows(
-            Exception.class,
+        RuntimeException ex = assertThrows(
+            RuntimeException.class,
             () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
         );
+        Throwable root = ex;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+        assertThat(root.getMessage(), containsString("Unknown type for null values"));
     }
 }
