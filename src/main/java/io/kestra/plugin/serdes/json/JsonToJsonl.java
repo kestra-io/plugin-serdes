@@ -183,7 +183,7 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
         @Schema(
             title = "URI of the generated JSONL file in Kestra's internal storage"
         )
-        private final URI uri;
+        private URI uri;
 
         @Schema(title = "The number of records converted")
         private long size;

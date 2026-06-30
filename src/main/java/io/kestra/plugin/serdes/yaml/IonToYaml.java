@@ -132,7 +132,7 @@ public class IonToYaml extends Task implements RunnableTask<IonToYaml.Output> {
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of the output YAML file")
-        private final URI uri;
+        private URI uri;
 
         @Schema(title = "The number of records converted")
         private long size;

@@ -157,7 +157,7 @@ public class JsonToIon extends Task implements RunnableTask<JsonToIon.Output> {
         @Schema(
             title = "URI of a temporary result file"
         )
-        private final URI uri;
+        private URI uri;
 
         @Schema(title = "The number of records converted")
         private long size;

@@ -90,7 +90,7 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of a temporary result file")
-        private final URI uri;
+        private URI uri;
 
         @Schema(title = "The number of records converted")
         private long size;
