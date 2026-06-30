@@ -118,19 +118,21 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(rParserConfig));
         }
 
+        long count;
         if (rQuery.isPresent()) {
-            runStreaming(runContext, from, rCharset, rQuery.get(), xmlParserConfiguration, tempFile);
+            count = runStreaming(runContext, from, rCharset, rQuery.get(), xmlParserConfiguration, tempFile);
         } else {
-            runBatch(runContext, from, rCharset, xmlParserConfiguration, tempFile);
+            count = runBatch(runContext, from, rCharset, xmlParserConfiguration, tempFile);
         }
 
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(count)
             .build();
     }
 
-    private void runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
+    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
         try (
             Reader input = new BufferedReader(
                 new InputStreamReader(runContext.storage().getFile(from), charset),
@@ -141,19 +143,23 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             var jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
             var result = unwrapRootArray(jsonObject);
 
+            long count;
             if (result instanceof JSONArray array) {
                 var list = array.toList();
                 list.forEach(throwConsumer(o -> FileSerde.write(output, o)));
-                runContext.metric(Counter.of("records", list.size()));
+                count = list.size();
             } else if (result instanceof JSONObject obj) {
                 var map = obj.toMap();
                 FileSerde.write(output, map);
-                runContext.metric(Counter.of("records", map.size()));
+                count = 1L;
             } else {
                 FileSerde.write(output, result);
+                count = 1L;
             }
 
+            runContext.metric(Counter.of("records", count));
             output.flush();
+            return count;
         }
     }
 
@@ -191,7 +197,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         return jsonObject;
     }
 
-    private void runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
+    private long runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
         // Parse query: "/catalog/book" → parentSegments=["catalog"], elementName="book"
         var segments = query.replaceFirst("^/", "").split("/");
         var parentSegments = new String[segments.length - 1];
@@ -217,7 +223,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                 // Empty or unparseable XML file — produce empty output
                 runContext.logger().debug("Failed to parse XML stream, file may be empty.");
                 output.flush();
-                return;
+                return 0L;
             }
 
             try {
@@ -228,11 +234,11 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                     // Empty or malformed XML — produce empty output
                     runContext.logger().debug("Failed to navigate XML stream, file may be empty.");
                     output.flush();
-                    return;
+                    return 0L;
                 }
                 if (!parentFound) {
                     output.flush();
-                    return;
+                    return 0L;
                 }
 
                 // Now we are positioned on the parent element's START_ELEMENT.
@@ -279,6 +285,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         }
 
         runContext.metric(Counter.of("records", recordCount));
+        return recordCount;
     }
 
     /**
@@ -398,6 +405,9 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             title = "URI of a temporary result file"
         )
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     @Builder

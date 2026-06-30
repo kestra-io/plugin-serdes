@@ -25,6 +25,7 @@ import jakarta.inject.Inject;
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 
 @KestraTest
 class IonToYamlTest {
@@ -60,12 +61,13 @@ class IonToYamlTest {
             .from(Property.ofValue(src.toString()))
             .build();
 
-        var result = task.run(runContextFactory.of(Map.of())).getUri();
+        var output = task.run(runContextFactory.of(Map.of()));
 
-        String yaml = new String(storage.get(MAIN_TENANT, null, result).readAllBytes(), StandardCharsets.UTF_8);
+        String yaml = new String(storage.get(MAIN_TENANT, null, output.getUri()).readAllBytes(), StandardCharsets.UTF_8);
 
         System.out.println(yaml);
         assertThat(yaml, containsString("---\na: 1"));
         assertThat(yaml, containsString("---\nb: 2"));
+        assertThat(output.getSize(), is(2L));
     }
 }

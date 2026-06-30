@@ -124,6 +124,7 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
 
         return Output.builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(count)
             .build();
     }
 
@@ -132,5 +133,8 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of the output file")
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

@@ -115,6 +115,7 @@ class ToonToJsonTest {
             """;
 
         assertThat(readJson(result), is(readJson(expected)));
+        assertThat(output.getSize(), is(2L));
     }
 
     @Test

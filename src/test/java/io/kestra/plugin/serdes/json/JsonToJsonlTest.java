@@ -71,6 +71,7 @@ class JsonToJsonlTest {
 
         assertThat(lines.get(1), containsString("\"id\":2"));
         assertThat(lines.get(2), containsString("\"id\":3"));
+        assertThat(output.getSize(), is(3L));
     }
 
     /**

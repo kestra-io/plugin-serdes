@@ -61,6 +61,7 @@ class YamlToJsonTest {
 
         String result = read(out.getUri());
         assertThat(result, is("{\"a\":1}\n{\"b\":2}\n"));
+        assertThat(out.getSize(), is(2L));
     }
 
     @Test

@@ -106,6 +106,7 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
         var rCharset = runContext.render(charset).as(String.class).orElse(StandardCharsets.UTF_8.name());
 
         File tempFile = runContext.workingDir().createTempFile(".jsonl").toFile();
+        long[] count = { 0 };
 
         try (
             InputStream inputStream = runContext.storage().getFile(URI.create(String.valueOf(rFrom)));
@@ -122,8 +123,6 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
 
             // Use streaming parser to avoid loading entire file into memory
             JsonParser jsonParser = mapper.getFactory().createParser(reader);
-
-            long[] count = { 0 };
 
             try {
                 JsonToken token = jsonParser.nextToken();
@@ -174,6 +173,7 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
 
         return Output.builder()
             .uri(outputUri)
+            .size(count[0])
             .build();
     }
 
@@ -184,5 +184,8 @@ public class JsonToJsonl extends Task implements RunnableTask<JsonToJsonl.Output
             title = "URI of the generated JSONL file in Kestra's internal storage"
         )
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

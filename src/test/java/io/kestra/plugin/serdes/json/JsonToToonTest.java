@@ -8,6 +8,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -19,8 +20,6 @@ import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 
 import jakarta.inject.Inject;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -78,6 +77,7 @@ class JsonToToonTest {
 
         assertThat(result.trim(), is(expected.trim()));
         assertThat(FilenameUtils.getExtension(output.getUri().getPath()), is("toon"));
+        assertThat(output.getSize(), is(1L));
     }
 
     @Test

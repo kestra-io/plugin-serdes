@@ -86,22 +86,22 @@ class IonToAvroTest {
 
         IonToAvro.Output run = task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
 
-        assertThat(
-            IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri())),
-            is(
-                IonToAvroTest.avroSize(
-                    new FileInputStream(
-                        new File(
-                            Objects.requireNonNull(
-                                IonToAvroTest.class.getClassLoader()
-                                    .getResource("csv/insurance_sample.avro")
-                            )
-                                .toURI()
-                        )
+        int recordCount = IonToAvroTest.avroSize(
+            new FileInputStream(
+                new File(
+                    Objects.requireNonNull(
+                        IonToAvroTest.class.getClassLoader()
+                            .getResource("csv/insurance_sample.avro")
                     )
+                        .toURI()
                 )
             )
         );
+        assertThat(
+            IonToAvroTest.avroSize(this.storageInterface.get(TenantService.MAIN_TENANT, null, run.getUri())),
+            is(recordCount)
+        );
+        assertThat(run.getSize(), is((long) recordCount));
     }
 
     public static int avroSize(InputStream inputStream) throws IOException {
