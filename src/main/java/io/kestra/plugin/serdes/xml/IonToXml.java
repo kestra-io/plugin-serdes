@@ -163,7 +163,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
         @Schema(
             title = "URI of a temporary result file"
         )
-        private final URI uri;
+        private URI uri;
 
         @Schema(title = "The number of records converted")
         private long size;

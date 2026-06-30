@@ -428,6 +428,8 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
 
     @Builder
     @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of the output Ion file")
         private URI uri;
