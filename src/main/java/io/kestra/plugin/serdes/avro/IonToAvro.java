@@ -143,7 +143,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             try (var inputStreamForInfer = runContext.storage().getFile(rFrom)) {
                 var schemaOutputStream = new ByteArrayOutputStream();
                 new InferAvroSchema(
-                    runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
+                    getEffectiveRowsToScan(runContext)
                 ).inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
                 schema = schemaParser.parse(schemaOutputStream.toString(StandardCharsets.UTF_8));
             }
