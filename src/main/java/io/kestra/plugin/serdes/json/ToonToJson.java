@@ -125,6 +125,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
         return Output.builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(count)
             .build();
     }
 
@@ -161,6 +162,9 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of the resulting JSON file")
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     /**

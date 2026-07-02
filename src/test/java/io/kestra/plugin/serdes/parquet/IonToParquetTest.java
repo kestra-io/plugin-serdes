@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
+import java.util.stream.IntStream;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,8 @@ import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -89,6 +92,8 @@ class IonToParquetTest {
 
             assertThat(result.size(), is(1));
             assertThat(result.get(0).get("String"), is("string"));
+            assertThat(writerOutput.getSize(), is(1L));
+            assertThat(readerOutput.getSize(), is(1L));
         }
     }
 
@@ -210,5 +215,116 @@ class IonToParquetTest {
             assertThat(result.get(1).get("name"), is("Bob"));
             assertThat(result.get(2).get("name"), is("Charlie"));
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void inferAllFieldsTrueScansAllRowsForDateField() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_infer_all_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            // Rows 1–100: date field is null
+            IntStream.rangeClosed(1, 100).boxed()
+                .forEach(throwConsumer(i ->
+                {
+                    var row = new HashMap<String, Object>();
+                    row.put("id", i);
+                    row.put("event_date", null);
+                    FileSerde.write(output, row);
+                }));
+            // Row 101+: date field is non-null
+            IntStream.rangeClosed(101, 110).boxed()
+                .forEach(
+                    throwConsumer(
+                        i -> FileSerde.write(
+                            output,
+                            Map.of("id", i, "event_date", LocalDate.of(2024, 1, i - 100))
+                        )
+                    )
+                );
+        }
+
+        URI uri = storageInterface.put(
+            TenantService.MAIN_TENANT, null,
+            URI.create("/" + IdUtils.create() + ".ion"),
+            new FileInputStream(tempFile)
+        );
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(null)
+            .inferAllFields(Property.ofValue(true))
+            .build();
+
+        // Must succeed: all rows are scanned so event_date is typed correctly (not NULL)
+        IonToParquet.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        ParquetToIon reader = ParquetToIon.builder()
+            .id(IdUtils.create())
+            .type(ParquetToIon.class.getName())
+            .from(Property.ofValue(writerOutput.getUri().toString()))
+            .build();
+
+        ParquetToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        FileSerde.read(storageInterface.get(TenantService.MAIN_TENANT, null, readerOutput.getUri()), r -> result.add((Map<String, Object>) r));
+
+        assertThat(result.size(), is(110));
+        // Rows 101–110 must have a non-null date
+        assertThat(result.stream().filter(r -> r.get("event_date") != null).count(), greaterThan(0L));
+    }
+
+    @Test
+    void inferAllFieldsFalseFailsWhenDateFieldNullInFirstRows() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_infer_limited_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            // Rows 1–100: date field is null → inferred as NULL type
+            IntStream.rangeClosed(1, 100).boxed()
+                .forEach(throwConsumer(i ->
+                {
+                    var row = new HashMap<String, Object>();
+                    row.put("id", i);
+                    row.put("event_date", null);
+                    FileSerde.write(output, row);
+                }));
+            // Row 101+: date field is non-null → conflicts with NULL schema
+            IntStream.rangeClosed(101, 110).boxed()
+                .forEach(
+                    throwConsumer(
+                        i -> FileSerde.write(
+                            output,
+                            Map.of("id", i, "event_date", LocalDate.of(2024, 1, i - 100))
+                        )
+                    )
+                );
+        }
+
+        URI uri = storageInterface.put(
+            TenantService.MAIN_TENANT, null,
+            URI.create("/" + IdUtils.create() + ".ion"),
+            new FileInputStream(tempFile)
+        );
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(null)
+            .inferAllFields(Property.ofValue(false))
+            .numberOfRowsToScan(Property.ofValue(100))
+            .build();
+
+        // Must throw: event_date was inferred as NULL but row 101 has a real date value
+        RuntimeException ex = assertThrows(
+            RuntimeException.class,
+            () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
+        );
+        Throwable root = ex;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+        assertThat(root.getMessage(), containsString("Unknown type for null values"));
     }
 }

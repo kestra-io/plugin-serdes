@@ -155,6 +155,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         AtomicInteger skipped = new AtomicInteger();
+        Long lineCount = null;
 
         try (
             Reader reader = new BufferedReader(
@@ -244,7 +245,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
             Mono<Long> count = FileSerde.writeAll(output, flowable);
 
-            Long lineCount = count.block();
+            lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
             output.flush();
@@ -253,6 +254,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
             .build();
     }
 
@@ -263,6 +265,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             title = "URI of a temporary result file"
         )
         private URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     private CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {

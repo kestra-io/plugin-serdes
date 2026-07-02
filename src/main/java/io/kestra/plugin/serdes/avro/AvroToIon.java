@@ -90,6 +90,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
 
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+        Long lineCount = null;
         DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
 
         try (
@@ -132,13 +133,16 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
 
             Mono<Long> count = FileSerde.writeAll(output, deserialized);
 
-            Long lineCount = count.block();
+            lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount != null ? lineCount : 0));
 
             output.flush();
         }
 
-        return new Output(runContext.storage().putFile(tempFile));
+        return Output.builder()
+            .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
+            .build();
     }
 
     private void nextRow(DataFileStream<GenericRecord> dataFileStream, org.apache.avro.Schema avroSchema, OnBadLines onBadLinesValue, RunContext runContext, FluxSink<GenericRecord> sink)
@@ -422,15 +426,16 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         return false;
     }
 
+    @Builder
     @Getter
     @NoArgsConstructor
+    @AllArgsConstructor
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of the output Ion file")
         private URI uri;
 
-        public Output(URI uri) {
-            this.uri = uri;
-        }
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     public static class IllegalCellConversion extends RuntimeException {

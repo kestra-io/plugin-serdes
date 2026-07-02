@@ -135,6 +135,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             .setTimeZone(TimeZone.getTimeZone(zoneId));
 
         var rKeepAnnotations = runContext.render(this.shouldKeepAnnotations).as(Boolean.class).orElse(false);
+        Long recordCount = null;
 
         try (
             InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE);
@@ -290,7 +291,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             }
 
             Mono<Long> count = flowable.count();
-            Long recordCount = count.block();
+            recordCount = count.block();
 
             runContext.metric(Counter.of("records", recordCount));
         }
@@ -298,6 +299,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(recordCount != null ? recordCount : 0L)
             .build();
     }
 
@@ -458,5 +460,8 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             title = "URI of a temporary result file"
         )
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

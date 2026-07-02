@@ -34,6 +34,7 @@ import io.kestra.plugin.serdes.avro.IonToAvro;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
@@ -89,6 +90,9 @@ class JsonToIonTest {
             FilenameUtils.getExtension(writerRunOutput.getUri().getPath()),
             is("jsonl")
         );
+        assertThat(readerRunOutput.getSize(), is(greaterThan(0L)));
+        assertThat(writerRunOutput.getSize(), is(greaterThan(0L)));
+        assertThat(readerRunOutput.getSize(), is(writerRunOutput.getSize()));
     }
 
     @Test

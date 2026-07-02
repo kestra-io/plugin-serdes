@@ -36,6 +36,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
@@ -86,6 +87,8 @@ class XmlToIonWriterTest {
             IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri()))),
             is(IOUtils.toString(new FileInputStream(resultFile), Charsets.UTF_8))
         );
+        assertThat(readerRunOutput.getSize(), is(greaterThan(0L)));
+        assertThat(writerRunOutput.getSize(), is(greaterThan(0L)));
     }
 
     @Test
@@ -154,6 +157,7 @@ class XmlToIonWriterTest {
                         "</item>\n</items>\n"
                 )
             );
+            assertThat(run.getSize(), is(1L));
         }
     }
 

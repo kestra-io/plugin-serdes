@@ -164,7 +164,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
         runContext.metric(Counter.of("records", count));
 
         URI outputUri = runContext.storage().putFile(tempFile);
-        return Output.builder().uri(outputUri).build();
+        return Output.builder().uri(outputUri).size(count).build();
     }
 
     @Builder
@@ -173,6 +173,9 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
 
         @Schema(title = "URI of the resulting TOON file")
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     /**
@@ -520,7 +523,8 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
             header.append("- ").append(key).append("[").append(size).append("]{");
             boolean first = true;
             for (String field : fields) {
-                if (!first) header.append(DOCUMENT_DELIMITER);
+                if (!first)
+                    header.append(DOCUMENT_DELIMITER);
                 header.append(formatKey(field));
                 first = false;
             }
@@ -532,7 +536,8 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
                 var rowLine = new StringBuilder();
                 boolean firstCell = true;
                 for (String field : fields) {
-                    if (!firstCell) rowLine.append(DOCUMENT_DELIMITER);
+                    if (!firstCell)
+                        rowLine.append(DOCUMENT_DELIMITER);
                     JsonNode cell = row.get(field);
                     rowLine.append(formatPrimitive(cell == null ? nullNode() : cell));
                     firstCell = false;
