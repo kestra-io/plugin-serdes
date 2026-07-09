@@ -26,7 +26,7 @@ repositories {
     }
 }
 
-final targetJavaVersion = JavaVersion.VERSION_21
+final targetJavaVersion = JavaVersion.VERSION_25
 
 java {
     sourceCompatibility = targetJavaVersion
@@ -157,7 +157,8 @@ dependencies {
  **********************************************************************************************************************/
 dependencies {
     testImplementation enforcedPlatform("io.kestra:platform:$kestraVersion")
-    testImplementation "io.qameta.allure:allure-junit5"
+    // io.kestra:platform no longer manages allure's version as of Kestra 2.0, so pin it explicitly.
+    testImplementation "io.qameta.allure:allure-junit5:2.33.0"
 }
 
 configurations {
