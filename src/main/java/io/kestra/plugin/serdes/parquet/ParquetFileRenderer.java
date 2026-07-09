@@ -42,8 +42,6 @@ import java.util.Optional;
 )
 public class ParquetFileRenderer implements FileRenderer {
     static {
-        // Same rationale as ParquetToIon: load these once at plugin registration time,
-        // not on the request thread, to avoid /tmp write restrictions under Java Security.
         ParquetTools.handleLogger();
         ParquetTools.initSnappy();
     }
@@ -59,7 +57,6 @@ public class ParquetFileRenderer implements FileRenderer {
             throw new IllegalArgumentException("Unsupported extension: " + extension);
         }
 
-        // AvroParquetReader needs random access to the file, so the stream must be materialized locally first.
         File tempFile = File.createTempFile("parquet-preview_", ".parquet");
         try {
             try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile))) {
