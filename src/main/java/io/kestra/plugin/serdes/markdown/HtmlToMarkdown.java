@@ -34,7 +34,7 @@ import static com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter.SETEX
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an HTML file from Kestra internal storage into Markdown format.",
+    title = "Convert an HTML file from Kestra internal storage into Markdown format",
     description = """
         Useful for LLM processing and RAG pipelines where HTML is too verbose \
         — Markdown conveys the same structure with significantly fewer tokens."""
@@ -69,6 +69,7 @@ import static com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter.SETEX
         ),
         @Example(
             title = "Convert HTML file to Markdown with custom options.",
+            full = true,
             code = """
                 id: html_to_md_custom
                 namespace: company.team
@@ -195,7 +196,7 @@ public class HtmlToMarkdown extends Task implements RunnableTask<HtmlToMarkdown.
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "URI of the generated Markdown file in Kestra's internal storage.")
+        @Schema(title = "URI of the generated Markdown file in Kestra's internal storage")
         private final URI uri;
     }
 }

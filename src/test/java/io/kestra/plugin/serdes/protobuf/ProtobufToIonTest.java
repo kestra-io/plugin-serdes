@@ -123,6 +123,7 @@ class ProtobufToIonTest {
 
                 assertThat(ion.contains("streamline"), is(true));
                 assertThat(ion.contains("gomez"), is(true));
+                assertThat(output.getSize(), is(1L));
             }
         }
     }
@@ -153,6 +154,7 @@ class ProtobufToIonTest {
 
                 assertThat(ion.contains("streamline"), is(true));
                 assertThat(ion.contains("turn-key"), is(true));
+                assertThat(output.getSize(), is(2L));
             }
         }
     }

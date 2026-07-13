@@ -43,18 +43,18 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an ION file into a JSONL file.",
+    title = "Convert an ION file into a JSONL file",
     description = """
-        Outputs one JSON line per Ion record by default; set `newLine` to false \
-        to produce a JSON array instead. Ion timestamps use the configured \
-        `timeZoneId`. Set `shouldKeepAnnotations` to true to preserve Ion \
+        Outputs one JSON line per ION record by default; set `newLine` to false \
+        to produce a JSON array instead. ION timestamps use the configured \
+        `timeZoneId`. Set `shouldKeepAnnotations` to true to preserve ION \
         type annotations as `ion_annotations` fields in the output."""
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
-            title = "Convert an Ion file to newline-delimited JSON (JSONL).",
+            title = "Convert an ION file to newline-delimited JSON (JSONL).",
             code = """
                 id: ion_to_json
                 namespace: company.team
@@ -106,15 +106,15 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Timezone to use when no timezone can be parsed on the source."
+        title = "Timezone to use when no timezone can be parsed on the source"
     )
     @PluginProperty(group = "execution")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     @Builder.Default
     @Schema(
-        title = "Should keep Ion annotations in the output JSON",
-        description = "If true, Ion annotations will be preserved in the output JSON. Default is false."
+        title = "Should keep ION annotations in the output JSON",
+        description = "If true, ION annotations will be preserved in the output JSON. Default is false."
     )
     @PluginProperty(group = "advanced")
     private final Property<Boolean> shouldKeepAnnotations = Property.ofValue(false);
@@ -135,9 +135,10 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             .setTimeZone(TimeZone.getTimeZone(zoneId));
 
         var rKeepAnnotations = runContext.render(this.shouldKeepAnnotations).as(Boolean.class).orElse(false);
+        Long recordCount = null;
 
         try (
-            Reader inputStream = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE);
+            InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE);
             Writer fileWriter = new BufferedWriter(new FileWriter(tempFile, outputCharset), FileSerde.BUFFER_SIZE);
             JsonGenerator jsonGenerator = jsonObjectMapper.createGenerator(fileWriter)
         ) {
@@ -290,7 +291,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             }
 
             Mono<Long> count = flowable.count();
-            Long recordCount = count.block();
+            recordCount = count.block();
 
             runContext.metric(Counter.of("records", recordCount));
         }
@@ -298,6 +299,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(recordCount != null ? recordCount : 0L)
             .build();
     }
 
@@ -458,5 +460,8 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             title = "URI of a temporary result file"
         )
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

@@ -57,7 +57,7 @@ public class InferAvroSchema {
                 )
                 .map(Field::schema);
         } catch (IOException e) {
-            throw new RuntimeException("could not parse Ion input stream, err: " + e.getMessage(), e);
+            throw new RuntimeException("could not parse ION input stream, err: " + e.getMessage(), e);
         }
         try {
             Schema schema = inferedSchema.block();

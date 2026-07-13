@@ -31,7 +31,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a Markdown file into an HTML file.",
+    title = "Convert a Markdown file into an HTML file",
     description = "Turns Markdown into HTML syntax suitable for embedding into HTML contexts like email templates."
 )
 @Plugin(

@@ -41,8 +41,10 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "Number of rows that will be scanned while inferring. The more rows scanned, the more precise the output schema will be.",
-        description = "Only use when the 'schema' property is empty"
+        title = "Number of rows that will be scanned while inferring. The more rows scanned, the more precise the output schema will be",
+        description = """
+            Only use when the 'schema' property is empty. \
+            Ignored for schema inference when `inferAllFields` is `true` — in that case, all rows are scanned."""
     )
     @PluginProperty(group = "advanced")
     private Property<Integer> numberOfRowsToScan = Property.ofValue(100);
@@ -111,7 +113,7 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "Character to recognize as decimal point (e.g. use ‘,’ for European data).",
+        title = "Character to recognize as decimal point (e.g. use ‘,’ for European data)",
         description = "Default value is '.'"
     )
     @PluginProperty(group = "processing")
@@ -128,15 +130,19 @@ public abstract class AbstractAvroConverter extends Task {
     @Builder.Default
     @Schema(
         title = "Try to infer all fields",
-        description = "If true, we try to infer all fields using `trueValues`, `falseValues`, and `nullValues`." +
-            "If false, we infer booleans and nulls only on fields declared in the schema as `null` or `bool`."
+        description = """
+            If `true`, schema inference scans **all rows** (ignoring `numberOfRowsToScan`) and attempts to infer \
+            all field types using `trueValues`, `falseValues`, and `nullValues`. \
+            This prevents fields that are null in the first scanned rows from being typed as NULL. \
+            If `false`, only the first `numberOfRowsToScan` rows are scanned, and booleans/nulls are inferred \
+            only on fields declared in the schema as `null` or `bool`."""
     )
     @PluginProperty(group = "advanced")
     protected Property<Boolean> inferAllFields = Property.ofValue(false);
 
     @Builder.Default
     @Schema(
-        title = "Timezone to use when no timezone can be parsed on the source.",
+        title = "Timezone to use when no timezone can be parsed on the source",
         description = "If null, the timezone defaults to `UTC`. Default value is the system timezone"
     )
     @PluginProperty(group = "advanced")
@@ -144,11 +150,19 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
+        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)",
         description = "Can be `ERROR`, `WARN`, or `SKIP`."
     )
     @PluginProperty(group = "advanced")
     protected final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
+
+    protected int getEffectiveRowsToScan(RunContext runContext) throws IllegalVariableEvaluationException {
+        var rInferAllFields = runContext.render(this.inferAllFields).as(Boolean.class).orElse(false);
+        if (Boolean.TRUE.equals(rInferAllFields)) {
+            return Integer.MAX_VALUE;
+        }
+        return runContext.render(this.numberOfRowsToScan).as(Integer.class).orElseThrow();
+    }
 
     protected <E extends Exception> Long convert(InputStream inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext)
         throws IOException, IllegalVariableEvaluationException {

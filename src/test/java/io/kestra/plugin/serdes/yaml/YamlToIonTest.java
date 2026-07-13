@@ -66,5 +66,6 @@ class YamlToIonTest {
             IonValue v2 = ion.newValue(reader);
             assertThat(((IonInt) ((IonStruct) v2).get("b")).intValue(), is(2));
         }
+        assertThat(out.getSize(), is(2L));
     }
 }

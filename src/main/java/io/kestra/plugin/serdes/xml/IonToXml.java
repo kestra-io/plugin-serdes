@@ -38,9 +38,9 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Ion file to the XML format.",
+    title = "Convert an ION file to the XML format",
     description = """
-        Each Ion record becomes a child element wrapped under a configurable \
+        Each ION record becomes a child element wrapped under a configurable \
         root element (default: `items`). The full record set is loaded into \
         memory during conversion; for very large datasets, prefer \
         `IonToParquet` or `IonToJson` instead."""
@@ -111,7 +111,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Timezone to use when no timezone can be parsed on the source."
+        title = "Timezone to use when no timezone can be parsed on the source"
     )
     @PluginProperty(group = "execution")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
@@ -120,6 +120,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
     public IonToXml.Output run(RunContext runContext) throws Exception {
         File tempFile = runContext.workingDir().createTempFile(".xml").toFile();
         URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        long count = 0;
 
         try (
             Writer outfile = new BufferedWriter(new FileWriter(tempFile, Charset.forName(runContext.render(charset).as(String.class).orElseThrow())), FileSerde.BUFFER_SIZE);
@@ -142,7 +143,8 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
             List<Object> list = FileSerde.readAll(is).collectList().block();
             if (list != null) {
                 outfile.write(objectWriter.writeValueAsString(list));
-                runContext.metric(Counter.of("records", list.size()));
+                count = list.size();
+                runContext.metric(Counter.of("records", count));
             }
 
             outfile.flush();
@@ -151,6 +153,7 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
         return IonToXml.Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(count)
             .build();
     }
 
@@ -160,6 +163,9 @@ public class IonToXml extends Task implements RunnableTask<IonToXml.Output> {
         @Schema(
             title = "URI of a temporary result file"
         )
-        private final URI uri;
+        private URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

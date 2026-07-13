@@ -43,10 +43,10 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Schema(title = "Convert a Protobuf file into Amazon Ion.", description = """
+@Schema(title = "Convert a Protobuf file into Amazon ION", description = """
     The plugin reads one or more Protobuf messages from a binary file or stream,
     decodes them using a provided descriptor and message type name, and then serializes
-    the result as Ion data based on [ProtoJSON Format](https://protobuf.dev/programming-guides/json/).
+    the result as ION data based on [ProtoJSON Format](https://protobuf.dev/programming-guides/json/).
     It requires the following information regarding the Protobuf message:
     - A **descriptor file** (`.desc`), generated with `--descriptor_set_out`, that contains
       the compiled Protobuf message definitions.
@@ -61,7 +61,7 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
     """)
 @Plugin(
     examples = {
-        @Example(full = true, title = "Convert a Protobuf file to the Amazon Ion format.", code = """
+        @Example(full = true, title = "Convert a Protobuf file to the Amazon ION format.", code = """
             id: protobuf_to_ion
             namespace: company.team
 
@@ -91,6 +91,9 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of a temporary result file")
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     @NotNull
@@ -142,6 +145,8 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
             throw new IllegalArgumentException("Message type not found in descriptor: " + rTypeName);
         }
 
+        Long lineCount = null;
+
         try (
             InputStream inputStream = runContext.storage().getFile(rFrom);
             OutputStream writer = new BufferedOutputStream(
@@ -157,11 +162,14 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
             Mono<Long> count = FileSerde.writeAll(writer, flowable);
 
             // metrics & finalize
-            Long lineCount = count.block();
+            lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
         }
 
-        return Output.builder().uri(runContext.storage().putFile(tempFile)).build();
+        return Output.builder()
+            .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
+            .build();
     }
 
     private Consumer<FluxSink<Object>> nextMessage(InputStream inputStream, Descriptor messageDescriptor,

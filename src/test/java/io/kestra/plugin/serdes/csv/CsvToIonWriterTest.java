@@ -71,6 +71,9 @@ class CsvToIonWriterTest {
             CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, writerRunOutput.getUri()))),
             is(CharStreams.toString(new InputStreamReader(new FileInputStream(sourceFile))))
         );
+        assertThat(readerRunOutput.getSize(), is(greaterThan(0L)));
+        assertThat(writerRunOutput.getSize(), is(greaterThan(0L)));
+        assertThat(readerRunOutput.getSize(), is(writerRunOutput.getSize()));
     }
 
     @Test

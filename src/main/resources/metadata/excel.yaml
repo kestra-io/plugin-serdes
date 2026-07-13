@@ -1,8 +1,8 @@
 group: io.kestra.plugin.serdes.excel
 name: "excel"
 title: "Excel"
-description: "Tasks that convert between Excel and Ion."
-body: "Supply Excel workbooks to convert sheets into Ion data, or take Ion data to generate Excel files with configurable column rendering and date/time handling."
+description: "Tasks that convert between Excel and ION."
+body: "Supply Excel workbooks to convert sheets into ION data, or take ION data to generate Excel files with configurable column rendering and date/time handling."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

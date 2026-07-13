@@ -32,14 +32,14 @@ import reactor.core.publisher.Mono;
 @ToString
 @EqualsAndHashCode
 @Schema(
-    title = "Convert a YAML file into ION.",
-    description = "Each YAML document in the file — separated by `---` — becomes a separate Ion record."
+    title = "Convert a YAML file into ION",
+    description = "Each YAML document in the file — separated by `---` — becomes a separate ION record."
 )
 @Plugin(
     examples = {
         @Example(
             full = true,
-            title = "Convert YAML to Ion",
+            title = "Convert YAML to ION",
             code = """
                 id: yaml_to_ion
                 namespace: company.team
@@ -124,6 +124,7 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
 
         return Output.builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(count)
             .build();
     }
 
@@ -132,5 +133,8 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(title = "URI of the output file")
         private final URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }

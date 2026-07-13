@@ -59,6 +59,7 @@ class JsonToYamlTest {
 
         assertThat(result, containsString("---\na: 1"));
         assertThat(result, containsString("---\nb: 2"));
+        assertThat(out.getSize(), is(2L));
     }
 
     @Test

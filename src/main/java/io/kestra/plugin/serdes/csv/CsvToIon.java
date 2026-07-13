@@ -35,7 +35,7 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a CSV file to the Amazon Ion format.",
+    title = "Convert a CSV file to the Amazon ION format",
     description = """
         Supports configurable field separator, text delimiter, charset, and \
         header detection. The value `\\N` is treated as null in any field. \
@@ -45,7 +45,7 @@ import reactor.core.publisher.Mono;
     examples = {
         @Example(
             full = true,
-            title = "Convert a CSV file to the Amazon Ion format.",
+            title = "Convert a CSV file to the Amazon ION format.",
             code = """
                 id: csv_to_ion
                 namespace: company.team
@@ -114,7 +114,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     @Builder.Default
     @Schema(
-        title = "How to handle bad lines (e.g., a line with too many fields)."
+        title = "How to handle bad lines (e.g., a line with too many fields)"
     )
     @PluginProperty(group = "advanced")
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
@@ -155,6 +155,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
         AtomicInteger skipped = new AtomicInteger();
+        Long lineCount = null;
 
         try (
             Reader reader = new BufferedReader(
@@ -244,7 +245,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
             Mono<Long> count = FileSerde.writeAll(output, flowable);
 
-            Long lineCount = count.block();
+            lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
 
             output.flush();
@@ -253,6 +254,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
             .build();
     }
 
@@ -263,6 +265,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             title = "URI of a temporary result file"
         )
         private URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 
     private CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {

@@ -32,7 +32,8 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert a Markdown file into plain text."
+    title = "Convert a Markdown file into plain text",
+    description = "Strips Markdown formatting from the input file and writes the resulting plain text to Kestra internal storage."
 )
 @Plugin(
     examples = {

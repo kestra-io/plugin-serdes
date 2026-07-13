@@ -27,7 +27,7 @@ public class FullIonParquetConversionTest extends FullIonConversionAbstractTest 
         var ionInputStream = IOUtils.toInputStream(ionInput, StandardCharsets.UTF_8);
         var inputIonFileUri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), ionInputStream);
 
-        // infer Avro schema from Ion
+        // infer Avro schema from ION
         var inferAvroSchemaFromIon = InferAvroSchemaFromIon.builder()
             .id(InferAvroSchemaFromIon.class.getSimpleName())
             .type(InferAvroSchemaFromIon.class.getName())
@@ -52,7 +52,7 @@ public class FullIonParquetConversionTest extends FullIonConversionAbstractTest 
             .build();
         var parquetToIonOutput = parquetToIon.run(TestsUtils.mockRunContext(runContextFactory, parquetToIon, ImmutableMap.of()));
 
-        // compare original Ion with generated after conversions
+        // compare original ION with generated after conversions
         var ion = IonSystemBuilder.standard().build();
         assertThat(
             ImmutableList.copyOf(

@@ -49,7 +49,7 @@ public abstract class AbstractTextWriter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "Timezone to use when no timezone can be parsed on the source."
+        title = "Timezone to use when no timezone can be parsed on the source"
     )
     @PluginProperty(group = "advanced")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());

@@ -37,9 +37,9 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Convert an Ion file to the Avro format.",
+    title = "Convert an ION file to the Avro format",
     description = """
-        Converts an Amazon Ion file to Avro format using a JSON Avro schema. \
+        Converts an Amazon ION file to Avro format using a JSON Avro schema. \
         If no schema is provided, one is inferred by scanning up to \
         `numberOfRowsToScan` rows. Use `onBadLines` to control whether records \
         that fail validation cause an error, log a warning, or are silently skipped."""
@@ -48,7 +48,7 @@ import lombok.experimental.SuperBuilder;
     examples = {
         @Example(
             full = true,
-            title = "Convert a CSV dataset to the Avro format via Ion.",
+            title = "Convert a CSV dataset to the Avro format via ION.",
             code = """
                 id: divvy_tripdata
                 namespace: company.team
@@ -121,7 +121,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @Builder.Default
     @PluginProperty(group = "advanced")
     @Schema(
-        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches).",
+        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)",
         description = "Can be `ERROR`, `WARN`, or `SKIP`."
     )
     private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
@@ -143,7 +143,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             try (var inputStreamForInfer = runContext.storage().getFile(rFrom)) {
                 var schemaOutputStream = new ByteArrayOutputStream();
                 new InferAvroSchema(
-                    runContext.render(this.getNumberOfRowsToScan()).as(Integer.class).orElse(100)
+                    getEffectiveRowsToScan(runContext)
                 ).inferAvroSchemaFromIon(inputStreamForInfer, schemaOutputStream);
                 schema = schemaParser.parse(schemaOutputStream.toString(StandardCharsets.UTF_8));
             }
@@ -158,6 +158,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         }
 
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
+        Long lineCount = null;
 
         try (
             InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(rFrom), FileSerde.BUFFER_SIZE);
@@ -165,7 +166,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
-            Long lineCount = this.convert(inputStream, schema, record ->
+            lineCount = this.convert(inputStream, schema, record ->
             {
                 try {
                     dataFileWriter.append(record);
@@ -191,6 +192,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         return Output
             .builder()
             .uri(runContext.storage().putFile(tempFile))
+            .size(lineCount != null ? lineCount : 0L)
             .build();
     }
 
@@ -201,5 +203,8 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             title = "URI of a temporary result file"
         )
         private URI uri;
+
+        @Schema(title = "The number of records converted")
+        private long size;
     }
 }
