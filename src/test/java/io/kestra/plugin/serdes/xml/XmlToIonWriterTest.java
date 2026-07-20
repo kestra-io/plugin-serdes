@@ -256,7 +256,7 @@ class XmlToIonWriterTest {
     void readEmptyTagGoodQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/catalog");
-        String tagContent = new BufferedReader(new InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
+        String tagContent = readIonAsText(runContextFactory.of().storage().getFile(reader.getUri())).strip();
         assertThat(tagContent, is("\"\""));
     }
 
@@ -277,18 +277,22 @@ class XmlToIonWriterTest {
         XmlToIon.Output output = this.reader(largeXml, "/catalog/item");
 
         // Read back all records and count them
-        int count = 0;
-        try (
-            BufferedReader br = new BufferedReader(
-                new InputStreamReader(runContextFactory.of().storage().getFile(output.getUri()))
-            )
-        ) {
-            while (br.readLine() != null) {
-                count++;
-            }
+        java.util.concurrent.atomic.AtomicLong count = new java.util.concurrent.atomic.AtomicLong();
+        try (InputStream is = runContextFactory.of().storage().getFile(output.getUri())) {
+            FileSerde.read(is, o -> count.incrementAndGet());
         }
 
-        assertThat(count, is(recordCount));
+        assertThat((int) count.get(), is(recordCount));
         largeXml.delete();
+    }
+
+    private static String readIonAsText(java.io.InputStream is) throws java.io.IOException {
+        var ionSystem = com.amazon.ion.system.IonSystemBuilder.standard().build();
+        var sb = new StringBuilder();
+        var iter = ionSystem.iterate(is);
+        while (iter.hasNext()) {
+            sb.append(iter.next().toString()).append("\n");
+        }
+        return sb.toString();
     }
 }
