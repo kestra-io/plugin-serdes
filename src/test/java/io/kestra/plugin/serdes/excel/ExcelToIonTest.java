@@ -14,7 +14,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.CharStreams;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -57,11 +56,22 @@ public class ExcelToIonTest {
                 .build();
             ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get(excelSheet))));
+            String out = readIonAsText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get(excelSheet)));
 
             expectedStrings.forEach(expectedString -> assertThat(out, containsString(expectedString)));
         }
     }
+
+    private static String readIonAsText(java.io.InputStream is) throws java.io.IOException {
+        var ionSystem = com.amazon.ion.system.IonSystemBuilder.standard().build();
+        var sb = new StringBuilder();
+        var iter = ionSystem.iterate(is);
+        while (iter.hasNext()) {
+            sb.append(iter.next().toString()).append("\n");
+        }
+        return sb.toString();
+    }
+
 
     private static Stream<Arguments> should_get_a_correct_ion_inputs() {
         return Stream.of(
@@ -139,41 +149,17 @@ public class ExcelToIonTest {
                 )
             );
 
-            String outWorkSheet1 = CharStreams.toString(
-                new InputStreamReader(
-                    storageInterface.get(
-                        TenantService.MAIN_TENANT,
-                        null,
-                        ionOutput.getUris().get("Worksheet_1")
-                    )
-                )
-            );
+            String outWorkSheet1 = readIonAsText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Worksheet_1")));
 
             assertThat(outWorkSheet1, containsString("policyID:\"333743\""));
             assertThat(outWorkSheet1, containsString("point_latitude:30.102261"));
 
-            String outWorkSheet2 = CharStreams.toString(
-                new InputStreamReader(
-                    storageInterface.get(
-                        TenantService.MAIN_TENANT,
-                        null,
-                        ionOutput.getUris().get("Worksheet_2")
-                    )
-                )
-            );
+            String outWorkSheet2 = readIonAsText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Worksheet_2")));
 
             assertThat(outWorkSheet2, containsString("policyID:\"333743\""));
             assertThat(outWorkSheet2, containsString("point_latitude:30.102261"));
 
-            String outWorkSheet3 = CharStreams.toString(
-                new InputStreamReader(
-                    storageInterface.get(
-                        TenantService.MAIN_TENANT,
-                        null,
-                        ionOutput.getUris().get("Worksheet_3")
-                    )
-                )
-            );
+            String outWorkSheet3 = readIonAsText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Worksheet_3")));
 
             assertThat(outWorkSheet3, containsString("policyID:\"333743\""));
             assertThat(outWorkSheet3, containsString("point_latitude:30.102261"));

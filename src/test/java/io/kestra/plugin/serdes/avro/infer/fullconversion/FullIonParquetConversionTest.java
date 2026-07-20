@@ -56,7 +56,7 @@ public class FullIonParquetConversionTest extends FullIonConversionAbstractTest 
         var ion = IonSystemBuilder.standard().build();
         assertThat(
             ImmutableList.copyOf(
-                ion.iterate(IOUtils.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, parquetToIonOutput.getUri()))))
+                ion.iterate(storageInterface.get(TenantService.MAIN_TENANT, null, parquetToIonOutput.getUri()))
             )
         ).isEqualTo(
             ImmutableList.copyOf(
