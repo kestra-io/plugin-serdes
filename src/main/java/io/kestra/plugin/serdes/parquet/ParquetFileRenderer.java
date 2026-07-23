@@ -11,17 +11,17 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.io.IOUtils;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.parquet.io.DelegatingSeekableInputStream;
 import org.apache.parquet.io.InputFile;
-import org.apache.parquet.io.SeekableInputStream;
+import org.apache.parquet.io.LocalInputFile;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -47,66 +47,46 @@ public class ParquetFileRenderer implements FileRenderer {
         return "parquet".equalsIgnoreCase(extension);
     }
 
+    // Parquet needs random access (footer at end, seeks to row groups), so it cannot be read from a
+    // forward-only stream. Copy to a local temp file once, then seek-read, same as ParquetToIon.
     @Override
     public FilePreview render(String extension, InputStream inputStream, Optional<Charset> charset, int maxRows) throws IOException {
         if (!supports(extension)) {
             throw new IllegalArgumentException("Unsupported extension: " + extension);
         }
 
-        byte[] data = IOUtils.toByteArray(inputStream);
-        InputFile inputFile = new InMemoryInputFile(data);
-
-        List<Object> records = new ArrayList<>();
-        boolean truncated;
-
-        AvroParquetReader.Builder<GenericRecord> readerBuilder = AvroParquetReader.<GenericRecord>builder(inputFile)
-            .disableCompatibility()
-            .withDataModel(AvroConverter.genericData());
-
-        try (ParquetReader<GenericRecord> parquetReader = readerBuilder.build()) {
-            GenericRecord record;
-            while (records.size() < maxRows && (record = parquetReader.read()) != null) {
-                records.add(AvroDeserializer.recordDeserializer(record));
+        Path tmp = Files.createTempFile("parquet-preview_", ".parquet");
+        try {
+            try (InputStream in = inputStream) {
+                Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
             }
 
-            truncated = parquetReader.read() != null;
-        }
+            InputFile inputFile = new LocalInputFile(tmp);
 
-        return FilePreview.builder()
-            .content(records)
-            .truncated(truncated)
-            .extension(extension)
-            .type(FilePreview.Type.LIST)
-            .build();
-    }
+            List<Object> records = new ArrayList<>();
+            boolean truncated;
 
-    private static class InMemoryInputFile implements InputFile {
-        private final byte[] data;
+            AvroParquetReader.Builder<GenericRecord> readerBuilder = AvroParquetReader.<GenericRecord>builder(inputFile)
+                .disableCompatibility()
+                .withDataModel(AvroConverter.genericData());
 
-        InMemoryInputFile(byte[] data) {
-            this.data = data;
-        }
-
-        @Override
-        public long getLength() {
-            return data.length;
-        }
-
-        @Override
-        public SeekableInputStream newStream() {
-            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-            return new DelegatingSeekableInputStream(bais) {
-                @Override
-                public long getPos() {
-                    return data.length - bais.available();
+            try (ParquetReader<GenericRecord> parquetReader = readerBuilder.build()) {
+                GenericRecord record;
+                while (records.size() < maxRows && (record = parquetReader.read()) != null) {
+                    records.add(AvroDeserializer.recordDeserializer(record));
                 }
 
-                @Override
-                public void seek(long newPos) {
-                    bais.reset();
-                    bais.skip(newPos);
-                }
-            };
+                truncated = parquetReader.read() != null;
+            }
+
+            return FilePreview.builder()
+                .content(records)
+                .truncated(truncated)
+                .extension(extension)
+                .type(FilePreview.Type.LIST)
+                .build();
+        } finally {
+            Files.deleteIfExists(tmp);
         }
     }
 }
