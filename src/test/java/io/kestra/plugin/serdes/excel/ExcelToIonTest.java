@@ -2,7 +2,8 @@ package io.kestra.plugin.serdes.excel;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStreamReader;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.util.List;
@@ -13,8 +14,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import com.amazon.ion.system.IonSystemBuilder;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.CharStreams;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
@@ -57,7 +58,7 @@ public class ExcelToIonTest {
                 .build();
             ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-            String out = CharStreams.toString(new InputStreamReader(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get(excelSheet))));
+            String out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get(excelSheet)));
 
             expectedStrings.forEach(expectedString -> assertThat(out, containsString(expectedString)));
         }
@@ -139,44 +140,46 @@ public class ExcelToIonTest {
                 )
             );
 
-            String outWorkSheet1 = CharStreams.toString(
-                new InputStreamReader(
-                    storageInterface.get(
-                        TenantService.MAIN_TENANT,
-                        null,
-                        ionOutput.getUris().get("Worksheet_1")
-                    )
+            String outWorkSheet1 = ionToText(
+                storageInterface.get(
+                    TenantService.MAIN_TENANT,
+                    null,
+                    ionOutput.getUris().get("Worksheet_1")
                 )
             );
 
             assertThat(outWorkSheet1, containsString("policyID:\"333743\""));
             assertThat(outWorkSheet1, containsString("point_latitude:30.102261"));
 
-            String outWorkSheet2 = CharStreams.toString(
-                new InputStreamReader(
-                    storageInterface.get(
-                        TenantService.MAIN_TENANT,
-                        null,
-                        ionOutput.getUris().get("Worksheet_2")
-                    )
+            String outWorkSheet2 = ionToText(
+                storageInterface.get(
+                    TenantService.MAIN_TENANT,
+                    null,
+                    ionOutput.getUris().get("Worksheet_2")
                 )
             );
 
             assertThat(outWorkSheet2, containsString("policyID:\"333743\""));
             assertThat(outWorkSheet2, containsString("point_latitude:30.102261"));
 
-            String outWorkSheet3 = CharStreams.toString(
-                new InputStreamReader(
-                    storageInterface.get(
-                        TenantService.MAIN_TENANT,
-                        null,
-                        ionOutput.getUris().get("Worksheet_3")
-                    )
+            String outWorkSheet3 = ionToText(
+                storageInterface.get(
+                    TenantService.MAIN_TENANT,
+                    null,
+                    ionOutput.getUris().get("Worksheet_3")
                 )
             );
 
             assertThat(outWorkSheet3, containsString("policyID:\"333743\""));
             assertThat(outWorkSheet3, containsString("point_latitude:30.102261"));
+        }
+    }
+
+    // ionOutput files are binary ION; load them via the InputStream and re-render to ION text
+    // instead of decoding the binary bytes as UTF-8 text, which would corrupt the BVM header.
+    private static String ionToText(InputStream input) throws IOException {
+        try (input) {
+            return IonSystemBuilder.standard().build().getLoader().load(input).toString();
         }
     }
 }
