@@ -160,7 +160,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         try (
             Reader reader = new BufferedReader(
                 new InputStreamReader(
-                    runContext.storage().getFile(rFrom),
+                    this.stripUtf8Bom(runContext.storage().getFile(rFrom)),
                     runContext.render(charset).as(String.class).orElseThrow()
                 ),
                 FileSerde.BUFFER_SIZE
@@ -171,6 +171,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
             var rSkipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
             Map<Integer, String> headers = new TreeMap<>();
+            AtomicInteger rawHeaderFieldCount = new AtomicInteger();
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
 
             Flux<Object> flowable = Flux
@@ -192,6 +193,15 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         for (int i = 0; i < csvRecord.getFieldCount(); i++) {
                             headers.put(i, csvRecord.getField(i));
                         }
+                        rawHeaderFieldCount.set(csvRecord.getFieldCount());
+                        // Drop trailing empty-named columns (e.g. from a trailing field separator in the
+                        // header line): an unnamed field otherwise surfaces as an unusable "" field in the
+                        // Ion output and breaks downstream conversions (e.g. to Parquet).
+                        int trailing = csvRecord.getFieldCount();
+                        while (trailing > 0 && headers.get(trailing - 1) != null && headers.get(trailing - 1).isEmpty()) {
+                            headers.remove(trailing - 1);
+                            trailing--;
+                        }
                         return false;
                     }
                     if (rSkipRowsValue > 0 && skipped.get() < rSkipRowsValue) {
@@ -211,9 +221,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                             }
                             return Mono.empty();
                         }
-                        if (r.getFieldCount() != headers.size()) {
+                        if (r.getFieldCount() != rawHeaderFieldCount.get()) {
                             String message = "Bad line encountered (field count mismatch): Expected "
-                                + headers.size() + ", got " + r.getFieldCount() + " fields.";
+                                + rawHeaderFieldCount.get() + ", got " + r.getFieldCount() + " fields.";
                             if (rOnBadLinesValue == OnBadLines.ERROR) {
                                 return Mono.error(new RuntimeException(message));
                             } else if (rOnBadLinesValue == OnBadLines.WARN) {
@@ -297,5 +307,26 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         var handler = handlerBuilder.build();
         return builder.build(handler, reader);
+    }
+
+    /**
+     * Strips a leading UTF-8 byte-order mark (EF BB BF), if present, so it doesn't leak into the
+     * first field's name/value (e.g. as an invisible character prepended to the first header).
+     */
+    private InputStream stripUtf8Bom(InputStream inputStream) throws IOException {
+        PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream, 3);
+        byte[] possibleBom = new byte[3];
+        int read = pushbackInputStream.read(possibleBom, 0, 3);
+
+        boolean isUtf8Bom = read == 3
+            && (possibleBom[0] & 0xFF) == 0xEF
+            && (possibleBom[1] & 0xFF) == 0xBB
+            && (possibleBom[2] & 0xFF) == 0xBF;
+
+        if (!isUtf8Bom && read > 0) {
+            pushbackInputStream.unread(possibleBom, 0, read);
+        }
+
+        return pushbackInputStream;
     }
 }

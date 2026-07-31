@@ -1,12 +1,14 @@
 package io.kestra.plugin.serdes.csv;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -192,6 +194,77 @@ class CsvToIonWriterTest {
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
         CsvToIon.Output out = reader.run(runContext);
         assertThat(out.getUri(), is(notNullValue()));
+    }
+
+    @Test
+    void utf8BomInHeaderIsStripped() throws Exception {
+        // GitHub issue #17646: a UTF-8 BOM at the start of the file was leaking into the first
+        // header's name, causing it to be quoted differently from every other field in the Ion output.
+        String csvBody = "code_insee;nom_commune\n1001;L'Abergement-Clémenciat\n";
+        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+
+        ByteArrayOutputStream withBom = new ByteArrayOutputStream();
+        withBom.write(utf8Bom);
+        withBom.write(csvBody.getBytes(StandardCharsets.UTF_8));
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/bomHeader.csv"),
+            new ByteArrayInputStream(withBom.toByteArray())
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("utf8BomInHeaderIsStripped")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), hasItem("code_insee"));
+        assertThat(row.get("code_insee"), is("1001"));
+    }
+
+    @Test
+    void trailingEmptyHeaderColumnIsDropped() throws Exception {
+        // GitHub issue #17646: a trailing field separator on the header line produced a
+        // nameless field ('':"") on every row in the Ion output.
+        String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat;\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/trailingEmptyHeader.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("trailingEmptyHeaderColumnIsDropped")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), not(hasItem("")));
+        assertThat(row.keySet(), containsInAnyOrder("code_insee", "nom_commune"));
     }
 
     @Test
