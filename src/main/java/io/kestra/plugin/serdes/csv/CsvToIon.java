@@ -22,6 +22,8 @@ import io.kestra.plugin.serdes.OnBadLines;
 import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvReader;
 import de.siegmar.fastcsv.reader.CsvRecord;
+import org.apache.commons.io.ByteOrderMark;
+import org.apache.commons.io.input.BOMInputStream;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -160,7 +162,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         try (
             Reader reader = new BufferedReader(
                 new InputStreamReader(
-                    this.stripUtf8Bom(runContext.storage().getFile(rFrom)),
+                    BOMInputStream.builder()
+                        .setInputStream(runContext.storage().getFile(rFrom))
+                        .setByteOrderMarks(ByteOrderMark.UTF_8)
+                        .get(),
                     runContext.render(charset).as(String.class).orElseThrow()
                 ),
                 FileSerde.BUFFER_SIZE
@@ -171,7 +176,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
             var rSkipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
             Map<Integer, String> headers = new TreeMap<>();
-            Set<Integer> trailingEmptyHeaderColumns = new HashSet<>();
+            AtomicInteger effectiveHeaderCount = new AtomicInteger();
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
 
             Flux<Object> flowable = Flux
@@ -193,20 +198,21 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         for (int i = 0; i < csvRecord.getFieldCount(); i++) {
                             headers.put(i, csvRecord.getField(i));
                         }
-                        // Identify trailing empty-named columns (e.g. from a trailing field separator on
-                        // the header line): left as-is, an unnamed field surfaces as an unusable "" field
-                        // in the Ion output and breaks downstream conversions (e.g. to Parquet). Only
-                        // *trailing* empty names are treated as this artifact - an empty name in the
-                        // middle of the header is a structural property of the data itself and is kept.
+                        // Trailing empty-named columns are always a contiguous run at the end of the
+                        // header line (e.g. from a trailing field separator): left as-is, an unnamed
+                        // field surfaces as an unusable "" field in the Ion output and breaks downstream
+                        // conversions (e.g. to Parquet). An empty name earlier in the header is a
+                        // structural property of the data itself and is kept as-is.
                         int trailing = csvRecord.getFieldCount();
-                        while (trailing > 0 && headers.get(trailing - 1) != null && headers.get(trailing - 1).isEmpty()) {
-                            trailingEmptyHeaderColumns.add(trailing - 1);
+                        while (trailing > 0 && headers.get(trailing - 1).isEmpty()) {
                             trailing--;
                         }
-                        if (!trailingEmptyHeaderColumns.isEmpty()) {
+                        effectiveHeaderCount.set(trailing);
+                        int droppedCount = csvRecord.getFieldCount() - trailing;
+                        if (droppedCount > 0) {
                             runContext.logger().warn(
-                                "Dropping {} trailing unnamed column(s) from the CSV header (likely caused by a trailing field separator): column index(es) {}",
-                                trailingEmptyHeaderColumns.size(), trailingEmptyHeaderColumns
+                                "Dropping {} trailing unnamed column(s) from the CSV header (likely caused by a trailing field separator)",
+                                droppedCount
                             );
                         }
                         return false;
@@ -238,16 +244,12 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                             }
                             return Mono.empty();
                         }
-                        for (Map.Entry<Integer, String> header : headers.entrySet()) {
-                            int i = header.getKey();
-                            if (trailingEmptyHeaderColumns.contains(i)) {
-                                continue;
-                            }
+                        for (int i = 0; i < effectiveHeaderCount.get(); i++) {
                             String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
                             if ("\\N".equals(fieldValue)) {
                                 fieldValue = null;
                             }
-                            fields.put(header.getValue(), fieldValue);
+                            fields.put(headers.get(i), fieldValue);
                         }
                         return Mono.just(fields);
                     } else {
@@ -317,32 +319,5 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         var handler = handlerBuilder.build();
         return builder.build(handler, reader);
-    }
-
-    /**
-     * Strips a leading UTF-8 byte-order mark (EF BB BF), if present, so it doesn't leak into the
-     * first field's name/value (e.g. as an invisible character prepended to the first header).
-     * <p>
-     * This is done manually rather than via {@code CsvReaderBuilder#detectBomHeader(true)} because
-     * that option only takes effect when building from an {@code InputStream}, and doing so shrinks
-     * the effective capacity of a user-configured {@code maxBufferSize} enough to make small buffer
-     * sizes (e.g. the ones used to bound pathological fields) fail unexpectedly. Peeking 3 raw bytes
-     * here is fully decoupled from fastcsv's internal buffering.
-     */
-    private InputStream stripUtf8Bom(InputStream inputStream) throws IOException {
-        PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream, 3);
-        byte[] possibleBom = new byte[3];
-        int read = pushbackInputStream.read(possibleBom, 0, 3);
-
-        boolean isUtf8Bom = read == 3
-            && (possibleBom[0] & 0xFF) == 0xEF
-            && (possibleBom[1] & 0xFF) == 0xBB
-            && (possibleBom[2] & 0xFF) == 0xBF;
-
-        if (!isUtf8Bom && read > 0) {
-            pushbackInputStream.unread(possibleBom, 0, read);
-        }
-
-        return pushbackInputStream;
     }
 }
