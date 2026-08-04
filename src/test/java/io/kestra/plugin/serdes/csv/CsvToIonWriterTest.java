@@ -268,6 +268,40 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void emptyHeaderNameInTheMiddleIsPreservedNotDropped() throws Exception {
+        // Only *trailing* empty header names are treated as a trailing-separator artifact. An empty
+        // name in the middle of the header carries real data and is a structural property of the
+        // source file, not an artifact, so it must be preserved rather than silently dropped.
+        String csvBody = "code_insee;;nom_commune\n1001;X;L'Abergement-Clémenciat\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/middleEmptyHeader.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("emptyHeaderNameInTheMiddleIsPreservedNotDropped")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("code_insee", "", "nom_commune"));
+        assertThat(row.get(""), is("X"));
+    }
+
+    @Test
     void badLinesErrorThrows() throws Exception {
         String csv = "header1,header2\nvalue1,value2\nvalue3,value4,value5\nvalue6,value7"; // Bad line: value3,value4,value5
         URI src = storageInterface.put(

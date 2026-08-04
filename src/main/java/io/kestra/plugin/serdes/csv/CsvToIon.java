@@ -171,7 +171,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
             var rSkipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
             Map<Integer, String> headers = new TreeMap<>();
-            AtomicInteger rawHeaderFieldCount = new AtomicInteger();
+            Set<Integer> trailingEmptyHeaderColumns = new HashSet<>();
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
 
             Flux<Object> flowable = Flux
@@ -193,14 +193,21 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         for (int i = 0; i < csvRecord.getFieldCount(); i++) {
                             headers.put(i, csvRecord.getField(i));
                         }
-                        rawHeaderFieldCount.set(csvRecord.getFieldCount());
-                        // Drop trailing empty-named columns (e.g. from a trailing field separator in the
-                        // header line): an unnamed field otherwise surfaces as an unusable "" field in the
-                        // Ion output and breaks downstream conversions (e.g. to Parquet).
+                        // Identify trailing empty-named columns (e.g. from a trailing field separator on
+                        // the header line): left as-is, an unnamed field surfaces as an unusable "" field
+                        // in the Ion output and breaks downstream conversions (e.g. to Parquet). Only
+                        // *trailing* empty names are treated as this artifact - an empty name in the
+                        // middle of the header is a structural property of the data itself and is kept.
                         int trailing = csvRecord.getFieldCount();
                         while (trailing > 0 && headers.get(trailing - 1) != null && headers.get(trailing - 1).isEmpty()) {
-                            headers.remove(trailing - 1);
+                            trailingEmptyHeaderColumns.add(trailing - 1);
                             trailing--;
+                        }
+                        if (!trailingEmptyHeaderColumns.isEmpty()) {
+                            runContext.logger().warn(
+                                "Dropping {} trailing unnamed column(s) from the CSV header (likely caused by a trailing field separator): column index(es) {}",
+                                trailingEmptyHeaderColumns.size(), trailingEmptyHeaderColumns
+                            );
                         }
                         return false;
                     }
@@ -221,9 +228,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                             }
                             return Mono.empty();
                         }
-                        if (r.getFieldCount() != rawHeaderFieldCount.get()) {
+                        if (r.getFieldCount() != headers.size()) {
                             String message = "Bad line encountered (field count mismatch): Expected "
-                                + rawHeaderFieldCount.get() + ", got " + r.getFieldCount() + " fields.";
+                                + headers.size() + ", got " + r.getFieldCount() + " fields.";
                             if (rOnBadLinesValue == OnBadLines.ERROR) {
                                 return Mono.error(new RuntimeException(message));
                             } else if (rOnBadLinesValue == OnBadLines.WARN) {
@@ -233,6 +240,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         }
                         for (Map.Entry<Integer, String> header : headers.entrySet()) {
                             int i = header.getKey();
+                            if (trailingEmptyHeaderColumns.contains(i)) {
+                                continue;
+                            }
                             String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
                             if ("\\N".equals(fieldValue)) {
                                 fieldValue = null;
@@ -312,6 +322,12 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     /**
      * Strips a leading UTF-8 byte-order mark (EF BB BF), if present, so it doesn't leak into the
      * first field's name/value (e.g. as an invisible character prepended to the first header).
+     * <p>
+     * This is done manually rather than via {@code CsvReaderBuilder#detectBomHeader(true)} because
+     * that option only takes effect when building from an {@code InputStream}, and doing so shrinks
+     * the effective capacity of a user-configured {@code maxBufferSize} enough to make small buffer
+     * sizes (e.g. the ones used to bound pathological fields) fail unexpectedly. Peeking 3 raw bytes
+     * here is fully decoupled from fastcsv's internal buffering.
      */
     private InputStream stripUtf8Bom(InputStream inputStream) throws IOException {
         PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream, 3);
