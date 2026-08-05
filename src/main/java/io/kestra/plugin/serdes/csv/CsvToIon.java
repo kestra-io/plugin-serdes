@@ -41,7 +41,10 @@ import reactor.core.publisher.Mono;
     description = """
         Supports configurable field separator, text delimiter, charset, and \
         header detection. The value `\\N` is treated as null in any field. \
-        Use `onBadLines` to control error handling for malformed rows."""
+        Use `onBadLines` to control error handling for malformed rows. \
+        A leading UTF-8 byte-order mark is stripped automatically, and a trailing \
+        unnamed header column (e.g. from a trailing field separator) is dropped \
+        with a warning logged."""
 )
 @Plugin(
     examples = {
@@ -206,6 +209,12 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         int trailing = csvRecord.getFieldCount();
                         while (trailing > 0 && headers.get(trailing - 1).isEmpty()) {
                             trailing--;
+                        }
+                        if (trailing == 0) {
+                            // The entire header is empty (e.g. ";;;"): trimming would leave zero
+                            // columns and every row would collapse to an empty record. There's no
+                            // artifact to safely drop here, so keep every column as-is instead.
+                            trailing = csvRecord.getFieldCount();
                         }
                         effectiveHeaderCount.set(trailing);
                         int droppedCount = csvRecord.getFieldCount() - trailing;

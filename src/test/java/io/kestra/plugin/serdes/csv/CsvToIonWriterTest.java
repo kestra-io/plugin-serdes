@@ -302,6 +302,102 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void multipleTrailingEmptyHeaderColumnsAreDropped() throws Exception {
+        // Two trailing separators in a row should drop both empty-named trailing columns, not just one.
+        String csvBody = "code_insee;nom_commune;;\n1001;L'Abergement-Clémenciat;;\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/multiTrailingEmptyHeader.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("multipleTrailingEmptyHeaderColumnsAreDropped")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), not(hasItem("")));
+        assertThat(row.keySet(), containsInAnyOrder("code_insee", "nom_commune"));
+    }
+
+    @Test
+    void allEmptyHeaderIsNotTrimmedToZeroColumns() throws Exception {
+        // Edge case: if the whole header is empty (e.g. ";;;"), trimming every column would leave
+        // zero columns and every row would collapse to an empty record. There's no "real" header
+        // left to anchor the trim against, so nothing is dropped in this case.
+        String csvBody = ";;;\n1;2;3;4\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/allEmptyHeader.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("allEmptyHeaderIsNotTrimmedToZeroColumns")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        // Every column is named "" so they collide into a single map key; the point of this test
+        // is that the row is NOT an empty {} record with the data silently discarded.
+        assertThat(row.keySet(), contains(""));
+        assertThat(row.get(""), is("4"));
+    }
+
+    @Test
+    void rowMissingHeadersTrailingSeparatorIsFlaggedAsBadLine() throws Exception {
+        // Intended behavior: the field-count check validates against the RAW header field count
+        // (including the trailing unnamed column that gets dropped from the output), so a data row
+        // that leaves off the header's trailing separator is correctly flagged as a bad line rather
+        // than silently accepted.
+        String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat\n"; // data row omits the trailing ';'
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/rowMissingTrailingSeparator.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("rowMissingHeadersTrailingSeparatorIsFlaggedAsBadLine")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.ERROR))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+
+        Throwable thrown = assertThrows(RuntimeException.class, () -> reader.run(runContext));
+        assertThat(thrown.getMessage(), containsString("Bad line encountered (field count mismatch): Expected 3, got 2 fields."));
+    }
+
+    @Test
     void badLinesErrorThrows() throws Exception {
         String csv = "header1,header2\nvalue1,value2\nvalue3,value4,value5\nvalue6,value7"; // Bad line: value3,value4,value5
         URI src = storageInterface.put(
