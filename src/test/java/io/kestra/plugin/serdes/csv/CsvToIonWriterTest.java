@@ -25,6 +25,7 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.OnBadLines;
+import io.kestra.plugin.serdes.OnEmptyHeader;
 import io.kestra.plugin.serdes.SerdesUtils;
 
 import de.siegmar.fastcsv.reader.CsvParseException;
@@ -331,6 +332,112 @@ class CsvToIonWriterTest {
         Map<String, Object> row = (Map<String, Object>) rows.get(0);
         assertThat(row.keySet(), not(hasItem("")));
         assertThat(row.keySet(), containsInAnyOrder("code_insee", "nom_commune"));
+    }
+
+    @Test
+    void trailingUnnamedColumnsWithDataAreDroppedByDefault() throws Exception {
+        // Default onEmptyHeader=DROP: trailing columns with an empty header name are dropped even
+        // when the rows carry values there. Documents that data in those columns is not emitted.
+        String csvBody = "id;region;;\n1;north;100;200\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/trailingUnnamedWithData.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("trailingUnnamedColumnsWithDataAreDroppedByDefault")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("id", "region"));
+        assertThat(row.get("id"), is("1"));
+    }
+
+    @Test
+    void trailingUnnamedColumnsWithDataAreKeptWhenRename() throws Exception {
+        // onEmptyHeader=RENAME: keep every column and give unnamed ones generated names (col_2,
+        // col_3, ...) so no data is lost and downstream conversions get valid column names.
+        String csvBody = "id;region;;\n1;north;100;200\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/trailingUnnamedRename.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("trailingUnnamedColumnsWithDataAreKeptWhenRename")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .onEmptyHeader(Property.ofValue(OnEmptyHeader.RENAME))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("id", "region", "col_2", "col_3"));
+        assertThat(row.get("col_2"), is("100"));
+        assertThat(row.get("col_3"), is("200"));
+    }
+
+    @Test
+    void utf8BomAndTrailingEmptyHeaderTogether() throws Exception {
+        // GitHub issue #17646 as reported: the source file had both a UTF-8 BOM and a trailing
+        // separator. This is the combined regression guard for the exact reported shape.
+        String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat;\n";
+        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+
+        ByteArrayOutputStream withBom = new ByteArrayOutputStream();
+        withBom.write(utf8Bom);
+        withBom.write(csvBody.getBytes(StandardCharsets.UTF_8));
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/bomAndTrailing.csv"),
+            new ByteArrayInputStream(withBom.toByteArray())
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("utf8BomAndTrailingEmptyHeaderTogether")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("code_insee", "nom_commune"));
+        assertThat(row.get("code_insee"), is("1001"));
     }
 
     @Test

@@ -18,6 +18,7 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.OnBadLines;
+import io.kestra.plugin.serdes.OnEmptyHeader;
 
 import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvReader;
@@ -42,9 +43,10 @@ import reactor.core.publisher.Mono;
         Supports configurable field separator, text delimiter, charset, and \
         header detection. The value `\\N` is treated as null in any field. \
         Use `onBadLines` to control error handling for malformed rows. \
-        A leading UTF-8 byte-order mark is stripped automatically, and a trailing \
-        unnamed header column (e.g. from a trailing field separator) is dropped \
-        with a warning logged."""
+        A leading UTF-8 byte-order mark is stripped automatically. Trailing unnamed \
+        header columns (e.g. from a trailing field separator) are dropped by default; \
+        set `onEmptyHeader` to `RENAME` to keep them with generated names (col_0, col_1, ...) \
+        instead."""
 )
 @Plugin(
     examples = {
@@ -126,6 +128,14 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     @Builder.Default
     @Schema(
+        title = "How to handle columns whose header name is empty",
+        description = "`DROP` (default) removes trailing unnamed columns; `RENAME` keeps every column and names unnamed ones col_0, col_1, ... to avoid losing data."
+    )
+    @PluginProperty(group = "advanced")
+    private final Property<OnEmptyHeader> onEmptyHeader = Property.ofValue(OnEmptyHeader.DROP);
+
+    @Builder.Default
+    @Schema(
         title = "Number of lines to skip at the start of the file"
     )
     @PluginProperty(group = "advanced")
@@ -181,6 +191,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             Map<Integer, String> headers = new TreeMap<>();
             AtomicInteger effectiveHeaderCount = new AtomicInteger();
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
+            OnEmptyHeader rOnEmptyHeaderValue = runContext.render(this.onEmptyHeader).as(OnEmptyHeader.class).orElse(OnEmptyHeader.DROP);
 
             Flux<Object> flowable = Flux
                 .fromIterable(csvReader)
@@ -201,28 +212,39 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         for (int i = 0; i < csvRecord.getFieldCount(); i++) {
                             headers.put(i, csvRecord.getField(i));
                         }
-                        // Trailing empty-named columns are always a contiguous run at the end of the
-                        // header line (e.g. from a trailing field separator): left as-is, an unnamed
-                        // field surfaces as an unusable "" field in the Ion output and breaks downstream
-                        // conversions (e.g. to Parquet). An empty name earlier in the header is a
-                        // structural property of the data itself and is kept as-is.
-                        int trailing = csvRecord.getFieldCount();
-                        while (trailing > 0 && headers.get(trailing - 1).isEmpty()) {
-                            trailing--;
-                        }
-                        if (trailing == 0) {
-                            // The entire header is empty (e.g. ";;;"): trimming would leave zero
-                            // columns and every row would collapse to an empty record. There's no
-                            // artifact to safely drop here, so keep every column as-is instead.
-                            trailing = csvRecord.getFieldCount();
-                        }
-                        effectiveHeaderCount.set(trailing);
-                        int droppedCount = csvRecord.getFieldCount() - trailing;
-                        if (droppedCount > 0) {
-                            runContext.logger().warn(
-                                "Dropping {} trailing unnamed column(s) from the CSV header (likely caused by a trailing field separator)",
-                                droppedCount
-                            );
+                        if (rOnEmptyHeaderValue == OnEmptyHeader.RENAME) {
+                            // Keep every column; give each unnamed one a generated name so no data is
+                            // lost and downstream conversions (e.g. to Parquet) get valid column names.
+                            for (int i = 0; i < csvRecord.getFieldCount(); i++) {
+                                if (headers.get(i).isEmpty()) {
+                                    headers.put(i, "col_" + i);
+                                }
+                            }
+                            effectiveHeaderCount.set(csvRecord.getFieldCount());
+                        } else {
+                            // DROP (default): trailing empty-named columns are always a contiguous run at
+                            // the end of the header line (e.g. from a trailing field separator). Left
+                            // as-is, an unnamed field surfaces as an unusable "" field in the Ion output
+                            // and breaks downstream conversions. An empty name earlier in the header is a
+                            // structural property of the data itself and is kept as-is.
+                            int trailing = csvRecord.getFieldCount();
+                            while (trailing > 0 && headers.get(trailing - 1).isEmpty()) {
+                                trailing--;
+                            }
+                            if (trailing == 0) {
+                                // The entire header is empty (e.g. ";;;"): trimming would leave zero
+                                // columns and every row would collapse to an empty record. There's no
+                                // artifact to safely drop here, so keep every column as-is instead.
+                                trailing = csvRecord.getFieldCount();
+                            }
+                            effectiveHeaderCount.set(trailing);
+                            int droppedCount = csvRecord.getFieldCount() - trailing;
+                            if (droppedCount > 0) {
+                                runContext.logger().warn(
+                                    "Dropped {} trailing unnamed header column(s); any values in those columns are not emitted. Set onEmptyHeader=RENAME to keep them.",
+                                    droppedCount
+                                );
+                            }
                         }
                         return false;
                     }
@@ -237,12 +259,6 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 {
                     if (rHeaderValue) {
                         Map<String, Object> fields = new LinkedHashMap<>();
-                        if (r.getStartingLineNumber() == 1) {
-                            for (int i = 0; i < r.getFieldCount(); i++) {
-                                headers.put(i, r.getField(i));
-                            }
-                            return Mono.empty();
-                        }
                         if (r.getFieldCount() != headers.size()) {
                             String message = "Bad line encountered (field count mismatch): Expected "
                                 + headers.size() + ", got " + r.getFieldCount() + " fields.";
