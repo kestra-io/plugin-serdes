@@ -1,8 +1,5 @@
 package io.kestra.plugin.serdes;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-
-@Schema(title = "How to handle columns whose header name is empty (e.g. from a trailing field separator)")
 public enum OnEmptyHeader {
     /**
      * Drop trailing unnamed header columns and any values they hold. This is the default: it removes

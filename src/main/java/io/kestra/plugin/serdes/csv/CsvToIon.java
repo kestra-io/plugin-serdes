@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.csv;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,12 +25,12 @@ import io.kestra.plugin.serdes.OnEmptyHeader;
 import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvReader;
 import de.siegmar.fastcsv.reader.CsvRecord;
-import org.apache.commons.io.ByteOrderMark;
-import org.apache.commons.io.input.BOMInputStream;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.apache.commons.io.ByteOrderMark;
+import org.apache.commons.io.input.BOMInputStream;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -130,7 +131,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Builder.Default
     @Schema(
         title = "How to handle columns whose header name is empty",
-        description = "`DROP` (default) removes trailing unnamed columns; `RENAME` keeps every column and names unnamed ones col_0, col_1, ... to avoid losing data."
+        description = """
+            `DROP` (default) removes trailing unnamed columns. \
+            `RENAME` keeps every column and names unnamed ones col_0, col_1, ... to avoid losing data."""
     )
     @PluginProperty(group = "advanced")
     private final Property<OnEmptyHeader> onEmptyHeader = Property.ofValue(OnEmptyHeader.DROP);
@@ -167,6 +170,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Override
     public Output run(RunContext runContext) throws Exception {
         URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        String rCharset = runContext.render(charset).as(String.class).orElseThrow();
 
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
@@ -176,11 +180,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         try (
             Reader reader = new BufferedReader(
                 new InputStreamReader(
-                    BOMInputStream.builder()
-                        .setInputStream(runContext.storage().getFile(rFrom))
-                        .setByteOrderMarks(ByteOrderMark.UTF_8)
-                        .get(),
-                    runContext.render(charset).as(String.class).orElseThrow()
+                    stripBomIfUtf8(runContext.storage().getFile(rFrom), rCharset),
+                    rCharset
                 ),
                 FileSerde.BUFFER_SIZE
             );
@@ -283,6 +284,20 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     }
 
     /**
+     * Wraps the source stream to strip a leading UTF-8 byte-order mark, but only when the file is
+     * read as UTF-8. For any other charset those three bytes are real data, so they are left alone.
+     */
+    private static InputStream stripBomIfUtf8(InputStream in, String charsetName) throws IOException {
+        if (!StandardCharsets.UTF_8.equals(Charset.forName(charsetName))) {
+            return in;
+        }
+        return BOMInputStream.builder()
+            .setInputStream(in)
+            .setByteOrderMarks(ByteOrderMark.UTF_8)
+            .get();
+    }
+
+    /**
      * Populates {@code headers} from the header record and returns the number of columns to emit,
      * applying the {@code onEmptyHeader} policy to columns whose name is empty.
      */
@@ -319,6 +334,17 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             runContext.logger().warn(
                 "Dropped {} trailing unnamed header column(s); their values are not emitted. Set onEmptyHeader=RENAME to keep them.",
                 names.size() - kept
+            );
+        }
+
+        // Any empty or duplicate name left among the kept columns maps to the same output key, so
+        // only the last such column's value survives. Warn rather than lose data silently (this
+        // covers an all-empty header, which cannot be trimmed without collapsing every row).
+        long distinctKept = IntStream.range(0, kept).mapToObj(names::get).distinct().count();
+        if (distinctKept < kept) {
+            runContext.logger().warn(
+                "Header has {} duplicate or empty column name(s) among the kept columns. Colliding columns share one output key and only the last value is kept. Set onEmptyHeader=RENAME to keep every column.",
+                kept - distinctKept
             );
         }
         return kept;

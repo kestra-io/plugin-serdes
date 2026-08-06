@@ -234,6 +234,45 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void bomBytesAreNotStrippedForNonUtf8Charset() throws Exception {
+        // EF BB BF is the UTF-8 BOM, but under ISO-8859-1 these are three real characters that
+        // must be preserved, not stripped, so BOM detection is gated on the configured charset.
+        String csvBody = "code_insee;nom_commune\n1001;Abergement\n";
+        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+
+        ByteArrayOutputStream withBom = new ByteArrayOutputStream();
+        withBom.write(utf8Bom);
+        withBom.write(csvBody.getBytes(StandardCharsets.ISO_8859_1));
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/bomNonUtf8.csv"),
+            new ByteArrayInputStream(withBom.toByteArray())
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("bomBytesAreNotStrippedForNonUtf8Charset")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .charset(Property.ofValue("ISO-8859-1"))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), not(hasItem("code_insee")));
+        assertThat(row.keySet(), hasItem("ï»¿code_insee"));
+    }
+
+    @Test
     void trailingEmptyHeaderColumnIsDropped() throws Exception {
         String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat;\n";
 
@@ -574,12 +613,13 @@ class CsvToIonWriterTest {
 
     @Test
     void badLinesWarnAndSkip() throws Exception {
-        String csv = "header1,header2\nvalue1,value2\nvalue3,\"value4\nvalue6,value7\nvalue8,value9,value10\nvalue11,value12";
+        String csv = "header1,header2\nvalue1,value2\nvalue3,\"value4\nvalue6,value7\nvalue8,value9,value10\nvalue11,value12"; // Bad lines: value3,"value4 (unclosed quote), value8,value9,value10 (field count mismatch)
         URI src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/badLinesWarnSkip.csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
         );
 
+        // Test WARN
         CsvToIon readerWarn = CsvToIon.builder()
             .id("badLinesWarn")
             .type(CsvToIon.class.getName())
@@ -597,8 +637,9 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsWarn.getValue(), is(2D));
+        assertThat(recordsWarn.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
 
+        // Test SKIP
         CsvToIon readerSkip = CsvToIon.builder()
             .id("badLinesSkip")
             .type(CsvToIon.class.getName())
@@ -616,21 +657,23 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsSkip.getValue(), is(2D));
+        assertThat(recordsSkip.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
     }
 
     @Test
     void testCsvWithBadRows() throws Exception {
         String csv = "name,age,city\n" +
-            "Alice,New York\n" +
-            "Bob,25,London,extra\n" +
-            "Charlie,35,Paris";
+            "Alice,New York\n" + // less column → bad row
+            "Bob,25,London,extra\n" + // extra column → bad row
+            "Charlie,35,Paris"; // correct row
 
+        // Put CSV in storage
         URI src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/badRows.csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
         );
 
+        // WARN mode
         CsvToIon readerWarn = CsvToIon.builder()
             .id("badRowsTestWarn")
             .type(CsvToIon.class.getName())
@@ -649,6 +692,7 @@ class CsvToIonWriterTest {
             .orElseThrow();
         assertThat(recordsWarn.getValue(), is(1D));
 
+        // SKIP mode
         CsvToIon readerSkip = CsvToIon.builder()
             .id("badRowsTestSkip")
             .type(CsvToIon.class.getName())
@@ -667,6 +711,7 @@ class CsvToIonWriterTest {
             .orElseThrow();
         assertThat(recordsSkip.getValue(), is(1D));
 
+        // ERROR mode
         CsvToIon readerError = CsvToIon.builder()
             .id("badRowsTestError")
             .type(CsvToIon.class.getName())
