@@ -199,8 +199,6 @@ class CsvToIonWriterTest {
 
     @Test
     void utf8BomInHeaderIsStripped() throws Exception {
-        // GitHub issue #17646: a UTF-8 BOM at the start of the file was leaking into the first
-        // header's name, causing it to be quoted differently from every other field in the Ion output.
         String csvBody = "code_insee;nom_commune\n1001;L'Abergement-Clémenciat\n";
         byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
@@ -237,8 +235,6 @@ class CsvToIonWriterTest {
 
     @Test
     void trailingEmptyHeaderColumnIsDropped() throws Exception {
-        // GitHub issue #17646: a trailing field separator on the header line produced a
-        // nameless field ('':"") on every row in the Ion output.
         String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat;\n";
 
         URI src = storageInterface.put(
@@ -270,9 +266,6 @@ class CsvToIonWriterTest {
 
     @Test
     void emptyHeaderNameInTheMiddleIsPreservedNotDropped() throws Exception {
-        // Only *trailing* empty header names are treated as a trailing-separator artifact. An empty
-        // name in the middle of the header carries real data and is a structural property of the
-        // source file, not an artifact, so it must be preserved rather than silently dropped.
         String csvBody = "code_insee;;nom_commune\n1001;X;L'Abergement-Clémenciat\n";
 
         URI src = storageInterface.put(
@@ -304,7 +297,6 @@ class CsvToIonWriterTest {
 
     @Test
     void multipleTrailingEmptyHeaderColumnsAreDropped() throws Exception {
-        // Two trailing separators in a row should drop both empty-named trailing columns, not just one.
         String csvBody = "code_insee;nom_commune;;\n1001;L'Abergement-Clémenciat;;\n";
 
         URI src = storageInterface.put(
@@ -336,8 +328,6 @@ class CsvToIonWriterTest {
 
     @Test
     void trailingUnnamedColumnsWithDataAreDroppedByDefault() throws Exception {
-        // Default onEmptyHeader=DROP: trailing columns with an empty header name are dropped even
-        // when the rows carry values there. Documents that data in those columns is not emitted.
         String csvBody = "id;region;;\n1;north;100;200\n";
 
         URI src = storageInterface.put(
@@ -369,8 +359,6 @@ class CsvToIonWriterTest {
 
     @Test
     void trailingUnnamedColumnsWithDataAreKeptWhenRename() throws Exception {
-        // onEmptyHeader=RENAME: keep every column and give unnamed ones generated names (col_2,
-        // col_3, ...) so no data is lost and downstream conversions get valid column names.
         String csvBody = "id;region;;\n1;north;100;200\n";
 
         URI src = storageInterface.put(
@@ -404,9 +392,6 @@ class CsvToIonWriterTest {
 
     @Test
     void renameDisambiguatesAgainstRealColumnNamedLikeGenerated() throws Exception {
-        // RENAME must not overwrite a real column that happens to be named like a generated one.
-        // Here index 1 is empty (would generate "col_1") and index 2 is literally named "col_1";
-        // the generated name is disambiguated so all four columns and their values survive.
         String csvBody = "a;;col_1;d\n1;2;3;4\n";
 
         URI src = storageInterface.put(
@@ -433,7 +418,6 @@ class CsvToIonWriterTest {
         assertThat(rows, hasSize(1));
         @SuppressWarnings("unchecked")
         Map<String, Object> row = (Map<String, Object>) rows.get(0);
-        // 4 distinct keys: the real "col_1" is preserved, the generated one gets "col_1_2".
         assertThat(row.keySet(), hasSize(4));
         assertThat(row.keySet(), hasItems("a", "col_1", "d"));
         assertThat(row.get("col_1"), is("3"));
@@ -442,8 +426,6 @@ class CsvToIonWriterTest {
 
     @Test
     void renameNamesMiddleAndAllEmptyHeaders() throws Exception {
-        // RENAME renames every empty header name, including one in the middle and the all-empty case,
-        // so no column collapses to an unusable "" name and no data is lost.
         String csvBody = ";b;\n1;2;3\n";
 
         URI src = storageInterface.put(
@@ -478,8 +460,6 @@ class CsvToIonWriterTest {
 
     @Test
     void utf8BomAndTrailingEmptyHeaderTogether() throws Exception {
-        // GitHub issue #17646 as reported: the source file had both a UTF-8 BOM and a trailing
-        // separator. This is the combined regression guard for the exact reported shape.
         String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat;\n";
         byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
@@ -516,9 +496,6 @@ class CsvToIonWriterTest {
 
     @Test
     void allEmptyHeaderIsNotTrimmedToZeroColumns() throws Exception {
-        // Edge case: if the whole header is empty (e.g. ";;;"), trimming every column would leave
-        // zero columns and every row would collapse to an empty record. There's no "real" header
-        // left to anchor the trim against, so nothing is dropped in this case.
         String csvBody = ";;;\n1;2;3;4\n";
 
         URI src = storageInterface.put(
@@ -544,19 +521,13 @@ class CsvToIonWriterTest {
         assertThat(rows, hasSize(1));
         @SuppressWarnings("unchecked")
         Map<String, Object> row = (Map<String, Object>) rows.get(0);
-        // Every column is named "" so they collide into a single map key; the point of this test
-        // is that the row is NOT an empty {} record with the data silently discarded.
         assertThat(row.keySet(), contains(""));
         assertThat(row.get(""), is("4"));
     }
 
     @Test
     void rowMissingHeadersTrailingSeparatorIsFlaggedAsBadLine() throws Exception {
-        // Intended behavior: the field-count check validates against the RAW header field count
-        // (including the trailing unnamed column that gets dropped from the output), so a data row
-        // that leaves off the header's trailing separator is correctly flagged as a bad line rather
-        // than silently accepted.
-        String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat\n"; // data row omits the trailing ';'
+        String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat\n";
 
         URI src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/rowMissingTrailingSeparator.csv"),
@@ -580,7 +551,7 @@ class CsvToIonWriterTest {
 
     @Test
     void badLinesErrorThrows() throws Exception {
-        String csv = "header1,header2\nvalue1,value2\nvalue3,value4,value5\nvalue6,value7"; // Bad line: value3,value4,value5
+        String csv = "header1,header2\nvalue1,value2\nvalue3,value4,value5\nvalue6,value7";
         URI src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/badLinesError.csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
@@ -603,13 +574,12 @@ class CsvToIonWriterTest {
 
     @Test
     void badLinesWarnAndSkip() throws Exception {
-        String csv = "header1,header2\nvalue1,value2\nvalue3,\"value4\nvalue6,value7\nvalue8,value9,value10\nvalue11,value12"; // Bad lines: value3,"value4 (unclosed quote), value8,value9,value10 (field count mismatch)
+        String csv = "header1,header2\nvalue1,value2\nvalue3,\"value4\nvalue6,value7\nvalue8,value9,value10\nvalue11,value12";
         URI src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/badLinesWarnSkip.csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
         );
 
-        // Test WARN
         CsvToIon readerWarn = CsvToIon.builder()
             .id("badLinesWarn")
             .type(CsvToIon.class.getName())
@@ -627,9 +597,8 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsWarn.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsWarn.getValue(), is(2D));
 
-        // Test SKIP
         CsvToIon readerSkip = CsvToIon.builder()
             .id("badLinesSkip")
             .type(CsvToIon.class.getName())
@@ -647,23 +616,21 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsSkip.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsSkip.getValue(), is(2D));
     }
 
     @Test
     void testCsvWithBadRows() throws Exception {
         String csv = "name,age,city\n" +
-            "Alice,New York\n" + // less column → bad row
-            "Bob,25,London,extra\n" + // extra column → bad row
-            "Charlie,35,Paris"; // correct row
+            "Alice,New York\n" +
+            "Bob,25,London,extra\n" +
+            "Charlie,35,Paris";
 
-        // Put CSV in storage
         URI src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/badRows.csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
         );
 
-        // WARN mode
         CsvToIon readerWarn = CsvToIon.builder()
             .id("badRowsTestWarn")
             .type(CsvToIon.class.getName())
@@ -682,7 +649,6 @@ class CsvToIonWriterTest {
             .orElseThrow();
         assertThat(recordsWarn.getValue(), is(1D));
 
-        // SKIP mode
         CsvToIon readerSkip = CsvToIon.builder()
             .id("badRowsTestSkip")
             .type(CsvToIon.class.getName())
@@ -701,7 +667,6 @@ class CsvToIonWriterTest {
             .orElseThrow();
         assertThat(recordsSkip.getValue(), is(1D));
 
-        // ERROR mode
         CsvToIon readerError = CsvToIon.builder()
             .id("badRowsTestError")
             .type(CsvToIon.class.getName())

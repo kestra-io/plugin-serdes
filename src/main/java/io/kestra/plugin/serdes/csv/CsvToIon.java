@@ -209,52 +209,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 .filter(csvRecord ->
                 {
                     if (rHeaderValue && csvRecord.getStartingLineNumber() == 1) {
-                        for (int i = 0; i < csvRecord.getFieldCount(); i++) {
-                            headers.put(i, csvRecord.getField(i));
-                        }
-                        if (rOnEmptyHeaderValue == OnEmptyHeader.RENAME) {
-                            // Keep every column; give each unnamed one a generated name so no data is
-                            // lost and downstream conversions (e.g. to Parquet) get valid column names.
-                            // The generated name is disambiguated against existing (and already
-                            // generated) names so it can never collide with a real column literally
-                            // named "col_<n>" and silently overwrite it.
-                            Set<String> usedNames = new HashSet<>(headers.values());
-                            for (int i = 0; i < csvRecord.getFieldCount(); i++) {
-                                if (headers.get(i).isEmpty()) {
-                                    String name = "col_" + i;
-                                    for (int suffix = 2; usedNames.contains(name); suffix++) {
-                                        name = "col_" + i + "_" + suffix;
-                                    }
-                                    headers.put(i, name);
-                                    usedNames.add(name);
-                                }
-                            }
-                            effectiveHeaderCount.set(csvRecord.getFieldCount());
-                        } else {
-                            // DROP (default): trailing empty-named columns are always a contiguous run at
-                            // the end of the header line (e.g. from a trailing field separator). Left
-                            // as-is, an unnamed field surfaces as an unusable "" field in the Ion output
-                            // and breaks downstream conversions. An empty name earlier in the header is a
-                            // structural property of the data itself and is kept as-is.
-                            int trailing = csvRecord.getFieldCount();
-                            while (trailing > 0 && headers.get(trailing - 1).isEmpty()) {
-                                trailing--;
-                            }
-                            if (trailing == 0) {
-                                // The entire header is empty (e.g. ";;;"): trimming would leave zero
-                                // columns and every row would collapse to an empty record. There's no
-                                // artifact to safely drop here, so keep every column as-is instead.
-                                trailing = csvRecord.getFieldCount();
-                            }
-                            effectiveHeaderCount.set(trailing);
-                            int droppedCount = csvRecord.getFieldCount() - trailing;
-                            if (droppedCount > 0) {
-                                runContext.logger().warn(
-                                    "Dropped {} trailing unnamed header column(s); any values in those columns are not emitted. Set onEmptyHeader=RENAME to keep them.",
-                                    droppedCount
-                                );
-                            }
-                        }
+                        effectiveHeaderCount.set(this.resolveHeaders(csvRecord, headers, rOnEmptyHeaderValue, runContext));
                         return false;
                     }
                     if (rSkipRowsValue > 0 && skipped.get() < rSkipRowsValue) {
@@ -324,6 +279,48 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         @Schema(title = "The number of records converted")
         private long size;
+    }
+
+    /**
+     * Populates {@code headers} from the header record and returns the number of columns to emit,
+     * applying the {@code onEmptyHeader} policy to columns whose name is empty.
+     */
+    private int resolveHeaders(CsvRecord header, Map<Integer, String> headers, OnEmptyHeader onEmptyHeader, RunContext runContext) {
+        int count = header.getFieldCount();
+        for (int i = 0; i < count; i++) {
+            headers.put(i, header.getField(i));
+        }
+
+        if (onEmptyHeader == OnEmptyHeader.RENAME) {
+            Set<String> usedNames = new HashSet<>(headers.values());
+            for (int i = 0; i < count; i++) {
+                if (headers.get(i).isEmpty()) {
+                    String name = "col_" + i;
+                    for (int suffix = 2; usedNames.contains(name); suffix++) {
+                        name = "col_" + i + "_" + suffix;
+                    }
+                    headers.put(i, name);
+                    usedNames.add(name);
+                }
+            }
+            return count;
+        }
+
+        // DROP: trim the trailing run of unnamed columns, but never down to zero columns.
+        int kept = count;
+        while (kept > 0 && headers.get(kept - 1).isEmpty()) {
+            kept--;
+        }
+        if (kept == 0) {
+            return count;
+        }
+        if (kept < count) {
+            runContext.logger().warn(
+                "Dropped {} trailing unnamed header column(s); their values are not emitted. Set onEmptyHeader=RENAME to keep them.",
+                count - kept
+            );
+        }
+        return kept;
     }
 
     private CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {
