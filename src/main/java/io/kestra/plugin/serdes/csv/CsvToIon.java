@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -286,38 +287,38 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
      * applying the {@code onEmptyHeader} policy to columns whose name is empty.
      */
     private int resolveHeaders(CsvRecord header, Map<Integer, String> headers, OnEmptyHeader onEmptyHeader, RunContext runContext) {
-        int count = header.getFieldCount();
-        for (int i = 0; i < count; i++) {
-            headers.put(i, header.getField(i));
-        }
+        List<String> names = header.getFields();
+        IntStream.range(0, names.size()).forEach(index -> headers.put(index, names.get(index)));
 
         if (onEmptyHeader == OnEmptyHeader.RENAME) {
-            Set<String> usedNames = new HashSet<>(headers.values());
-            for (int i = 0; i < count; i++) {
-                if (headers.get(i).isEmpty()) {
-                    String name = "col_" + i;
-                    for (int suffix = 2; usedNames.contains(name); suffix++) {
-                        name = "col_" + i + "_" + suffix;
-                    }
-                    headers.put(i, name);
-                    usedNames.add(name);
+            // Name every unnamed column uniquely, so no data is lost and Parquet gets valid names.
+            Set<String> taken = new HashSet<>(names);
+            headers.replaceAll((index, name) -> {
+                if (!name.isEmpty()) {
+                    return name;
                 }
-            }
-            return count;
+                String unique = IntStream.iterate(1, attempt -> attempt + 1)
+                    .mapToObj(attempt -> attempt == 1 ? "col_" + index : "col_" + index + "_" + attempt)
+                    .filter(candidate -> !taken.contains(candidate))
+                    .findFirst()
+                    .orElseThrow();
+                taken.add(unique);
+                return unique;
+            });
+            return names.size();
         }
 
-        // DROP: trim the trailing run of unnamed columns, but never down to zero columns.
-        int kept = count;
-        while (kept > 0 && headers.get(kept - 1).isEmpty()) {
-            kept--;
-        }
-        if (kept == 0) {
-            return count;
-        }
-        if (kept < count) {
+        // DROP: drop the trailing run of unnamed columns (e.g. a trailing separator), but keep at
+        // least one column so rows never collapse to an empty record.
+        int kept = IntStream.range(0, names.size())
+            .filter(index -> !names.get(index).isEmpty())
+            .max()
+            .orElse(names.size() - 1) + 1;
+
+        if (kept < names.size()) {
             runContext.logger().warn(
                 "Dropped {} trailing unnamed header column(s); their values are not emitted. Set onEmptyHeader=RENAME to keep them.",
-                count - kept
+                names.size() - kept
             );
         }
         return kept;
