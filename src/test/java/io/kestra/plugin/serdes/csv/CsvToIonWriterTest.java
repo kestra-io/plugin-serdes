@@ -403,6 +403,80 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void renameDisambiguatesAgainstRealColumnNamedLikeGenerated() throws Exception {
+        // RENAME must not overwrite a real column that happens to be named like a generated one.
+        // Here index 1 is empty (would generate "col_1") and index 2 is literally named "col_1";
+        // the generated name is disambiguated so all four columns and their values survive.
+        String csvBody = "a;;col_1;d\n1;2;3;4\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/renameCollision.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("renameDisambiguatesAgainstRealColumnNamedLikeGenerated")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .onEmptyHeader(Property.ofValue(OnEmptyHeader.RENAME))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        // 4 distinct keys: the real "col_1" is preserved, the generated one gets "col_1_2".
+        assertThat(row.keySet(), hasSize(4));
+        assertThat(row.keySet(), hasItems("a", "col_1", "d"));
+        assertThat(row.get("col_1"), is("3"));
+        assertThat(row.get("col_1_2"), is("2"));
+    }
+
+    @Test
+    void renameNamesMiddleAndAllEmptyHeaders() throws Exception {
+        // RENAME renames every empty header name, including one in the middle and the all-empty case,
+        // so no column collapses to an unusable "" name and no data is lost.
+        String csvBody = ";b;\n1;2;3\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/renameMiddleAndEdges.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("renameNamesMiddleAndAllEmptyHeaders")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .onEmptyHeader(Property.ofValue(OnEmptyHeader.RENAME))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("col_0", "b", "col_2"));
+        assertThat(row.get("col_0"), is("1"));
+        assertThat(row.get("b"), is("2"));
+        assertThat(row.get("col_2"), is("3"));
+    }
+
+    @Test
     void utf8BomAndTrailingEmptyHeaderTogether() throws Exception {
         // GitHub issue #17646 as reported: the source file had both a UTF-8 BOM and a trailing
         // separator. This is the combined regression guard for the exact reported shape.

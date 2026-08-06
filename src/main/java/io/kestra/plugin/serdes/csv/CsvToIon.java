@@ -215,9 +215,18 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                         if (rOnEmptyHeaderValue == OnEmptyHeader.RENAME) {
                             // Keep every column; give each unnamed one a generated name so no data is
                             // lost and downstream conversions (e.g. to Parquet) get valid column names.
+                            // The generated name is disambiguated against existing (and already
+                            // generated) names so it can never collide with a real column literally
+                            // named "col_<n>" and silently overwrite it.
+                            Set<String> usedNames = new HashSet<>(headers.values());
                             for (int i = 0; i < csvRecord.getFieldCount(); i++) {
                                 if (headers.get(i).isEmpty()) {
-                                    headers.put(i, "col_" + i);
+                                    String name = "col_" + i;
+                                    for (int suffix = 2; usedNames.contains(name); suffix++) {
+                                        name = "col_" + i + "_" + suffix;
+                                    }
+                                    headers.put(i, name);
+                                    usedNames.add(name);
                                 }
                             }
                             effectiveHeaderCount.set(csvRecord.getFieldCount());
