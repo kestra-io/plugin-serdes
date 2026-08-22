@@ -87,7 +87,7 @@ dependencies {
         exclude group: "org.slf4j"
         exclude group: "com.fasterxml.jackson.core"
     }
-    implementation group: 'org.json', name: 'json', version: '20260719'
+    implementation group: 'org.json', name: 'json', version: '20260814'
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
 
