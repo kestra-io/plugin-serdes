@@ -67,7 +67,7 @@ dependencies {
 
     implementation 'de.siegmar:fastcsv:4.4.0'
     implementation 'commons-io:commons-io' // for BOMInputStream
-    implementation ('org.apache.avro:avro:1.12.1') {
+    implementation ('org.apache.avro:avro:1.12.2') {
         exclude group: 'com.fasterxml.jackson.core'
     }
     implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.17.1'
