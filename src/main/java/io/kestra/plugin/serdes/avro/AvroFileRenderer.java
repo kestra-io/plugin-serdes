@@ -1,24 +1,28 @@
 package io.kestra.plugin.serdes.avro;
 
-import io.kestra.core.preview.FilePreview;
-import io.kestra.core.preview.FileRenderer;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+
+import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.preview.FilePreview;
+import io.kestra.core.preview.FileRenderer;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
 @ToString
@@ -31,10 +35,17 @@ import java.util.Optional;
         Preview Avro files inside the Kestra UI. Each record is decoded using its \
         embedded schema and rendered as a row."""
 )
+@Plugin
 public class AvroFileRenderer implements FileRenderer {
     @Override
     public boolean supports(String extension) {
         return "avro".equalsIgnoreCase(extension);
+    }
+
+    // No @Override: this branch's kestraVersion predates FileRenderer.extensions()
+    // (kestra-io/kestra#16054). Overrides correctly once that dependency updates.
+    public Set<String> extensions() {
+        return Set.of("avro");
     }
 
     @Override

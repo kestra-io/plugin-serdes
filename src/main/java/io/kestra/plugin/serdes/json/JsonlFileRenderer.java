@@ -1,16 +1,5 @@
 package io.kestra.plugin.serdes.json;
 
-import com.fasterxml.jackson.databind.ObjectReader;
-import io.kestra.core.preview.FilePreview;
-import io.kestra.core.preview.FileRenderer;
-import io.kestra.core.serializers.JacksonMapper;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,6 +9,21 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+
+import com.fasterxml.jackson.databind.ObjectReader;
+
+import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.preview.FilePreview;
+import io.kestra.core.preview.FileRenderer;
+import io.kestra.core.serializers.JacksonMapper;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
 @ToString
@@ -32,10 +36,17 @@ import java.util.Optional;
         Preview JSONL (newline-delimited JSON) files inside the Kestra UI. Each line \
         is parsed as a standalone JSON object and rendered as a row."""
 )
+@Plugin
 public class JsonlFileRenderer implements FileRenderer {
     @Override
     public boolean supports(String extension) {
         return "jsonl".equalsIgnoreCase(extension);
+    }
+
+    // No @Override: this branch's kestraVersion predates FileRenderer.extensions()
+    // (kestra-io/kestra#16054). Overrides correctly once that dependency updates.
+    public Set<String> extensions() {
+        return Set.of("jsonl");
     }
 
     @Override

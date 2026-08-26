@@ -1,20 +1,5 @@
 package io.kestra.plugin.serdes.excel;
 
-import com.github.pjfanning.xlsx.StreamingReader;
-import io.kestra.core.preview.FilePreview;
-import io.kestra.core.preview.FileRenderer;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.DateUtil;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -25,6 +10,26 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+
+import com.github.pjfanning.xlsx.StreamingReader;
+
+import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.preview.FilePreview;
+import io.kestra.core.preview.FileRenderer;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
 @ToString
@@ -39,10 +44,17 @@ import java.util.Optional;
         the header, and each following row is rendered as a record mapping header names \
         to values."""
 )
+@Plugin
 public class ExcelFileRenderer implements FileRenderer {
     @Override
     public boolean supports(String extension) {
         return "xlsx".equalsIgnoreCase(extension);
+    }
+
+    // No @Override: this branch's kestraVersion predates FileRenderer.extensions()
+    // (kestra-io/kestra#16054). Overrides correctly once that dependency updates.
+    public Set<String> extensions() {
+        return Set.of("xlsx");
     }
 
     @Override
