@@ -46,8 +46,7 @@ public class CsvFileRenderer implements FileRenderer {
         return "csv".equalsIgnoreCase(extension);
     }
 
-    // No @Override: this branch's kestraVersion predates FileRenderer.extensions()
-    // (kestra-io/kestra#16054). Overrides correctly once that dependency updates.
+    @Override
     public Set<String> extensions() {
         return Set.of("csv");
     }
