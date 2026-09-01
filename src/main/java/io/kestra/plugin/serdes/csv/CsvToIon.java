@@ -2,9 +2,11 @@ package io.kestra.plugin.serdes.csv;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -18,6 +20,7 @@ import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.plugin.serdes.OnBadLines;
+import io.kestra.plugin.serdes.OnEmptyHeader;
 
 import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvReader;
@@ -26,6 +29,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.apache.commons.io.ByteOrderMark;
+import org.apache.commons.io.input.BOMInputStream;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -39,7 +44,11 @@ import reactor.core.publisher.Mono;
     description = """
         Supports configurable field separator, text delimiter, charset, and \
         header detection. The value `\\N` is treated as null in any field. \
-        Use `onBadLines` to control error handling for malformed rows."""
+        Use `onBadLines` to control error handling for malformed rows. \
+        A leading UTF-8 byte-order mark is stripped automatically. Trailing unnamed \
+        header columns (e.g. from a trailing field separator) are dropped by default; \
+        set `onEmptyHeader` to `RENAME` to keep them with generated names (col_0, col_1, ...) \
+        instead."""
 )
 @Plugin(
     examples = {
@@ -121,6 +130,16 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     @Builder.Default
     @Schema(
+        title = "How to handle columns whose header name is empty",
+        description = """
+            `DROP` (default) removes trailing unnamed columns. \
+            `RENAME` keeps every column and names unnamed ones col_0, col_1, ... to avoid losing data."""
+    )
+    @PluginProperty(group = "advanced")
+    private final Property<OnEmptyHeader> onEmptyHeader = Property.ofValue(OnEmptyHeader.DROP);
+
+    @Builder.Default
+    @Schema(
         title = "Number of lines to skip at the start of the file"
     )
     @PluginProperty(group = "advanced")
@@ -151,6 +170,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     @Override
     public Output run(RunContext runContext) throws Exception {
         URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        String rCharset = runContext.render(charset).as(String.class).orElseThrow();
 
         File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
@@ -160,8 +180,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         try (
             Reader reader = new BufferedReader(
                 new InputStreamReader(
-                    runContext.storage().getFile(rFrom),
-                    runContext.render(charset).as(String.class).orElseThrow()
+                    stripBomIfUtf8(runContext.storage().getFile(rFrom), rCharset),
+                    rCharset
                 ),
                 FileSerde.BUFFER_SIZE
             );
@@ -171,7 +191,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
             var rSkipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
             Map<Integer, String> headers = new TreeMap<>();
+            AtomicInteger effectiveHeaderCount = new AtomicInteger();
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
+            OnEmptyHeader rOnEmptyHeaderValue = runContext.render(this.onEmptyHeader).as(OnEmptyHeader.class).orElse(OnEmptyHeader.DROP);
 
             Flux<Object> flowable = Flux
                 .fromIterable(csvReader)
@@ -189,9 +211,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 .filter(csvRecord ->
                 {
                     if (rHeaderValue && csvRecord.getStartingLineNumber() == 1) {
-                        for (int i = 0; i < csvRecord.getFieldCount(); i++) {
-                            headers.put(i, csvRecord.getField(i));
-                        }
+                        effectiveHeaderCount.set(this.resolveHeaders(csvRecord, headers, rOnEmptyHeaderValue, runContext));
                         return false;
                     }
                     if (rSkipRowsValue > 0 && skipped.get() < rSkipRowsValue) {
@@ -205,12 +225,6 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 {
                     if (rHeaderValue) {
                         Map<String, Object> fields = new LinkedHashMap<>();
-                        if (r.getStartingLineNumber() == 1) {
-                            for (int i = 0; i < r.getFieldCount(); i++) {
-                                headers.put(i, r.getField(i));
-                            }
-                            return Mono.empty();
-                        }
                         if (r.getFieldCount() != headers.size()) {
                             String message = "Bad line encountered (field count mismatch): Expected "
                                 + headers.size() + ", got " + r.getFieldCount() + " fields.";
@@ -221,13 +235,12 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                             }
                             return Mono.empty();
                         }
-                        for (Map.Entry<Integer, String> header : headers.entrySet()) {
-                            int i = header.getKey();
+                        for (int i = 0; i < effectiveHeaderCount.get(); i++) {
                             String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
                             if ("\\N".equals(fieldValue)) {
                                 fieldValue = null;
                             }
-                            fields.put(header.getValue(), fieldValue);
+                            fields.put(headers.get(i), fieldValue);
                         }
                         return Mono.just(fields);
                     } else {
@@ -268,6 +281,73 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         @Schema(title = "The number of records converted")
         private long size;
+    }
+
+    /**
+     * Wraps the source stream to strip a leading UTF-8 byte-order mark, but only when the file is
+     * read as UTF-8. For any other charset those three bytes are real data, so they are left alone.
+     */
+    private static InputStream stripBomIfUtf8(InputStream in, String charsetName) throws IOException {
+        if (!StandardCharsets.UTF_8.equals(Charset.forName(charsetName))) {
+            return in;
+        }
+        return BOMInputStream.builder()
+            .setInputStream(in)
+            .setByteOrderMarks(ByteOrderMark.UTF_8)
+            .get();
+    }
+
+    /**
+     * Populates {@code headers} from the header record and returns the number of columns to emit,
+     * applying the {@code onEmptyHeader} policy to columns whose name is empty.
+     */
+    private int resolveHeaders(CsvRecord header, Map<Integer, String> headers, OnEmptyHeader onEmptyHeader, RunContext runContext) {
+        List<String> names = header.getFields();
+        IntStream.range(0, names.size()).forEach(index -> headers.put(index, names.get(index)));
+
+        if (onEmptyHeader == OnEmptyHeader.RENAME) {
+            // Name every unnamed column uniquely, so no data is lost and Parquet gets valid names.
+            Set<String> taken = new HashSet<>(names);
+            headers.replaceAll((index, name) -> {
+                if (!name.isEmpty()) {
+                    return name;
+                }
+                String unique = IntStream.iterate(1, attempt -> attempt + 1)
+                    .mapToObj(attempt -> attempt == 1 ? "col_" + index : "col_" + index + "_" + attempt)
+                    .filter(candidate -> !taken.contains(candidate))
+                    .findFirst()
+                    .orElseThrow();
+                taken.add(unique);
+                return unique;
+            });
+            return names.size();
+        }
+
+        // DROP: drop the trailing run of unnamed columns (e.g. a trailing separator), but keep at
+        // least one column so rows never collapse to an empty record.
+        int kept = IntStream.range(0, names.size())
+            .filter(index -> !names.get(index).isEmpty())
+            .max()
+            .orElse(names.size() - 1) + 1;
+
+        if (kept < names.size()) {
+            runContext.logger().warn(
+                "Dropped {} trailing unnamed header column(s); their values are not emitted. Set onEmptyHeader=RENAME to keep them.",
+                names.size() - kept
+            );
+        }
+
+        // Any empty or duplicate name left among the kept columns maps to the same output key, so
+        // only the last such column's value survives. Warn rather than lose data silently (this
+        // covers an all-empty header, which cannot be trimmed without collapsing every row).
+        long distinctKept = IntStream.range(0, kept).mapToObj(names::get).distinct().count();
+        if (distinctKept < kept) {
+            runContext.logger().warn(
+                "Header has {} duplicate or empty column name(s) among the kept columns. Colliding columns share one output key and only the last value is kept. Set onEmptyHeader=RENAME to keep every column.",
+                kept - distinctKept
+            );
+        }
+        return kept;
     }
 
     private CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {

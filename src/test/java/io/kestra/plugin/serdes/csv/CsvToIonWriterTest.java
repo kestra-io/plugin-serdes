@@ -1,12 +1,14 @@
 package io.kestra.plugin.serdes.csv;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +25,7 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.OnBadLines;
+import io.kestra.plugin.serdes.OnEmptyHeader;
 import io.kestra.plugin.serdes.SerdesUtils;
 
 import de.siegmar.fastcsv.reader.CsvParseException;
@@ -195,8 +198,399 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void utf8BomInHeaderIsStripped() throws Exception {
+        String csvBody = "code_insee;nom_commune\n1001;L'Abergement-Clémenciat\n";
+        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+
+        ByteArrayOutputStream withBom = new ByteArrayOutputStream();
+        withBom.write(utf8Bom);
+        withBom.write(csvBody.getBytes(StandardCharsets.UTF_8));
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/bomHeader.csv"),
+            new ByteArrayInputStream(withBom.toByteArray())
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("utf8BomInHeaderIsStripped")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), hasItem("code_insee"));
+        assertThat(row.get("code_insee"), is("1001"));
+    }
+
+    @Test
+    void bomBytesAreNotStrippedForNonUtf8Charset() throws Exception {
+        // EF BB BF is the UTF-8 BOM, but under ISO-8859-1 these are three real characters that
+        // must be preserved, not stripped, so BOM detection is gated on the configured charset.
+        String csvBody = "code_insee;nom_commune\n1001;Abergement\n";
+        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+
+        ByteArrayOutputStream withBom = new ByteArrayOutputStream();
+        withBom.write(utf8Bom);
+        withBom.write(csvBody.getBytes(StandardCharsets.ISO_8859_1));
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/bomNonUtf8.csv"),
+            new ByteArrayInputStream(withBom.toByteArray())
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("bomBytesAreNotStrippedForNonUtf8Charset")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .charset(Property.ofValue("ISO-8859-1"))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), not(hasItem("code_insee")));
+        assertThat(row.keySet(), hasItem("ï»¿code_insee"));
+    }
+
+    @Test
+    void trailingEmptyHeaderColumnIsDropped() throws Exception {
+        String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat;\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/trailingEmptyHeader.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("trailingEmptyHeaderColumnIsDropped")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), not(hasItem("")));
+        assertThat(row.keySet(), containsInAnyOrder("code_insee", "nom_commune"));
+    }
+
+    @Test
+    void emptyHeaderNameInTheMiddleIsPreservedNotDropped() throws Exception {
+        String csvBody = "code_insee;;nom_commune\n1001;X;L'Abergement-Clémenciat\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/middleEmptyHeader.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("emptyHeaderNameInTheMiddleIsPreservedNotDropped")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("code_insee", "", "nom_commune"));
+        assertThat(row.get(""), is("X"));
+    }
+
+    @Test
+    void multipleTrailingEmptyHeaderColumnsAreDropped() throws Exception {
+        String csvBody = "code_insee;nom_commune;;\n1001;L'Abergement-Clémenciat;;\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/multiTrailingEmptyHeader.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("multipleTrailingEmptyHeaderColumnsAreDropped")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), not(hasItem("")));
+        assertThat(row.keySet(), containsInAnyOrder("code_insee", "nom_commune"));
+    }
+
+    @Test
+    void trailingUnnamedColumnsWithDataAreDroppedByDefault() throws Exception {
+        String csvBody = "id;region;;\n1;north;100;200\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/trailingUnnamedWithData.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("trailingUnnamedColumnsWithDataAreDroppedByDefault")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("id", "region"));
+        assertThat(row.get("id"), is("1"));
+    }
+
+    @Test
+    void trailingUnnamedColumnsWithDataAreKeptWhenRename() throws Exception {
+        String csvBody = "id;region;;\n1;north;100;200\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/trailingUnnamedRename.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("trailingUnnamedColumnsWithDataAreKeptWhenRename")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .onEmptyHeader(Property.ofValue(OnEmptyHeader.RENAME))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("id", "region", "col_2", "col_3"));
+        assertThat(row.get("col_2"), is("100"));
+        assertThat(row.get("col_3"), is("200"));
+    }
+
+    @Test
+    void renameDisambiguatesAgainstRealColumnNamedLikeGenerated() throws Exception {
+        String csvBody = "a;;col_1;d\n1;2;3;4\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/renameCollision.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("renameDisambiguatesAgainstRealColumnNamedLikeGenerated")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .onEmptyHeader(Property.ofValue(OnEmptyHeader.RENAME))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), hasSize(4));
+        assertThat(row.keySet(), hasItems("a", "col_1", "d"));
+        assertThat(row.get("col_1"), is("3"));
+        assertThat(row.get("col_1_2"), is("2"));
+    }
+
+    @Test
+    void renameNamesMiddleAndAllEmptyHeaders() throws Exception {
+        String csvBody = ";b;\n1;2;3\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/renameMiddleAndEdges.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("renameNamesMiddleAndAllEmptyHeaders")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .onEmptyHeader(Property.ofValue(OnEmptyHeader.RENAME))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("col_0", "b", "col_2"));
+        assertThat(row.get("col_0"), is("1"));
+        assertThat(row.get("b"), is("2"));
+        assertThat(row.get("col_2"), is("3"));
+    }
+
+    @Test
+    void utf8BomAndTrailingEmptyHeaderTogether() throws Exception {
+        String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat;\n";
+        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+
+        ByteArrayOutputStream withBom = new ByteArrayOutputStream();
+        withBom.write(utf8Bom);
+        withBom.write(csvBody.getBytes(StandardCharsets.UTF_8));
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/bomAndTrailing.csv"),
+            new ByteArrayInputStream(withBom.toByteArray())
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("utf8BomAndTrailingEmptyHeaderTogether")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), containsInAnyOrder("code_insee", "nom_commune"));
+        assertThat(row.get("code_insee"), is("1001"));
+    }
+
+    @Test
+    void allEmptyHeaderIsNotTrimmedToZeroColumns() throws Exception {
+        String csvBody = ";;;\n1;2;3;4\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/allEmptyHeader.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("allEmptyHeaderIsNotTrimmedToZeroColumns")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(1));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> row = (Map<String, Object>) rows.get(0);
+        assertThat(row.keySet(), contains(""));
+        assertThat(row.get(""), is("4"));
+    }
+
+    @Test
+    void rowMissingHeadersTrailingSeparatorIsFlaggedAsBadLine() throws Exception {
+        String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat\n";
+
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/rowMissingTrailingSeparator.csv"),
+            new ByteArrayInputStream(csvBody.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("rowMissingHeadersTrailingSeparatorIsFlaggedAsBadLine")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .fieldSeparator(Property.ofValue(';'))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.ERROR))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+
+        Throwable thrown = assertThrows(RuntimeException.class, () -> reader.run(runContext));
+        assertThat(thrown.getMessage(), containsString("Bad line encountered (field count mismatch): Expected 3, got 2 fields."));
+    }
+
+    @Test
     void badLinesErrorThrows() throws Exception {
-        String csv = "header1,header2\nvalue1,value2\nvalue3,value4,value5\nvalue6,value7"; // Bad line: value3,value4,value5
+        String csv = "header1,header2\nvalue1,value2\nvalue3,value4,value5\nvalue6,value7";
         URI src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/badLinesError.csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
