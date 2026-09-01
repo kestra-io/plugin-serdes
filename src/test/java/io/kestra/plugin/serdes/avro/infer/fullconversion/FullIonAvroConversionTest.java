@@ -55,6 +55,8 @@ public class FullIonAvroConversionTest extends FullIonConversionAbstractTest {
         var avroToIonOutput = avroToIon.run(TestsUtils.mockRunContext(runContextFactory, avroToIon, ImmutableMap.of()));
 
         // compare original ION with generated after conversions
+        // avroToIonOutput is binary ION; iterate it directly from the InputStream instead of
+        // decoding it as UTF-8 text first, which would corrupt the binary BVM header.
         var ion = IonSystemBuilder.standard().build();
         assertThat(
             ImmutableList.copyOf(
