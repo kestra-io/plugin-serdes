@@ -8,7 +8,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
@@ -35,6 +34,8 @@ import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 
@@ -238,8 +239,11 @@ class XmlToIonWriterTest {
     void readEmpty() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
-        String tagContent = new BufferedReader(new InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
-        assertThat(tagContent, is(""));
+        List<Object> records;
+        try (var inputStream = runContextFactory.of().storage().getFile(reader.getUri())) {
+            records = FileSerde.readAll(inputStream).collectList().block();
+        }
+        assertThat(records, is(empty()));
     }
 
     @Test
@@ -247,8 +251,11 @@ class XmlToIonWriterTest {
     void readEmptyTagBadQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/random/stuff");
-        String tagContent = new BufferedReader(new InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
-        assertThat(tagContent, is(""));
+        List<Object> records;
+        try (var inputStream = runContextFactory.of().storage().getFile(reader.getUri())) {
+            records = FileSerde.readAll(inputStream).collectList().block();
+        }
+        assertThat(records, is(empty()));
     }
 
     @Test
@@ -256,8 +263,11 @@ class XmlToIonWriterTest {
     void readEmptyTagGoodQuery() throws Exception {
         File sourceFile = SerdesUtils.resourceToFile("xml/empty-tag.xml");
         XmlToIon.Output reader = this.reader(sourceFile, "/catalog");
-        String tagContent = new BufferedReader(new InputStreamReader(runContextFactory.of().storage().getFile(reader.getUri()))).lines().collect(Collectors.joining("\n"));
-        assertThat(tagContent, is("\"\""));
+        List<Object> records;
+        try (var inputStream = runContextFactory.of().storage().getFile(reader.getUri())) {
+            records = FileSerde.readAll(inputStream).collectList().block();
+        }
+        assertThat(records, contains(""));
     }
 
     @Test
@@ -276,16 +286,11 @@ class XmlToIonWriterTest {
 
         XmlToIon.Output output = this.reader(largeXml, "/catalog/item");
 
-        // Read back all records and count them
-        int count = 0;
-        try (
-            BufferedReader br = new BufferedReader(
-                new InputStreamReader(runContextFactory.of().storage().getFile(output.getUri()))
-            )
-        ) {
-            while (br.readLine() != null) {
-                count++;
-            }
+        // Read back all records and count them. Output is binary ION, so decode it via
+        // FileSerde instead of counting text lines, which assumes a text ION format.
+        int count;
+        try (var inputStream = runContextFactory.of().storage().getFile(output.getUri())) {
+            count = FileSerde.readAll(inputStream).collectList().block().size();
         }
 
         assertThat(count, is(recordCount));
