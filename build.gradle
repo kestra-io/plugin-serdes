@@ -1,16 +1,15 @@
 plugins {
-    id 'io.kestra.gradle.repository-conventions' version '1.2.5'
-    id "io.kestra.gradle.plugin-doc-lint" version "1.2.5"
-    id 'io.kestra.gradle.spotless-conventions' version '1.2.5'
+    id 'io.kestra.gradle.repository-conventions' version '1.2.9'
+    id "io.kestra.gradle.plugin-doc-lint" version "1.2.9"
+    id 'io.kestra.gradle.spotless-conventions' version '1.2.9'
     id "com.vanniktech.maven.publish" version "0.37.0"
-    id "io.kestra.gradle.inject-bom-versions" version "1.2.5"
+    id "io.kestra.gradle.inject-bom-versions" version "1.2.9"
     id 'java-library'
     id "idea"
     id 'jacoco'
-    id "com.adarshr.test-logger" version "4.0.0"
-    id "com.gradleup.shadow" version "9.4.3"
+    id "com.gradleup.shadow" version "9.6.1"
     id 'signing'
-    id "com.github.ben-manes.versions" version "0.54.0"
+    id "com.github.ben-manes.versions" version "0.61.0"
     id 'net.researchgate.release' version '3.1.0'
 }
 
@@ -62,14 +61,15 @@ dependencies {
     compileOnly 'ch.qos.logback:logback-classic'
 
     // Protobuf
-    implementation "com.google.protobuf:protobuf-java:4.35.1"
-    implementation "com.google.protobuf:protobuf-java-util:4.35.1"
+    implementation "com.google.protobuf:protobuf-java:4.36.0"
+    implementation "com.google.protobuf:protobuf-java-util:4.36.0"
 
-    implementation 'de.siegmar:fastcsv:4.3.1'
-    implementation ('org.apache.avro:avro:1.12.1') {
+    implementation 'de.siegmar:fastcsv:4.4.0'
+    implementation 'commons-io:commons-io' // for BOMInputStream
+    implementation ('org.apache.avro:avro:1.12.2') {
         exclude group: 'com.fasterxml.jackson.core'
     }
-    implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.17.1'
+    implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.18.0'
     implementation group: 'org.apache.poi', name: 'poi', version: '5.5.1'
     implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
     implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.2.0'
@@ -86,14 +86,14 @@ dependencies {
         exclude group: "org.slf4j"
         exclude group: "com.fasterxml.jackson.core"
     }
-    implementation group: 'org.json', name: 'json', version: '20260522'
+    implementation group: 'org.json', name: 'json', version: '20260814'
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
 
-    implementation "org.commonmark:commonmark:0.29.0" // for Markdown
+    implementation "org.commonmark:commonmark:0.30.0" // for Markdown
     implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
     implementation "com.vladsch.flexmark:flexmark-html2md-converter:0.64.8" // for HTML to Markdown conversion
-    implementation "org.jsoup:jsoup:1.22.2" // for HTML parsing (required by flexmark-html2md-converter)
+    implementation "org.jsoup:jsoup:1.23.2" // for HTML parsing (required by flexmark-html2md-converter)
 }
 
 configurations.configureEach {
@@ -105,15 +105,6 @@ configurations.configureEach {
  **********************************************************************************************************************/
 test {
     useJUnitPlatform()
-}
-
-testlogger {
-    theme "mocha-parallel"
-    showExceptions true
-    showFullStackTraces true
-    showStandardStreams true
-    showPassedStandardStreams false
-    showSkippedStandardStreams true
 }
 
 dependencies {
@@ -159,21 +150,6 @@ dependencies {
     testImplementation enforcedPlatform("io.kestra:platform:$kestraVersion")
     // io.kestra:platform no longer manages allure's version as of Kestra 2.0, so pin it explicitly.
     testImplementation "io.qameta.allure:allure-junit5:2.33.0"
-}
-
-configurations {
-    agent {
-        canBeResolved = true
-        canBeConsumed = true
-    }
-}
-
-dependencies {
-    agent "org.aspectj:aspectjweaver:1.9.25.1"
-}
-
-test {
-    jvmArgs = [ "-javaagent:${configurations.agent.singleFile}" ]
 }
 
 /**********************************************************************************************************************\
