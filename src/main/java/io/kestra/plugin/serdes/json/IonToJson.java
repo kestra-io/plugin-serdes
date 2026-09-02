@@ -385,7 +385,14 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                 jsonGenerator.writeEndArray();
             }
             case BOOL -> jsonGenerator.writeBoolean(((IonBool) value).booleanValue());
-            case INT -> jsonGenerator.writeNumber(((IonInt) value).intValue());
+            case INT -> {
+                var ionInt = (IonInt) value;
+                switch (ionInt.getIntegerSize()) {
+                    case INT -> jsonGenerator.writeNumber(ionInt.intValue());
+                    case LONG -> jsonGenerator.writeNumber(ionInt.longValue());
+                    case BIG_INTEGER -> jsonGenerator.writeNumber(ionInt.bigIntegerValue());
+                }
+            }
             case FLOAT -> jsonGenerator.writeNumber(((IonFloat) value).doubleValue());
             case DECIMAL -> jsonGenerator.writeNumber(((IonDecimal) value).decimalValue());
             case TIMESTAMP -> {
@@ -436,8 +443,13 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
     private Map<String, Object> readIonStructAsMap(IonStruct struct) {
         Map<String, Object> result = new HashMap<>();
         for (IonValue field : struct) {
-            if (field instanceof IonInt) {
-                result.put(field.getFieldName(), ((IonInt) field).intValue());
+            if (field instanceof IonInt ionInt) {
+                Number value = switch (ionInt.getIntegerSize()) {
+                    case INT -> ionInt.intValue();
+                    case LONG -> ionInt.longValue();
+                    case BIG_INTEGER -> ionInt.bigIntegerValue();
+                };
+                result.put(field.getFieldName(), value);
             } else if (field instanceof IonFloat) {
                 result.put(field.getFieldName(), ((IonFloat) field).doubleValue());
             } else if (field instanceof IonDecimal) {
