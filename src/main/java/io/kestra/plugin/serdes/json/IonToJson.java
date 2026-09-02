@@ -443,13 +443,8 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
     private Map<String, Object> readIonStructAsMap(IonStruct struct) {
         Map<String, Object> result = new HashMap<>();
         for (IonValue field : struct) {
-            if (field instanceof IonInt ionInt) {
-                Number value = switch (ionInt.getIntegerSize()) {
-                    case INT -> ionInt.intValue();
-                    case LONG -> ionInt.longValue();
-                    case BIG_INTEGER -> ionInt.bigIntegerValue();
-                };
-                result.put(field.getFieldName(), value);
+            if (field instanceof IonInt) {
+                result.put(field.getFieldName(), ((IonInt) field).intValue());
             } else if (field instanceof IonFloat) {
                 result.put(field.getFieldName(), ((IonFloat) field).doubleValue());
             } else if (field instanceof IonDecimal) {
