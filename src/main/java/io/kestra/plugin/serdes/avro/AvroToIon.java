@@ -244,13 +244,13 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
                 validateRecord(value, fieldSchema, fieldName, onBadLinesValue, runContext);
                 break;
             case BYTES:
-                validateBytes(value, fieldName);
+                validateBytes(value, fieldName, onBadLinesValue, runContext);
                 break;
             case FIXED:
-                validateFixed(value, fieldSchema, fieldName);
+                validateFixed(value, fieldSchema, fieldName, onBadLinesValue, runContext);
                 break;
             case ENUM:
-                validateEnum(value, fieldSchema, fieldName);
+                validateEnum(value, fieldSchema, fieldName, onBadLinesValue, runContext);
                 break;
             case NULL:
                 validateNull(value, fieldName, onBadLinesValue, runContext);
@@ -337,13 +337,16 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         }
     }
 
-    private void validateBytes(Object value, String fieldName) {
+    // Package-private so AvroToIonBytesFixedEnumTest can cover these defensive branches: a well-formed
+    // Avro file can never feed them a mismatching value, since the reader builds every value from the
+    // very schema they are validated against.
+    void validateBytes(Object value, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
         if (!(value instanceof ByteBuffer) && !(value instanceof byte[])) {
             throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected BYTES, got " + value.getClass().getSimpleName());
         }
     }
 
-    private void validateFixed(Object value, org.apache.avro.Schema fieldSchema, String fieldName) {
+    void validateFixed(Object value, org.apache.avro.Schema fieldSchema, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
         int length;
         if (value instanceof GenericFixed genericFixed) {
             length = genericFixed.bytes().length;
@@ -358,7 +361,7 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
         }
     }
 
-    private void validateEnum(Object value, org.apache.avro.Schema fieldSchema, String fieldName) {
+    void validateEnum(Object value, org.apache.avro.Schema fieldSchema, String fieldName, OnBadLines onBadLinesValue, RunContext runContext) {
         if (!(value instanceof GenericEnumSymbol) && !(value instanceof CharSequence)) {
             throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected ENUM, got " + value.getClass().getSimpleName());
         }

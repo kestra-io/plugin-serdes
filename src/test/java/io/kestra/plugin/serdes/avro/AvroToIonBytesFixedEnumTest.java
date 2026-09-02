@@ -7,21 +7,26 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder;
 import org.junit.jupiter.api.Test;
 
 import com.google.common.collect.ImmutableMap;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.serdes.OnBadLines;
 
 import jakarta.inject.Inject;
 
@@ -29,12 +34,15 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Reproduces <a href="https://github.com/kestra-io/plugin-serdes/issues/373">#373</a>: an Avro file
  * written by {@link IonToAvro} with a {@code bytes}, {@code fixed} or {@code enum} field (and
  * therefore a {@code decimal}, which is a {@code bytes} logical type) could not be read back by
  * {@link AvroToIon}.
+ *
+ * <p>Also covers the defensive failure branches of the three validators added for those types.
  */
 @KestraTest
 class AvroToIonBytesFixedEnumTest {
@@ -97,7 +105,7 @@ class AvroToIonBytesFixedEnumTest {
         List<Object> rows = roundTrip(
             """
             {"type":"record","name":"T","fields":[{"name":"v","type":["null","bytes"],"default":null}]}""",
-            List.of(Map.of("v", "abc"), java.util.Collections.singletonMap("v", null))
+            List.of(Map.of("v", "abc"), Collections.singletonMap("v", null))
         );
 
         assertThat(rows, hasSize(2));
@@ -131,6 +139,76 @@ class AvroToIonBytesFixedEnumTest {
             (List<?>) asMap(rows.getFirst()).get("v"),
             contains("ab".getBytes(StandardCharsets.UTF_8), "cd".getBytes(StandardCharsets.UTF_8))
         );
+    }
+
+    @Test
+    void bytesRejectsNonBinaryValue() {
+        AvroToIon.IllegalCellConversion e = assertThrows(
+            AvroToIon.IllegalCellConversion.class,
+            () -> reader().validateBytes(42, "v", OnBadLines.ERROR, runContext())
+        );
+
+        assertThat(e.getMessage(), is("Invalid type for field 'v': expected BYTES, got Integer"));
+    }
+
+    @Test
+    void fixedRejectsWrongLength() {
+        Schema fixedSchema = SchemaBuilder.builder().fixed("F").size(3);
+
+        AvroToIon.IllegalCellConversion e = assertThrows(
+            AvroToIon.IllegalCellConversion.class,
+            () -> reader().validateFixed(new byte[]{1, 2}, fixedSchema, "v", OnBadLines.ERROR, runContext())
+        );
+
+        assertThat(e.getMessage(), is("Invalid length for FIXED field 'v': expected 3, got 2"));
+    }
+
+    @Test
+    void fixedRejectsNonBinaryValue() {
+        Schema fixedSchema = SchemaBuilder.builder().fixed("F").size(3);
+
+        AvroToIon.IllegalCellConversion e = assertThrows(
+            AvroToIon.IllegalCellConversion.class,
+            () -> reader().validateFixed("abc", fixedSchema, "v", OnBadLines.ERROR, runContext())
+        );
+
+        assertThat(e.getMessage(), is("Invalid type for field 'v': expected FIXED, got String"));
+    }
+
+    @Test
+    void enumRejectsUnknownSymbol() {
+        Schema enumSchema = SchemaBuilder.builder().enumeration("E").symbols("A", "B");
+
+        AvroToIon.IllegalCellConversion e = assertThrows(
+            AvroToIon.IllegalCellConversion.class,
+            () -> reader().validateEnum("Z", enumSchema, "v", OnBadLines.ERROR, runContext())
+        );
+
+        assertThat(e.getMessage(), is("Invalid ENUM value for field 'v': Z, expected one of [A, B]"));
+    }
+
+    @Test
+    void enumRejectsNonSymbolValue() {
+        Schema enumSchema = SchemaBuilder.builder().enumeration("E").symbols("A", "B");
+
+        AvroToIon.IllegalCellConversion e = assertThrows(
+            AvroToIon.IllegalCellConversion.class,
+            () -> reader().validateEnum(42, enumSchema, "v", OnBadLines.ERROR, runContext())
+        );
+
+        assertThat(e.getMessage(), is("Invalid type for field 'v': expected ENUM, got Integer"));
+    }
+
+    private AvroToIon reader() {
+        return AvroToIon.builder()
+            .id(IdUtils.create())
+            .type(AvroToIon.class.getName())
+            .build();
+    }
+
+    private RunContext runContext() {
+        AvroToIon reader = reader();
+        return TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
     }
 
     @SuppressWarnings("unchecked")
