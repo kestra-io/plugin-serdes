@@ -272,14 +272,17 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
 
     private Object getFormattedValue(Cell cell, DateTimeRender dateTimeRender) {
         DataFormatter dataFormatter = new DataFormatter();
-        if (DateUtil.isCellDateFormatted(cell)) {
+        // DateUtil.isCellDateFormatted() reads the cell's numeric value, which throws
+        // NumberFormatException under the streaming reader for non-numeric cells;
+        // it must only be reached for NUMERIC cells.
+        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
             return switch (dateTimeRender) {
                 case SERIAL_NUMBER -> cell.getNumericCellValue();
                 case FORMATTED_STRING -> dataFormatter.formatCellValue(cell);
                 default -> cell.getDateCellValue();
             };
         }
-        return dataFormatter.formatCellValue(cell);
+        return dataFormatter.formatCellValue(cell); // STRING, BOOLEAN, FORMULA, BLANK, ERROR and non-date NUMERIC
     }
 
     private Object getUnformattedValue(Cell cell, DateTimeRender dateTimeRender) {
