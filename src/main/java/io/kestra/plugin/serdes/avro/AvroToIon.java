@@ -1,12 +1,16 @@
 package io.kestra.plugin.serdes.avro;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Map;
 
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericEnumSymbol;
+import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 
@@ -240,6 +244,15 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
             case RECORD:
                 validateRecord(value, fieldSchema, fieldName, onBadLinesValue, runContext);
                 break;
+            case BYTES:
+                validateBytes(value, fieldName);
+                break;
+            case FIXED:
+                validateFixed(value, fieldSchema, fieldName);
+                break;
+            case ENUM:
+                validateEnum(value, fieldSchema, fieldName);
+                break;
             case NULL:
                 validateNull(value, fieldName, onBadLinesValue, runContext);
                 break;
@@ -322,6 +335,43 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
             }
         } else if (!(value instanceof Boolean)) {
             throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected BOOLEAN, got " + value.getClass().getSimpleName());
+        }
+    }
+
+    private void validateBytes(Object value, String fieldName) {
+        // A decimal is a BYTES logical type, so a reader configured with conversions hands back a BigDecimal.
+        if (!(value instanceof ByteBuffer) && !(value instanceof byte[]) && !(value instanceof BigDecimal)) {
+            throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected BYTES, got " + value.getClass().getSimpleName());
+        }
+    }
+
+    private void validateFixed(Object value, org.apache.avro.Schema fieldSchema, String fieldName) {
+        if (value instanceof BigDecimal) {
+            // decimal logical type read through a conversion
+            return;
+        }
+
+        int length;
+        if (value instanceof GenericFixed genericFixed) {
+            length = genericFixed.bytes().length;
+        } else if (value instanceof byte[] bytes) {
+            length = bytes.length;
+        } else {
+            throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected FIXED, got " + value.getClass().getSimpleName());
+        }
+
+        if (length != fieldSchema.getFixedSize()) {
+            throw new IllegalCellConversion("Invalid length for FIXED field '" + fieldName + "': expected " + fieldSchema.getFixedSize() + ", got " + length);
+        }
+    }
+
+    private void validateEnum(Object value, org.apache.avro.Schema fieldSchema, String fieldName) {
+        if (!(value instanceof GenericEnumSymbol) && !(value instanceof CharSequence)) {
+            throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected ENUM, got " + value.getClass().getSimpleName());
+        }
+
+        if (!fieldSchema.getEnumSymbols().contains(value.toString())) {
+            throw new IllegalCellConversion("Invalid ENUM value for field '" + fieldName + "': " + value + ", expected one of " + fieldSchema.getEnumSymbols());
         }
     }
 

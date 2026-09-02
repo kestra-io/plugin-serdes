@@ -108,7 +108,7 @@ public class AvroDeserializer {
                 case STRING:
                     return ((CharSequence) value).toString();
                 case BYTES:
-                    return ((ByteBuffer) value).array();
+                    return AvroDeserializer.bytesDeserializer((ByteBuffer) value);
                 case INT:
                 case LONG:
                 case FLOAT:
@@ -120,6 +120,18 @@ public class AvroDeserializer {
                     throw new IllegalStateException("Unexpected value: " + primitiveType);
             }
         }
+    }
+
+    /**
+     * Avro reuses the {@link ByteBuffer} of the previous record when its capacity is large enough, only
+     * moving the limit. Copying the remaining bytes avoids exposing the stale tail of the backing array.
+     */
+    private static byte[] bytesDeserializer(ByteBuffer value) {
+        ByteBuffer duplicate = value.duplicate();
+        byte[] bytes = new byte[duplicate.remaining()];
+        duplicate.get(bytes);
+
+        return bytes;
     }
 
     private static Object unionDeserializer(Object value, Schema schema) {
