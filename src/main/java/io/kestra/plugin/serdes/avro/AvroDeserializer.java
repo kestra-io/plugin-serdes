@@ -104,7 +104,7 @@ public class AvroDeserializer {
                 case ARRAY:
                     return arrayDeserializer((Collection<?>) value, schema);
                 case FIXED:
-                    return ((GenericFixed) value).bytes();
+                    return AvroDeserializer.fixedDeserializer((GenericFixed) value);
                 case STRING:
                     return ((CharSequence) value).toString();
                 case BYTES:
@@ -120,6 +120,14 @@ public class AvroDeserializer {
                     throw new IllegalStateException("Unexpected value: " + primitiveType);
             }
         }
+    }
+
+    /**
+     * Avro reuses the {@link GenericFixed} of the previous record and overwrites its backing array in
+     * place, so the array has to be copied before being handed to the caller.
+     */
+    private static byte[] fixedDeserializer(GenericFixed value) {
+        return value.bytes().clone();
     }
 
     /**

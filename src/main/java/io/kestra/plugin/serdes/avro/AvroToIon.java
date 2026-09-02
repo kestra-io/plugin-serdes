@@ -1,7 +1,6 @@
 package io.kestra.plugin.serdes.avro;
 
 import java.io.*;
-import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -339,18 +338,12 @@ public class AvroToIon extends Task implements RunnableTask<AvroToIon.Output> {
     }
 
     private void validateBytes(Object value, String fieldName) {
-        // A decimal is a BYTES logical type, so a reader configured with conversions hands back a BigDecimal.
-        if (!(value instanceof ByteBuffer) && !(value instanceof byte[]) && !(value instanceof BigDecimal)) {
+        if (!(value instanceof ByteBuffer) && !(value instanceof byte[])) {
             throw new IllegalCellConversion("Invalid type for field '" + fieldName + "': expected BYTES, got " + value.getClass().getSimpleName());
         }
     }
 
     private void validateFixed(Object value, org.apache.avro.Schema fieldSchema, String fieldName) {
-        if (value instanceof BigDecimal) {
-            // decimal logical type read through a conversion
-            return;
-        }
-
         int length;
         if (value instanceof GenericFixed genericFixed) {
             length = genericFixed.bytes().length;

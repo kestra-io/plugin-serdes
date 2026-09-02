@@ -14,6 +14,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +34,19 @@ class AvroFileRendererTest {
             {"name": "name", "type": "string"}
           ]
         }""";
+
+    private static final String BINARY_SCHEMA_JSON = """
+        {
+          "type": "record",
+          "name": "Binary",
+          "fields": [
+            {"name": "fixed", "type": {"type": "fixed", "name": "F", "size": 3}},
+            {"name": "bytes", "type": "bytes"}
+          ]
+        }""";
+
+    // decreasing lengths, so a reused buffer would leave the previous row's tail behind
+    private static final String[][] BINARY_ROWS = { { "aaa", "aaaaaa" }, { "bbb", "bb" }, { "ccc", "cccc" } };
 
     @ParameterizedTest
     @CsvSource({ "0, false", "100, false", "101, true" })
@@ -61,12 +76,51 @@ class AvroFileRendererTest {
         assertThat(rows.get(0).get("name"), is("name0"));
     }
 
+    /**
+     * Avro hands the same reused {@code GenericFixed} and {@code ByteBuffer} back on every record, so a
+     * renderer that accumulates the deserialized rows must not be given their backing arrays.
+     */
+    @Test
+    void testBinaryRowsAreNotAliasedAcrossRecords() throws Exception {
+        InputStream is = binaryAvroInputStream();
+
+        AvroFileRenderer renderer = new AvroFileRenderer();
+        FilePreview rendered = renderer.render("avro", is, Optional.empty(), 100);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) rendered.getContent();
+        assertThat(rows, hasSize(BINARY_ROWS.length));
+        for (int i = 0; i < BINARY_ROWS.length; i++) {
+            assertThat(rows.get(i).get("fixed"), is(BINARY_ROWS[i][0].getBytes(StandardCharsets.UTF_8)));
+            assertThat(rows.get(i).get("bytes"), is(BINARY_ROWS[i][1].getBytes(StandardCharsets.UTF_8)));
+        }
+    }
+
     @Test
     void testUnsupportedExtensionThrows() {
         AvroFileRenderer renderer = new AvroFileRenderer();
         InputStream is = new ByteArrayInputStream(new byte[0]);
 
         assertThrows(IllegalArgumentException.class, () -> renderer.render("csv", is, Optional.empty(), 10));
+    }
+
+    private InputStream binaryAvroInputStream() throws Exception {
+        Schema schema = new Schema.Parser().parse(BINARY_SCHEMA_JSON);
+        Schema fixedSchema = schema.getField("fixed").schema();
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema);
+        try (DataFileWriter<GenericRecord> writer = new DataFileWriter<>(datumWriter)) {
+            writer.create(schema, output);
+            for (String[] row : BINARY_ROWS) {
+                GenericRecord record = new GenericData.Record(schema);
+                record.put("fixed", new GenericData.Fixed(fixedSchema, row[0].getBytes(StandardCharsets.UTF_8)));
+                record.put("bytes", ByteBuffer.wrap(row[1].getBytes(StandardCharsets.UTF_8)));
+                writer.append(record);
+            }
+        }
+
+        return new ByteArrayInputStream(output.toByteArray());
     }
 
     private InputStream avroInputStream(int recordCount) throws Exception {
