@@ -61,8 +61,8 @@ public class IonToJsonTest {
 
     @Test
     void should_transform_ion_to_json_with_annotations_without_truncating_large_integers() throws Exception {
-        var ion = "{v:9223372036854775807,w:4294967296,x:2147483648,y:2147483647}\n";
-        var expectedJson = "{\"v\":9223372036854775807,\"w\":4294967296,\"x\":2147483648,\"y\":2147483647}\n";
+        var ion = "{v:9223372036854775807,w:4294967296,x:2147483648,y:2147483647,z:-2147483649,big:170141183460469231731687303715884105728,negBig:-170141183460469231731687303715884105728}\n";
+        var expectedJson = "{\"v\":9223372036854775807,\"w\":4294967296,\"x\":2147483648,\"y\":2147483647,\"z\":-2147483649,\"big\":170141183460469231731687303715884105728,\"negBig\":-170141183460469231731687303715884105728}\n";
 
         var runContext = getRunContext(ion);
         var task = IonToJson.builder()
