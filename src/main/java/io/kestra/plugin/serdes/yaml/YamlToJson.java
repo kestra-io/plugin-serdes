@@ -74,7 +74,6 @@ import reactor.core.publisher.SynchronousSink;
     }
 )
 public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> {
-    private static final ObjectMapper YAML_MAPPER = JacksonMapper.ofYaml();
     private static final ObjectMapper JSON_MAPPER = JacksonMapper.ofJson();
 
     @NotNull
@@ -112,7 +111,7 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
             Writer writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(rCharset)), FileSerde.BUFFER_SIZE);
             JsonGenerator jsonGen = JSON_MAPPER.createGenerator(writer)
         ) {
-            Iterator<Object> docs = YAML_MAPPER.readerFor(Object.class).readValues(reader);
+            Iterator<Object> docs = YamlDocumentReader.readAll(reader);
 
             if (rJsonl) {
                 Flux<Object> flow = Flux.generate(

@@ -56,6 +56,10 @@ dependencies {
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
     annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
 
+    // SnakeYAML, needed to resolve anchors/aliases/merge keys when reading YAML (Jackson's YAML parser doesn't support them).
+    // Provided at runtime by io.kestra:core, which itself depends on it for JacksonMapper.ofYaml().
+    compileOnly 'org.yaml:snakeyaml'
+
     // Logs
     compileOnly 'org.slf4j:slf4j-api'
     compileOnly 'ch.qos.logback:logback-classic'

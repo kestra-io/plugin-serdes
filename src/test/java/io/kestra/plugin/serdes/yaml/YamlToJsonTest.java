@@ -104,6 +104,33 @@ class YamlToJsonTest {
     }
 
     @Test
+    void json_anchorsAliasesAndMergeKeys() throws Exception {
+        String yaml = """
+            base: &b
+              x: 1
+            copy: *b
+            merged:
+              <<: *b
+              y: 2
+            """;
+        URI src = put(yaml);
+
+        var task = YamlToJson.builder()
+            .jsonl(Property.ofValue(false))
+            .from(Property.ofValue(src.toString()))
+            .build();
+
+        var out = task.run(runContextFactory.of(Map.of()));
+        String result = read(out.getUri());
+
+        var mapper = new ObjectMapper();
+        assertThat(
+            mapper.readTree(result),
+            is(mapper.readTree("{\"base\":{\"x\":1},\"copy\":{\"x\":1},\"merged\":{\"x\":1,\"y\":2}}"))
+        );
+    }
+
+    @Test
     void json_listRoot() throws Exception {
         String yaml = """
             - a

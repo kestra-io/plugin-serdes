@@ -21,7 +21,9 @@ import jakarta.inject.Inject;
 
 import static io.kestra.core.tenant.TenantService.MAIN_TENANT;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 class YamlToIonTest {
@@ -67,5 +69,64 @@ class YamlToIonTest {
             assertThat(((IonInt) ((IonStruct) v2).get("b")).intValue(), is(2));
         }
         assertThat(out.getSize(), is(2L));
+    }
+
+    @Test
+    void yaml_anchorsAliasesAndMergeKeys() throws Exception {
+        URI src = put("""
+            base: &b
+              x: 1
+            copy: *b
+            merged:
+              <<: *b
+              y: 2
+            """);
+
+        var task = YamlToIon.builder()
+            .from(Property.ofValue(src.toString()))
+            .build();
+
+        var out = task.run(runContextFactory.of(Map.of()));
+
+        try (InputStream in = storage.get(MAIN_TENANT, null, out.getUri())) {
+            IonSystem ion = IonSystemBuilder.standard().build();
+            IonReader reader = ion.newReader(in);
+
+            reader.next();
+            IonValue doc = ion.newValue(reader);
+            IonStruct struct = (IonStruct) doc;
+
+            assertThat(((IonInt) ((IonStruct) struct.get("base")).get("x")).intValue(), is(1));
+            assertThat(((IonInt) ((IonStruct) struct.get("copy")).get("x")).intValue(), is(1));
+
+            IonStruct merged = (IonStruct) struct.get("merged");
+            assertThat(((IonInt) merged.get("x")).intValue(), is(1));
+            assertThat(((IonInt) merged.get("y")).intValue(), is(2));
+            assertThat(merged.get("<<"), is((IonValue) null));
+        }
+        assertThat(out.getSize(), is(1L));
+    }
+
+    @Test
+    void yaml_bombIsRejected() throws Exception {
+        // Billion-laughs style alias amplification: each level references the previous one 10 times,
+        // so aliases to non-scalar nodes pile up past SnakeYAML's default limit (50) well before any
+        // expansion happens, instead of exhausting memory.
+        URI src = put("""
+            a: &a ["x","x","x","x","x","x","x","x","x","x"]
+            b: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a,*a]
+            c: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b,*b]
+            d: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c,*c]
+            e: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d,*d]
+            f: &f [*e,*e,*e,*e,*e,*e,*e,*e,*e,*e]
+            g: [*f,*f,*f,*f,*f,*f,*f,*f,*f,*f]
+            """);
+
+        var task = YamlToIon.builder()
+            .from(Property.ofValue(src.toString()))
+            .build();
+
+        var exception = assertThrows(Exception.class, () -> task.run(runContextFactory.of(Map.of())));
+        assertThat(exception.getMessage(), containsString("aliases"));
     }
 }
