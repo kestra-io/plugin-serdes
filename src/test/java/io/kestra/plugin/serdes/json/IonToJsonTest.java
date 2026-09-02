@@ -193,6 +193,41 @@ public class IonToJsonTest {
     }
 
     @Test
+    void should_carry_overflowing_fractional_seconds_into_next_second_on_default_path() throws Exception {
+        // A >9-digit fractional second (e.g. .9999999999) rounds up to 1_000_000_000 nanos, which must
+        // carry into the next whole second instead of throwing a DateTimeException.
+        var ion = "{ts:2024-01-15T10:30:00.9999999999Z}\n";
+        var expectedJson = "{\"ts\":\"2024-01-15T10:30:01Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_not_carry_exact_nine_digit_fractional_seconds_on_default_path() throws Exception {
+        // Exactly 9 digits (.999999999) is a legal nanoOfSecond and must NOT carry into the next second.
+        var ion = "{ts:2024-01-15T10:30:00.999999999Z}\n";
+        var expectedJson = "{\"ts\":\"2024-01-15T10:30:00.999999999Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
     void should_render_low_precision_timestamps_on_default_path() throws Exception {
         var ion = "{y:2024T,m:2024-01T,d:2024-01-15T}\n";
         var expectedJson = "{\"y\":\"2024-01-01T00:00:00Z\",\"m\":\"2024-01-01T00:00:00Z\",\"d\":\"2024-01-15T00:00:00Z\"}\n";
