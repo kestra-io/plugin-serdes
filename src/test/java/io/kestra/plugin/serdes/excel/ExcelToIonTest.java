@@ -8,13 +8,11 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,6 +35,7 @@ import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 
 @KestraTest
@@ -207,10 +206,10 @@ public class ExcelToIonTest {
     @ParameterizedTest
     @EnumSource(DateTimeRender.class)
     void formattedValue_rendersTextNumericDateAndBooleanCells(DateTimeRender dateTimeRender) throws Exception {
-        File sourceFile = createWorkbookWithMixedTypes();
-        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+        var sourceFile = createWorkbookWithMixedTypes();
+        var source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
-        ExcelToIon reader = ExcelToIon.builder()
+        var reader = ExcelToIon.builder()
             .id(ExcelToIonTest.class.getSimpleName())
             .type(ExcelToIon.class.getName())
             .from(Property.ofValue(source.toString()))
@@ -219,44 +218,60 @@ public class ExcelToIonTest {
             .dateTimeRender(Property.ofValue(dateTimeRender))
             .build();
 
-        ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        var ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        String out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
+        var out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
 
         assertThat(out, containsString("name:\"alice\""));
         assertThat(out, containsString("active:\"TRUE\""));
         assertThat(out, not(containsString("birthDate:null")));
+        // a date-formatted formula cell must honour dateTimeRender exactly like the plain date cell it mirrors
+        assertThat(fieldValue(out, "birthDateFormula"), is(fieldValue(out, "birthDate")));
     }
 
-    // creates an in-memory workbook mixing text, numeric, date and boolean cells,
+    // creates an in-memory workbook mixing text, numeric, date, boolean and date-formatted formula cells,
     // since none of the committed fixtures contain a boolean cell
     private static File createWorkbookWithMixedTypes() throws IOException {
-        File file = File.createTempFile("excel_mixed_types_", ".xlsx");
-        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("Sheet1");
+        var file = File.createTempFile("excel_mixed_types_", ".xlsx");
+        file.deleteOnExit();
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("Sheet1");
 
-            Row header = sheet.createRow(0);
+            var header = sheet.createRow(0);
             header.createCell(0).setCellValue("name");
             header.createCell(1).setCellValue("amount");
             header.createCell(2).setCellValue("birthDate");
             header.createCell(3).setCellValue("active");
+            header.createCell(4).setCellValue("birthDateFormula");
 
-            CellStyle dateStyle = workbook.createCellStyle();
+            var dateStyle = workbook.createCellStyle();
             dateStyle.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("yyyy-mm-dd"));
 
-            Row row = sheet.createRow(1);
+            var row = sheet.createRow(1);
             row.createCell(0).setCellValue("alice");
             row.createCell(1).setCellValue(42.5);
-            Cell dateCell = row.createCell(2, CellType.NUMERIC);
+            var dateCell = row.createCell(2, CellType.NUMERIC);
             dateCell.setCellValue(LocalDate.of(2025, 4, 1));
             dateCell.setCellStyle(dateStyle);
             row.createCell(3).setCellValue(true);
+            // formula whose cached result is a date-formatted number: getCellType() reports FORMULA, not NUMERIC
+            var formulaCell = row.createCell(4, CellType.FORMULA);
+            formulaCell.setCellFormula("C2");
+            formulaCell.setCellValue(DateUtil.getExcelDate(LocalDate.of(2025, 4, 1)));
+            formulaCell.setCellStyle(dateStyle);
 
             try (var out = new FileOutputStream(file)) {
                 workbook.write(out);
             }
         }
         return file;
+    }
+
+    // extracts a single field value out of the ION text rendering, e.g. `birthDate:2025-04-01T...`
+    private static String fieldValue(String ion, String field) {
+        var matcher = Pattern.compile("\\b" + Pattern.quote(field) + ":([^,}]+)").matcher(ion);
+        assertThat("field " + field + " not found in " + ion, matcher.find(), is(true));
+        return matcher.group(1).trim();
     }
 
     // ionOutput files are binary ION; load them via the InputStream and re-render to ION text
