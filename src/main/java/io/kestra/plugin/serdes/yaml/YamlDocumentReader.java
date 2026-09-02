@@ -9,6 +9,8 @@ import java.util.stream.StreamSupport;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.error.YAMLException;
+import org.yaml.snakeyaml.nodes.Tag;
 
 /**
  * Reads YAML documents ({@code ---}-separated) resolving anchors, aliases and merge keys ({@code <<}).
@@ -31,10 +33,79 @@ final class YamlDocumentReader {
      * a plain YAML list yields one record per item, not one record holding the whole list).
      */
     static Iterator<Object> readAll(Reader reader) {
-        Iterable<Object> documents = new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(reader);
+        Iterable<Object> documents = safe(new Yaml(new StringTimestampSafeConstructor(new LoaderOptions())).loadAll(reader));
 
         return StreamSupport.stream(documents.spliterator(), false)
             .flatMap(document -> document instanceof List<?> list ? list.stream().map(o -> (Object) o) : Stream.of(document))
             .iterator();
+    }
+
+    private static Iterable<Object> safe(Iterable<Object> delegate) {
+        return () -> new SafeIterator(delegate.iterator());
+    }
+
+    /**
+     * SafeConstructor resolves date/datetime-shaped scalars (e.g. {@code 2024-01-01}) to
+     * {@link java.util.Date} by default. The previous Jackson-based reader always kept them as
+     * plain strings, and Kestra's date/time handling (KestraDateTimeModule) only customizes
+     * java.time types, not java.util.Date — auto-converting would silently reformat dates in
+     * YamlToJson output and flip the ION type from string to timestamp in YamlToIon output.
+     */
+    private static final class StringTimestampSafeConstructor extends SafeConstructor {
+        private StringTimestampSafeConstructor(LoaderOptions loaderOptions) {
+            super(loaderOptions);
+            this.yamlConstructors.put(Tag.TIMESTAMP, this.new ConstructYamlStr());
+        }
+    }
+
+    /**
+     * Translates SnakeYAML's safety-limit exceptions (alias/nesting/size guards) into an actionable
+     * message; other parse errors (malformed YAML) already carry line/column context via a Mark and
+     * are rethrown unchanged.
+     */
+    private static final class SafeIterator implements Iterator<Object> {
+        private final Iterator<Object> delegate;
+
+        private SafeIterator(Iterator<Object> delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean hasNext() {
+            try {
+                return delegate.hasNext();
+            } catch (YAMLException e) {
+                throw translate(e);
+            }
+        }
+
+        @Override
+        public Object next() {
+            try {
+                return delegate.next();
+            } catch (YAMLException e) {
+                throw translate(e);
+            }
+        }
+
+        private static YAMLException translate(YAMLException e) {
+            String message = e.getMessage();
+            if (message == null || e.getClass() != YAMLException.class) {
+                return e;
+            }
+            if (!message.contains("exceeds the specified max")
+                && !message.contains("Nesting Depth exceeded")
+                && !message.contains("exceeds the limit")) {
+                return e;
+            }
+
+            return new YAMLException(
+                "YAML document rejected: it exceeds SnakeYAML's safety limits for aliases, nesting depth or "
+                    + "document size, which usually means excessive anchor/alias expansion (a YAML bomb). "
+                    + "Reduce the number of aliases, the nesting depth, or split the document. Original error: "
+                    + message,
+                e
+            );
+        }
     }
 }

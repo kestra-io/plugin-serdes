@@ -108,6 +108,31 @@ class YamlToIonTest {
     }
 
     @Test
+    void yaml_dateLikeScalarsStayStrings() throws Exception {
+        URI src = put("""
+            date: 2024-01-01
+            datetime: 2024-01-01T10:15:30Z
+            """);
+
+        var task = YamlToIon.builder()
+            .from(Property.ofValue(src.toString()))
+            .build();
+
+        var out = task.run(runContextFactory.of(Map.of()));
+
+        try (InputStream in = storage.get(MAIN_TENANT, null, out.getUri())) {
+            IonSystem ion = IonSystemBuilder.standard().build();
+            IonReader reader = ion.newReader(in);
+
+            reader.next();
+            IonStruct struct = (IonStruct) ion.newValue(reader);
+
+            assertThat(((IonString) struct.get("date")).stringValue(), is("2024-01-01"));
+            assertThat(((IonString) struct.get("datetime")).stringValue(), is("2024-01-01T10:15:30Z"));
+        }
+    }
+
+    @Test
     void yaml_bombIsRejected() throws Exception {
         // Billion-laughs style alias amplification: each level references the previous one 10 times,
         // so aliases to non-scalar nodes pile up past SnakeYAML's default limit (50) well before any

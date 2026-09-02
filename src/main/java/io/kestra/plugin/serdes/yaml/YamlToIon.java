@@ -66,6 +66,10 @@ import reactor.core.publisher.Mono;
     }
 )
 public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
+    // Flux.generate forbids emitting a null element (Reactive Streams spec); a YAML document that legitimately
+    // resolves to null (e.g. an empty "---" section) is substituted with this marker purely to drive the count.
+    private static final Object NULL_DOCUMENT = new Object();
+
     @NotNull
     @PluginProperty(internalStorageURI = true, group = "main")
     @Schema(title = "Source file URI")
@@ -101,7 +105,7 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
                         if (iterator.hasNext()) {
                             Object doc = iterator.next();
                             FileSerde.write(outputStream, doc);
-                            sink.next(doc);
+                            sink.next(doc != null ? doc : NULL_DOCUMENT);
                         } else {
                             sink.complete();
                         }
