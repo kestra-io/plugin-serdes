@@ -228,6 +228,24 @@ public class IonToJsonTest {
     }
 
     @Test
+    void should_carry_overflowing_fractional_seconds_across_year_boundary_on_default_path() throws Exception {
+        // A >9-digit fractional second on the last instant of the year must carry through minute,
+        // hour, day and month boundaries into the next year instead of throwing or truncating.
+        var ion = "{ts:2023-12-31T23:59:59.9999999999Z}\n";
+        var expectedJson = "{\"ts\":\"2024-01-01T00:00:00Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
     void should_render_low_precision_timestamps_on_default_path() throws Exception {
         var ion = "{y:2024T,m:2024-01T,d:2024-01-15T}\n";
         var expectedJson = "{\"y\":\"2024-01-01T00:00:00Z\",\"m\":\"2024-01-01T00:00:00Z\",\"d\":\"2024-01-15T00:00:00Z\"}\n";
