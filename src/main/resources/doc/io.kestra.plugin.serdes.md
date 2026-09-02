@@ -44,7 +44,7 @@ All tasks require `from` (a `kestra://` URI pointing to the source file) and ret
 
 ### XML
 
-`xml.XmlToIon` converts an XML file to ION — set `from`. Optionally set `query` (XPath selector to extract a subset).
+`xml.XmlToIon` converts an XML file to ION — set `from`. Optionally set `query` (XPath selector, e.g. `/catalog/book`) to stream elements matching that path as separate records. Without `query`, the root element is inspected: if it wraps exactly one distinct, complex child element (e.g. `<catalog><book>...</book></catalog>`), each occurrence — whether there is one or several — is unwrapped into its own flat record, so the shape does not depend on record count. Otherwise the whole document becomes a single nested record. Set `unwrapRootCollection: false` to always get a single nested record, which is required for config-shaped XML that is structurally ambiguous with a one-record collection (e.g. `<config><database><host>x</host></database></config>`).
 
 `xml.IonToXml` converts an ION file to XML — set `from`. Set `rootName` (default `items`) as the root element name.
 
