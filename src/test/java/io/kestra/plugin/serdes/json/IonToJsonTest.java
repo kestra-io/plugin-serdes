@@ -60,6 +60,21 @@ public class IonToJsonTest {
     }
 
     @Test
+    void should_transform_ion_to_json_with_annotations_without_truncating_large_integers() throws Exception {
+        var ion = "{v:9223372036854775807,w:4294967296,x:2147483648,y:2147483647,z:-2147483649,big:170141183460469231731687303715884105728,negBig:-170141183460469231731687303715884105728}\n";
+        var expectedJson = "{\"v\":9223372036854775807,\"w\":4294967296,\"x\":2147483648,\"y\":2147483647,\"z\":-2147483649,\"big\":170141183460469231731687303715884105728,\"negBig\":-170141183460469231731687303715884105728}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(true))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
     void should_transform_ion_to_json_with_annotations() throws Exception {
         var ion = """
             {dn:"cn=tony@orga.com,ou=diffusion_list,dc=orga,dc=com",attributes:{description:["Some description 2",base64::"TGlzdGUgZCfDg8KpY2hhbmdlIHN1ciBsZSBzdWl2aSBkZSBsYSBtYXNzZSBzYWxhcmlhbGUgZGUgbCdJVVQ=","Melusine lover as well"],someOtherAttribute:["perhaps 2","perhapsAgain 2"]}}
