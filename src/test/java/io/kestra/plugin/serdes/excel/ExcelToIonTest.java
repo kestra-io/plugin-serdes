@@ -1,18 +1,27 @@
 package io.kestra.plugin.serdes.excel;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,6 +46,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 public class ExcelToIonTest {
@@ -280,5 +290,196 @@ public class ExcelToIonTest {
         try (input) {
             return IonSystemBuilder.standard().build().getLoader().load(input).toString();
         }
+    }
+
+    @Test
+    void formulaWithoutCachedValueFallsBackToFormulaString() throws Exception {
+        // writers such as openpyxl persist a formula cell with an empty cached <v/> result instead
+        // of omitting it; POI still reports that as a numeric result, so reading it must not crash.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("a");
+            headerRow.createCell(1).setCellValue("b");
+            headerRow.createCell(2).setCellValue("total");
+
+            Row dataRow = sheet.createRow(1);
+            dataRow.createCell(0).setCellValue(2);
+            dataRow.createCell(1).setCellValue(3);
+            dataRow.createCell(2).setCellFormula("A2*B2");
+
+            var bos = new ByteArrayOutputStream();
+            workbook.write(bos);
+            Files.write(sourceFile.toPath(), withEmptyCachedFormulaResult(bos.toByteArray(), "<f>A2*B2</f>"));
+        }
+
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(true))
+            .build();
+        ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        String out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
+        assertThat(out, containsString("total:\"A2*B2\""));
+    }
+
+    @Test
+    void formulaWithoutCachedValueUnderFormattedValueRenderFallsBackToFormulaString() throws Exception {
+        // getFormattedValue() hits the very same StreamingCell.getNumericCellValue() call as
+        // getFormula(), so the empty cached result crashes this render mode too.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            Row dataRow = sheet.createRow(0);
+            dataRow.createCell(0).setCellValue(2);
+            dataRow.createCell(1).setCellValue(3);
+            dataRow.createCell(2).setCellFormula("A1*B1");
+
+            var bos = new ByteArrayOutputStream();
+            workbook.write(bos);
+            Files.write(sourceFile.toPath(), withEmptyCachedFormulaResult(bos.toByteArray(), "<f>A1*B1</f>"));
+        }
+
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(false))
+            .valueRender(Property.ofValue(ValueRender.FORMATTED_VALUE))
+            .build();
+        ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        String out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
+        assertThat(out, containsString("\"A1*B1\""));
+    }
+
+    @Test
+    void formulaWithoutCachedValueUnderFormulaRenderFallsBackToFormulaString() throws Exception {
+        // isolated to a single formula-only cell: getFormula() also calls getCachedFormulaResultType()
+        // unconditionally for FORMULA render mode, which is only valid on an actual formula cell.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            Row dataRow = sheet.createRow(0);
+            dataRow.createCell(0).setCellFormula("2*3");
+
+            var bos = new ByteArrayOutputStream();
+            workbook.write(bos);
+            Files.write(sourceFile.toPath(), withEmptyCachedFormulaResult(bos.toByteArray(), "<f>2*3</f>"));
+        }
+
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(false))
+            .valueRender(Property.ofValue(ValueRender.FORMULA))
+            .build();
+        ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        String out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
+        assertThat(out, containsString("\"2*3\""));
+    }
+
+    @Test
+    void formulaWithCachedValueReturnsEvaluatedResult() throws Exception {
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("a");
+            headerRow.createCell(1).setCellValue("b");
+            headerRow.createCell(2).setCellValue("total");
+
+            Row dataRow = sheet.createRow(1);
+            dataRow.createCell(0).setCellValue(2);
+            dataRow.createCell(1).setCellValue(3);
+            dataRow.createCell(2).setCellFormula("A2*B2");
+
+            workbook.getCreationHelper().createFormulaEvaluator().evaluateAll();
+
+            try (var out = new FileOutputStream(sourceFile)) {
+                workbook.write(out);
+            }
+        }
+
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(true))
+            .build();
+        ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        String out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
+        assertThat(out, containsString("total:6"));
+    }
+
+    @Test
+    void malformedNonFormulaNumericCellStillThrows() throws Exception {
+        // the NumberFormatException fallback is scoped to formula cells; a plain numeric cell with
+        // an empty cached value is a genuinely malformed file and must still surface as an error.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Sheet1");
+            sheet.createRow(0).createCell(0).setCellValue(2);
+
+            var bos = new ByteArrayOutputStream();
+            workbook.write(bos);
+            Files.write(sourceFile.toPath(), rewriteSheetXml(bos.toByteArray(), "<v>2.0</v>", "<v></v>"));
+        }
+
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(false))
+            .build();
+
+        assertThrows(NumberFormatException.class, () -> reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of())));
+    }
+
+    // POI never writes a formula cell without evaluating it first, so this rewrites the generated
+    // xlsx's sheet XML to inject an empty <v/> after the given formula tag, mimicking what
+    // openpyxl (and other writers) produce for an un-evaluated formula.
+    private static byte[] withEmptyCachedFormulaResult(byte[] xlsx, String formulaTag) throws IOException {
+        return rewriteSheetXml(xlsx, formulaTag + "</c>", formulaTag + "<v></v></c>");
+    }
+
+    private static byte[] rewriteSheetXml(byte[] xlsx, String search, String replace) throws IOException {
+        var result = new ByteArrayOutputStream();
+        try (var zis = new ZipInputStream(new ByteArrayInputStream(xlsx));
+             var zos = new ZipOutputStream(result)) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                byte[] content = zis.readAllBytes();
+                if (entry.getName().equals("xl/worksheets/sheet1.xml")) {
+                    content = new String(content, StandardCharsets.UTF_8)
+                        .replace(search, replace)
+                        .getBytes(StandardCharsets.UTF_8);
+                }
+                zos.putNextEntry(new ZipEntry(entry.getName()));
+                zos.write(content);
+                zos.closeEntry();
+            }
+        }
+        return result.toByteArray();
     }
 }

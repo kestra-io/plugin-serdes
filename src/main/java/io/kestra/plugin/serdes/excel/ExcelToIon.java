@@ -252,12 +252,23 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     }
 
     private Object extractCellValue(Cell cell, ValueRender valueRender, DateTimeRender dateTimeRender) {
-        if (valueRender.equals(ValueRender.FORMATTED_VALUE)) {
-            return getFormattedValue(cell, dateTimeRender);
-        } else if (valueRender.equals(ValueRender.FORMULA)) {
-            return getFormula(cell, dateTimeRender);
-        } else {
-            return getUnformattedValue(cell, dateTimeRender);
+        try {
+            if (valueRender.equals(ValueRender.FORMATTED_VALUE)) {
+                return getFormattedValue(cell, dateTimeRender);
+            } else if (valueRender.equals(ValueRender.FORMULA)) {
+                return getFormula(cell, dateTimeRender);
+            } else {
+                return getUnformattedValue(cell, dateTimeRender);
+            }
+        } catch (NumberFormatException e) {
+            // some writers (e.g. openpyxl) persist a formula without evaluating it, leaving an empty
+            // cached value that POI still reports as numeric, regardless of the render mode used;
+            // fall back to the formula itself instead of crashing. A non-formula cell hitting this
+            // means the file itself has a genuinely malformed numeric value, so let it surface.
+            if (cell.getCellType() == CellType.FORMULA) {
+                return cell.getCellFormula();
+            }
+            throw e;
         }
     }
 
