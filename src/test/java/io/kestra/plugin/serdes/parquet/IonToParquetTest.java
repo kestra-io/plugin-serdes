@@ -541,6 +541,178 @@ class IonToParquetTest {
         assertThat(result.size(), is(2));
     }
 
+    private static final String ARRAY_OF_RECORDS_SCHEMA = """
+        {
+          "type": "record",
+          "name": "WithItems",
+          "namespace": "com.example.badline",
+          "fields": [
+            {"name": "id", "type": "int"},
+            {"name": "items", "type": {"type": "array", "items": {
+              "type": "record",
+              "name": "Item",
+              "fields": [
+                {"name": "score", "type": "int"}
+              ]
+            }}}
+          ]
+        }""";
+
+    // Regression for the gate missing records nested inside an ARRAY field: AvroConverter.complexArray resolves
+    // a bad element the same way fromMap does (null the field, keep the record), so this row must still fail the
+    // pre-write gate instead of reaching the writer. Must fail against the pre-fix gate, which only checked
+    // `instanceof GenericData.Record` on direct field values, never descending into List/Map contents.
+    @Test
+    void warnSkipsBadRowInArrayOfRecordsField() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(Map.of("id", 1, "items", List.of(Map.of("score", 10), Map.of("score", 20))));
+        Map<String, Object> badItem = new HashMap<>();
+        badItem.put("score", null); // null into the non-nullable "score" field of an array element
+        rows.add(Map.of("id", 2, "items", List.of(Map.of("score", 30), badItem)));
+        rows.add(Map.of("id", 3, "items", List.of(Map.of("score", 40))));
+
+        URI uri = uploadIonRows(rows);
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(ARRAY_OF_RECORDS_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+
+        IonToParquet.Output writerOutput = writer.run(runContext);
+
+        assertThat(writerOutput.getSize(), is(2L));
+        assertThat(
+            listAppender.list.stream().anyMatch(e -> e.getFormattedMessage().contains("items[1].score")),
+            is(true)
+        );
+        List<Map<String, Object>> result = readBackAsRows(writerOutput.getUri());
+        assertThat(result.size(), is(2));
+        assertThat(result.stream().map(r -> r.get("id")).toList(), is(List.of(1, 3)));
+    }
+
+    private static final String MAP_OF_RECORDS_SCHEMA = """
+        {
+          "type": "record",
+          "name": "WithByKey",
+          "namespace": "com.example.badline",
+          "fields": [
+            {"name": "id", "type": "int"},
+            {"name": "byKey", "type": {"type": "map", "values": {
+              "type": "record",
+              "name": "Entry",
+              "fields": [
+                {"name": "score", "type": "int"}
+              ]
+            }}}
+          ]
+        }""";
+
+    // Same gap as above but for a MAP field: AvroConverter.complexMap routes each value through the same
+    // fromMap(...) call, so a null in a non-nullable sub-field of a map value is just as invisible to a gate
+    // that only recurses into direct field values.
+    @Test
+    void warnSkipsBadRowInMapOfRecordsField() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(Map.of("id", 1, "byKey", Map.of("a", Map.of("score", 100))));
+        Map<String, Object> badEntry = new HashMap<>();
+        badEntry.put("score", null); // null into the non-nullable "score" field of a map value
+        rows.add(Map.of("id", 2, "byKey", Map.of("a", badEntry)));
+        rows.add(Map.of("id", 3, "byKey", Map.of("a", Map.of("score", 200))));
+
+        URI uri = uploadIonRows(rows);
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(MAP_OF_RECORDS_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+
+        IonToParquet.Output writerOutput = writer.run(runContext);
+
+        assertThat(writerOutput.getSize(), is(2L));
+        assertThat(
+            listAppender.list.stream().anyMatch(e -> e.getFormattedMessage().contains("byKey{'a'}.score")),
+            is(true)
+        );
+        List<Map<String, Object>> result = readBackAsRows(writerOutput.getUri());
+        assertThat(result.size(), is(2));
+        assertThat(result.stream().map(r -> r.get("id")).toList(), is(List.of(1, 3)));
+    }
+
+    private static final String NESTED_LOGICAL_CONTAINERS_SCHEMA = """
+        {
+          "type": "record",
+          "name": "NestedLogical",
+          "namespace": "com.example.logical",
+          "fields": [
+            {"name": "id", "type": "int"},
+            {"name": "items", "type": {"type": "array", "items": {
+              "type": "record",
+              "name": "Item",
+              "fields": [
+                {"name": "externalId", "type": {"type": "string", "logicalType": "uuid"}}
+              ]
+            }}},
+            {"name": "byKey", "type": {"type": "map", "values": {
+              "type": "record",
+              "name": "Entry",
+              "fields": [
+                {"name": "eventDate", "type": {"type": "int", "logicalType": "date"}}
+              ]
+            }}}
+          ]
+        }""";
+
+    private static Map<String, Object> validNestedLogicalRow(int id) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", id);
+        row.put("items", List.of(
+            Map.of("externalId", UUID.randomUUID().toString()),
+            Map.of("externalId", UUID.randomUUID().toString())
+        ));
+        row.put("byKey", Map.of("a", Map.of("eventDate", LocalDate.of(2024, 1, 1))));
+        return row;
+    }
+
+    // Counterpart to the logical-type gate regression, for container fields: an array-of-records and a
+    // map-of-records whose sub-fields legitimately hold non-null logical-typed values (uuid, date) must not
+    // be mistaken for the "null in a non-nullable field" bad-record shape, so every row must survive with zero
+    // warnings. Stops a future over-broad container gate from silently dropping valid nested data.
+    @Test
+    void warnKeepsAllRowsWhenArrayAndMapOfRecordsAreValidWithLogicalSubfields() throws Exception {
+        List<Map<String, Object>> rows = IntStream.rangeClosed(1, 5).mapToObj(IonToParquetTest::validNestedLogicalRow).toList();
+        URI uri = uploadIonRows(rows);
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(NESTED_LOGICAL_CONTAINERS_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+
+        IonToParquet.Output writerOutput = writer.run(runContext);
+
+        assertThat(writerOutput.getSize(), is((long) rows.size()));
+        assertThat(listAppender.list.isEmpty(), is(true));
+        assertThat(readBackAsRows(writerOutput.getUri()).size(), is(rows.size()));
+    }
+
     @Test
     void errorOnBadRowFailsUnchanged() throws Exception {
         URI uri = uploadIonRows(rowsWithOneBadId());

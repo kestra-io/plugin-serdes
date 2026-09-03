@@ -246,10 +246,13 @@ public abstract class AbstractAvroConverter extends Task {
     /**
      * Returns the name of the first field that is {@code null} while its schema does not admit {@code NULL}, or
      * {@code null} if the record is well-formed. Conversion-agnostic on purpose: it inspects the physical
-     * nullability of the field's declared schema, never the Java type a logical-type conversion produced.
-     * Recurses into nested records: {@code AvroConverter.fromMap} resolves a nested record's own bad fields to
-     * null internally without failing the outer field, so the outer field itself is a well-formed (non-null)
-     * record that can still contain an invalid null deeper down.
+     * nullability of the declared schema, never the Java type a logical-type conversion produced.
+     * Recurses into nested records wherever they actually live in the converted value -- as a direct field
+     * value, or nested inside a {@code List}/{@code Map} produced by {@code AvroConverter.complexArray}/
+     * {@code complexMap} for an ARRAY-of-record or MAP-of-record field -- since {@code AvroConverter.fromMap}
+     * resolves a nested record's own bad fields to null internally without failing the value that holds it.
+     * Walks the converted <em>data</em>, not the schema, so recursive named-type schemas can't cause infinite
+     * recursion: the data itself is always a finite tree.
      */
     private static String firstNonNullableFieldHoldingNull(GenericData.Record datum) {
         return firstNonNullableFieldHoldingNull(datum, null);
@@ -258,17 +261,79 @@ public abstract class AbstractAvroConverter extends Task {
     private static String firstNonNullableFieldHoldingNull(GenericData.Record datum, String parentFieldName) {
         for (org.apache.avro.Schema.Field field : datum.getSchema().getFields()) {
             String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
-            Object value = datum.get(field.name());
-            if (value == null) {
-                if (!acceptsNull(field.schema())) {
-                    return currentFieldName;
+            String invalidField = checkChildValue(datum.get(field.name()), field.schema(), currentFieldName);
+            if (invalidField != null) {
+                return invalidField;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Checks one field/element/map-value slot: a {@code null} value is invalid unless its (possibly unresolved)
+     * schema admits {@code NULL}; a non-null value is inspected further for a nested invalid null. Shared by the
+     * record field loop and the array/map loops below so the null-vs-recurse decision lives in exactly one place.
+     */
+    private static String checkChildValue(Object value, org.apache.avro.Schema schema, String fieldName) {
+        if (value == null) {
+            return (schema == null || acceptsNull(schema)) ? null : fieldName;
+        }
+        return firstNonNullableValueHoldingNull(value, schema, fieldName);
+    }
+
+    /**
+     * Inspects a single non-null value for a nested invalid null: a nested record's fields, or -- for a
+     * {@code List}/{@code Map} produced by {@code complexArray}/{@code complexMap} -- each element/value in turn.
+     * {@code schema} is the declared schema of the container the value came from (a field, an array element type,
+     * or a map value type); it may be a UNION, so the matching branch is resolved before use.
+     */
+    private static String firstNonNullableValueHoldingNull(Object value, org.apache.avro.Schema schema, String fieldName) {
+        if (value instanceof GenericData.Record nested) {
+            return firstNonNullableFieldHoldingNull(nested, fieldName);
+        }
+
+        if (value instanceof Collection<?> collection) {
+            org.apache.avro.Schema elementSchema = resolveSchema(schema, org.apache.avro.Schema.Type.ARRAY);
+            org.apache.avro.Schema elementType = elementSchema != null ? elementSchema.getElementType() : null;
+            int index = 0;
+            for (Object element : collection) {
+                String invalidField = checkChildValue(element, elementType, fieldName + "[" + index + "]");
+                if (invalidField != null) {
+                    return invalidField;
                 }
-            } else if (value instanceof GenericData.Record nested) {
-                String nestedInvalidField = firstNonNullableFieldHoldingNull(nested, currentFieldName);
-                if (nestedInvalidField != null) {
-                    return nestedInvalidField;
+                index++;
+            }
+            return null;
+        }
+
+        if (value instanceof Map<?, ?> map) {
+            org.apache.avro.Schema mapSchema = resolveSchema(schema, org.apache.avro.Schema.Type.MAP);
+            org.apache.avro.Schema valueType = mapSchema != null ? mapSchema.getValueType() : null;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                String invalidField = checkChildValue(entry.getValue(), valueType, fieldName + "{'" + entry.getKey() + "'}");
+                if (invalidField != null) {
+                    return invalidField;
                 }
             }
+            return null;
+        }
+
+        return null;
+    }
+
+    /** Returns {@code schema} if it already is of {@code type}, or its matching branch if it's a UNION, else {@code null}. */
+    private static org.apache.avro.Schema resolveSchema(org.apache.avro.Schema schema, org.apache.avro.Schema.Type type) {
+        if (schema == null) {
+            return null;
+        }
+        if (schema.getType() == type) {
+            return schema;
+        }
+        if (schema.getType() == org.apache.avro.Schema.Type.UNION) {
+            return schema.getTypes().stream()
+                .filter(candidate -> candidate.getType() == type)
+                .findFirst()
+                .orElse(null);
         }
         return null;
     }
