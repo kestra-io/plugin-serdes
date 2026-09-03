@@ -273,10 +273,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     }
 
     private Object getFormula(Cell cell, DateTimeRender dateTimeRender) {
-        // getCachedFormulaResultType() is only valid on an actual formula cell (e.g. StreamingCell throws
-        // otherwise); a non-formula cell reaching FORMULA render mode just falls back to its plain value.
-        // getUnformattedValue()'s FORMULA branch only calls back into getFormula() when the cell type is
-        // itself FORMULA, so this can never recurse.
+        // getCachedFormulaResultType() is only valid on an actual formula cell (StreamingCell throws otherwise)
         if (cell.getCellType() != CellType.FORMULA) {
             return getUnformattedValue(cell, dateTimeRender);
         }
