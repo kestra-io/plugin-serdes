@@ -97,7 +97,7 @@ public class IonToJsonTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"Instant", "Date", "timestampMillis", "timestampMicros", "LocalDate", "timeMillis"})
+    @ValueSource(strings = { "Instant", "Date", "timestampMillis", "timestampMicros", "LocalDate", "timeMillis" })
     void should_write_struct_under_temporal_field_name_as_plain_object(String fieldName) throws Exception {
         var ion = "{" + fieldName + ":{year:2024,month:1,day:15}}\n";
         var expectedJson = "{\"" + fieldName + "\":{\"year\":2024,\"month\":1,\"day\":15}}\n";
@@ -113,7 +113,7 @@ public class IonToJsonTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"Instant", "Date", "timestampMillis", "timestampMicros", "LocalDate"})
+    @ValueSource(strings = { "Instant", "Date", "timestampMillis", "timestampMicros", "LocalDate" })
     void should_keep_writing_scalar_under_temporal_field_name(String fieldName) throws Exception {
         // Generic regression guard: scalars never entered the removed STRUCT branches, but pin the behaviour anyway.
         // "timeMillis" scalars go through a dedicated H:mm reformatting branch (unrelated to this fix), so it is excluded here.

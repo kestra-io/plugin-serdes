@@ -1,6 +1,13 @@
 package io.kestra.plugin.serdes.parquet;
 
-import io.kestra.core.preview.FilePreview;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.hadoop.conf.Configuration;
@@ -13,13 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import io.kestra.core.preview.FilePreview;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -78,7 +79,7 @@ class ParquetFileRendererTest {
         tempFile.deleteOnExit();
 
         HadoopOutputFile outputFile = HadoopOutputFile.fromPath(new Path(tempFile.getPath()), new Configuration());
-        AvroParquetWriter.Builder<GenericData.Record> writerBuilder = AvroParquetWriter.<GenericData.Record>builder(outputFile)
+        AvroParquetWriter.Builder<GenericData.Record> writerBuilder = AvroParquetWriter.<GenericData.Record> builder(outputFile)
             .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
             .withSchema(schema);
 

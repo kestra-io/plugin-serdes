@@ -22,11 +22,11 @@ public abstract class FullIonConversionAbstractTest {
     void JSONArray() throws Exception {
         this.run(
             """
-            ["one", "two"]
-            """,
+                ["one", "two"]
+                """,
             """
-            ["one", "two"]
-            """
+                ["one", "two"]
+                """
         );
     }
 

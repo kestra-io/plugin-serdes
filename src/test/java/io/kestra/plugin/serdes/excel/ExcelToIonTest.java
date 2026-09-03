@@ -527,8 +527,10 @@ public class ExcelToIonTest {
 
     private static byte[] rewriteSheetXml(byte[] xlsx, String search, String replace) throws IOException {
         var result = new ByteArrayOutputStream();
-        try (var zis = new ZipInputStream(new ByteArrayInputStream(xlsx));
-             var zos = new ZipOutputStream(result)) {
+        try (
+            var zis = new ZipInputStream(new ByteArrayInputStream(xlsx));
+            var zos = new ZipOutputStream(result)
+        ) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 byte[] content = zis.readAllBytes();

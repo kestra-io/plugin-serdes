@@ -255,8 +255,10 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                     } else if (event == XMLStreamConstants.END_ELEMENT) {
                         // Children are fully skipped above, so this can only be the root's own end tag.
                         break;
-                    } else if ((event == XMLStreamConstants.CHARACTERS || event == XMLStreamConstants.CDATA)
-                        && !reader.getText().isBlank()) {
+                    } else if (
+                        (event == XMLStreamConstants.CHARACTERS || event == XMLStreamConstants.CDATA)
+                            && !reader.getText().isBlank()
+                    ) {
                         hasRootText = true;
                     }
                 }

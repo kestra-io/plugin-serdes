@@ -93,9 +93,11 @@ final class YamlDocumentReader {
             if (message == null || e.getClass() != YAMLException.class) {
                 return e;
             }
-            if (!message.contains("exceeds the specified max")
-                && !message.contains("Nesting Depth exceeded")
-                && !message.contains("exceeds the limit")) {
+            if (
+                !message.contains("exceeds the specified max")
+                    && !message.contains("Nesting Depth exceeded")
+                    && !message.contains("exceeds the limit")
+            ) {
                 return e;
             }
 

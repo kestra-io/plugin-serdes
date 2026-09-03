@@ -8,6 +8,9 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
+import org.apache.commons.io.ByteOrderMark;
+import org.apache.commons.io.input.BOMInputStream;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
@@ -29,8 +32,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.apache.commons.io.ByteOrderMark;
-import org.apache.commons.io.input.BOMInputStream;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -308,7 +309,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         if (onEmptyHeader == OnEmptyHeader.RENAME) {
             // Name every unnamed column uniquely, so no data is lost and Parquet gets valid names.
             Set<String> taken = new HashSet<>(names);
-            headers.replaceAll((index, name) -> {
+            headers.replaceAll((index, name) ->
+            {
                 if (!name.isEmpty()) {
                     return name;
                 }

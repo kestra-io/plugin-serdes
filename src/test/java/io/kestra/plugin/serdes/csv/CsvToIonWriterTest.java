@@ -200,7 +200,7 @@ class CsvToIonWriterTest {
     @Test
     void utf8BomInHeaderIsStripped() throws Exception {
         String csvBody = "code_insee;nom_commune\n1001;L'Abergement-Clémenciat\n";
-        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] utf8Bom = new byte[] { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF };
 
         ByteArrayOutputStream withBom = new ByteArrayOutputStream();
         withBom.write(utf8Bom);
@@ -238,7 +238,7 @@ class CsvToIonWriterTest {
         // EF BB BF is the UTF-8 BOM, but under ISO-8859-1 these are three real characters that
         // must be preserved, not stripped, so BOM detection is gated on the configured charset.
         String csvBody = "code_insee;nom_commune\n1001;Abergement\n";
-        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] utf8Bom = new byte[] { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF };
 
         ByteArrayOutputStream withBom = new ByteArrayOutputStream();
         withBom.write(utf8Bom);
@@ -500,7 +500,7 @@ class CsvToIonWriterTest {
     @Test
     void utf8BomAndTrailingEmptyHeaderTogether() throws Exception {
         String csvBody = "code_insee;nom_commune;\n1001;L'Abergement-Clémenciat;\n";
-        byte[] utf8Bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] utf8Bom = new byte[] { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF };
 
         ByteArrayOutputStream withBom = new ByteArrayOutputStream();
         withBom.write(utf8Bom);
