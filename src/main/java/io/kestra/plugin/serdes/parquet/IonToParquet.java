@@ -93,6 +93,39 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
                         ]
                       }
                 """
+        ),
+        @Example(
+            full = true,
+            title = "Convert an ION file to Parquet, logging a warning and skipping any row that fails to match the schema instead of failing the task.",
+            code = """
+                id: ion_to_parquet_on_bad_lines
+                namespace: company.team
+
+                tasks:
+                  - id: download_csv
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
+
+                  - id: convert
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.download_csv.uri }}"
+
+                  - id: result
+                    type: io.kestra.plugin.serdes.parquet.IonToParquet
+                    from: "{{ outputs.convert.uri }}"
+                    onBadLines: WARN
+                    schema: |
+                      {
+                        "type": "record",
+                        "name": "Salary",
+                        "namespace": "com.example.salary",
+                        "fields": [
+                          {"name": "work_year", "type": "int"},
+                          {"name": "job_title", "type": "string"},
+                          {"name": "salary_in_usd", "type": "int"}
+                        ]
+                      }
+                """
         )
     },
     metrics = {

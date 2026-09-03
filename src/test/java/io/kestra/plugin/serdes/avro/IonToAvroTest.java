@@ -32,6 +32,7 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.serdes.OnBadLines;
 import io.kestra.plugin.serdes.csv.IonToCsv;
 
 import jakarta.inject.Inject;
@@ -231,5 +232,67 @@ class IonToAvroTest {
             () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
         );
         assertThat(exception.getMessage(), is("Cannot infer Avro schema from ION input: the file appears to be empty or contains no valid records."));
+    }
+
+    private static final String NON_NULLABLE_INT_SCHEMA = """
+        {
+          "type": "record",
+          "name": "BadLine",
+          "namespace": "com.example.badline",
+          "fields": [
+            {"name": "id", "type": "int"},
+            {"name": "s", "type": "string"}
+          ]
+        }""";
+
+    private URI uploadRowsWithOneBadId() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_onbadlines_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            List.of(
+                ImmutableMap.of("id", 1, "s", "a"),
+                new HashMap<String, Object>() {{ put("id", null); put("s", "b"); }},
+                ImmutableMap.of("id", 3, "s", "c")
+            ).forEach(throwConsumer(row -> FileSerde.write(output, row)));
+        }
+
+        return storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+    }
+
+    // Permanent regression test (plan task 9): a null value into a non-nullable field must not make
+    // IonToAvro fail under WARN. This is the reference behaviour the IonToParquet fix must match.
+    @Test
+    void onBadLinesWarnSkipsBadRowAndSucceeds() throws Exception {
+        URI uri = uploadRowsWithOneBadId();
+
+        IonToAvro writer = IonToAvro.builder()
+            .id(IdUtils.create())
+            .type(IonToAvro.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(NON_NULLABLE_INT_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .build();
+
+        IonToAvro.Output output = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        assertThat(output.getSize(), is(2L));
+        assertThat(avroSize(storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())), is(2));
+    }
+
+    @Test
+    void onBadLinesSkipDropsBadRowAndSucceeds() throws Exception {
+        URI uri = uploadRowsWithOneBadId();
+
+        IonToAvro writer = IonToAvro.builder()
+            .id(IdUtils.create())
+            .type(IonToAvro.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(NON_NULLABLE_INT_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        IonToAvro.Output output = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        assertThat(output.getSize(), is(2L));
+        assertThat(avroSize(storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())), is(2));
     }
 }

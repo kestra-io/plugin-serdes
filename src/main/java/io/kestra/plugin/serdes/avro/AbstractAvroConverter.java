@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -23,7 +24,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 @SuperBuilder
 @ToString
@@ -182,30 +182,76 @@ public abstract class AbstractAvroConverter extends Task {
             .onBadLines(rOnBadLines)
             .build();
 
+        AtomicLong writtenCount = new AtomicLong();
+
         Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
             .map(this.convertToAvro(schema, converter, rOnBadLines))
-            .doOnNext(datum ->
-            {
-                try {
-                    consumer.accept(datum);
-                } catch (Throwable e) {
-                    var avroException = new AvroConverter.IllegalRowConvertion(
-                        datum.getSchema()
-                            .getFields()
-                            .stream()
-                            .map(field -> new AbstractMap.SimpleEntry<>(field.name(), datum.get(field.name())))
-                            // https://bugs.openjdk.java.net/browse/JDK-8148463
-                            .collect(HashMap::new, (m, v) -> m.put(v.getKey(), v.getValue()), HashMap::putAll),
-                        e,
-                        null
-                    );
-                    throw new RuntimeException(avroException);
-                }
-            });
+            .doOnNext(datum -> this.writeRecord(datum, consumer, rOnBadLines, runContext, writtenCount));
 
-        // metrics & finalize
-        Mono<Long> count = flowable.count();
-        return count.block();
+        // metrics & finalize: count only rows actually written, not rows skipped under WARN/SKIP
+        flowable.then().block();
+        return writtenCount.get();
+    }
+
+    /**
+     * A record that fails to write is not safely resumable: {@code AvroParquetWriter} streams field values into
+     * column writers as it walks the record, so a partially-written record can leave a row group with columns of
+     * unequal length. Under {@code WARN}/{@code SKIP} we therefore validate the record *before* handing it to the
+     * consumer, so a bad record never reaches {@code writer.write()} in the first place. Under {@code ERROR},
+     * validation is skipped so the existing exception type, message and behaviour are preserved exactly.
+     */
+    private <E extends Exception> void writeRecord(
+        GenericData.Record datum,
+        Rethrow.ConsumerChecked<GenericData.Record, E> consumer,
+        OnBadLines rOnBadLines,
+        RunContext runContext,
+        AtomicLong writtenCount
+    ) {
+        if (rOnBadLines != OnBadLines.ERROR && !AvroConverter.genericData().validate(datum.getSchema(), datum)) {
+            if (rOnBadLines == OnBadLines.WARN) {
+                runContext.logger().warn("Bad record skipped (onBadLines=WARN): record does not conform to schema '{}': {}", datum.getSchema().getName(), datum);
+            }
+            return;
+        }
+
+        try {
+            consumer.accept(datum);
+            writtenCount.incrementAndGet();
+        } catch (Throwable e) {
+            // an I/O failure (disk full, closed stream) is an infrastructure failure, not a bad line: it must fail the task under every mode
+            if (isIOFailure(e)) {
+                throw new RuntimeException(e);
+            }
+
+            if (rOnBadLines == OnBadLines.ERROR) {
+                throw new RuntimeException(illegalRowConvertion(datum, e));
+            } else if (rOnBadLines == OnBadLines.WARN) {
+                runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", e.getMessage());
+            }
+            // SKIP: silently drop the row
+        }
+    }
+
+    private static boolean isIOFailure(Throwable e) {
+        for (Throwable current = e; current != null; current = current.getCause()) {
+            if (current instanceof IOException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static AvroConverter.IllegalRowConvertion illegalRowConvertion(GenericData.Record datum, Throwable e) {
+        return new AvroConverter.IllegalRowConvertion(
+            datum.getSchema()
+                .getFields()
+                .stream()
+                .map(field -> new AbstractMap.SimpleEntry<>(field.name(), datum.get(field.name())))
+                // https://bugs.openjdk.java.net/browse/JDK-8148463
+                .collect(HashMap::new, (m, v) -> m.put(v.getKey(), v.getValue()), HashMap::putAll),
+            e,
+            null
+        );
     }
 
     @SuppressWarnings("unchecked")
