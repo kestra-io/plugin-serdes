@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.avro.converter;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.apache.avro.Schema;
@@ -22,7 +23,10 @@ public class PrimitiveStringBytesTest {
             Arguments.of(42F, "42.0"),
             Arguments.of(42L, "42"),
             Arguments.of(42.0D, "42.0"),
-            Arguments.of("", "")
+            Arguments.of("", ""),
+            // The literal user string "null" is a real value and must survive untouched -
+            // only a Java null is rejected (see convertNullFailsOnNonNullableString).
+            Arguments.of("null", "null")
         );
     }
 
@@ -50,5 +54,18 @@ public class PrimitiveStringBytesTest {
     @Test
     void convertNullFailsOnNonNullableBytes() {
         AvroConverterTest.Utils.oneFieldFailed(null, Schema.create(Schema.Type.BYTES), false);
+    }
+
+    // ENUM and FIXED reach primitiveString through complexEnum / primitiveBytes, so they inherit the same guard.
+    @Test
+    void convertNullFailsOnNonNullableEnum() {
+        AvroConverterTest.Utils.oneFieldFailed(
+            null, Schema.createEnum("enumName", null, null, List.of("A", "B")), false
+        );
+    }
+
+    @Test
+    void convertNullFailsOnNonNullableFixed() {
+        AvroConverterTest.Utils.oneFieldFailed(null, Schema.createFixed("fixedName", null, null, 3), false);
     }
 }
