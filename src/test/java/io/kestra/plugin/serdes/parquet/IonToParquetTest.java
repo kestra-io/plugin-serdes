@@ -8,6 +8,8 @@ import java.time.*;
 import java.util.*;
 import java.util.stream.IntStream;
 
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +29,7 @@ import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.OnBadLines;
+import io.kestra.plugin.serdes.avro.AvroConverter;
 
 import jakarta.inject.Inject;
 
@@ -476,6 +479,54 @@ class IonToParquetTest {
         assertThat(message, containsString("schema 'BadLine'"));
         assertThat(message, containsString("(truncated)"));
         assertThat(message.length(), lessThan(hugeValue.length()));
+    }
+
+    // Regression test: the truncation cap must never land on the low half of a surrogate pair.
+    @Test
+    void warnLogsTruncateOnSurrogatePairBoundaryWithoutMojibake() throws Exception {
+        Schema schema = new Schema.Parser().parse(NON_NULLABLE_INT_SCHEMA);
+        AvroConverter converter = AvroConverter.builder().build();
+
+        // probe the exact prefix Avro's GenericData.Record#toString() prepends before the "s" field value,
+        // so the astral character below can be positioned deterministically at the 1000th character
+        Map<String, Object> probeData = new HashMap<>();
+        probeData.put("id", null);
+        probeData.put("s", "Z".repeat(3000));
+        GenericData.Record probeRecord = converter.fromMap(schema, probeData, OnBadLines.SKIP);
+        int prefixLength = probeRecord.toString().indexOf('Z');
+
+        int localIndex = 999 - prefixLength;
+        String hugeValue = "Z".repeat(localIndex) + "😀" + "Z".repeat(1000);
+
+        Map<String, Object> bad = new HashMap<>();
+        bad.put("id", null); // null into a non-nullable "int" field
+        bad.put("s", hugeValue);
+        URI uri = uploadIonRows(List.of(bad));
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(NON_NULLABLE_INT_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+
+        writer.run(runContext);
+
+        String message = listAppender.list.stream()
+            .map(ILoggingEvent::getFormattedMessage)
+            .filter(m -> m.contains("onBadLines=WARN"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Expected a WARN log for the bad record"));
+
+        String value = message.substring(message.indexOf("nullable: ") + "nullable: ".length());
+        String truncatedPart = value.substring(0, value.indexOf("… (truncated)"));
+        assertThat(truncatedPart.length(), is(999));
+        assertThat(Character.isHighSurrogate(truncatedPart.charAt(truncatedPart.length() - 1)), is(false));
+        assertThat(Character.isLowSurrogate(truncatedPart.charAt(truncatedPart.length() - 1)), is(false));
     }
 
     @Test

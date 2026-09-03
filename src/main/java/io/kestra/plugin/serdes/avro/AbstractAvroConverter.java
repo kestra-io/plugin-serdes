@@ -353,7 +353,11 @@ public abstract class AbstractAvroConverter extends Task {
         if (value == null || value.length() <= MAX_LOGGED_RECORD_LENGTH) {
             return value;
         }
-        return value.substring(0, MAX_LOGGED_RECORD_LENGTH) + "… (truncated)";
+        // never cut between a surrogate pair, which would leave a dangling unpaired surrogate in the log line
+        int cut = Character.isHighSurrogate(value.charAt(MAX_LOGGED_RECORD_LENGTH - 1))
+            ? MAX_LOGGED_RECORD_LENGTH - 1
+            : MAX_LOGGED_RECORD_LENGTH;
+        return value.substring(0, cut) + "… (truncated)";
     }
 
     private static boolean isIOFailure(Throwable e) {
