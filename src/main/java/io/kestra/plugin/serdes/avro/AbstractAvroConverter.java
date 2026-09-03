@@ -219,7 +219,7 @@ public abstract class AbstractAvroConverter extends Task {
             var invalidField = firstNonNullableFieldHoldingNull(datum);
             if (invalidField != null) {
                 if (rOnBadLines == OnBadLines.WARN) {
-                    runContext.logger().warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), datum);
+                    runContext.logger().warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), truncateForLog(String.valueOf(datum)));
                 }
                 return;
             }
@@ -237,7 +237,7 @@ public abstract class AbstractAvroConverter extends Task {
             if (rOnBadLines == OnBadLines.ERROR) {
                 throw new RuntimeException(illegalRowConvertion(datum, e));
             } else if (rOnBadLines == OnBadLines.WARN) {
-                runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", e.getMessage());
+                runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", truncateForLog(e.getMessage()));
             }
             // SKIP: silently drop the row
         }
@@ -344,6 +344,16 @@ public abstract class AbstractAvroConverter extends Task {
             case UNION -> schema.getTypes().stream().anyMatch(type -> type.getType() == org.apache.avro.Schema.Type.NULL);
             default -> false;
         };
+    }
+
+    /** Cap on the size of a bad-record dump or exception message embedded in a WARN log line, to bound log volume across many bad rows. */
+    private static final int MAX_LOGGED_RECORD_LENGTH = 1000;
+
+    private static String truncateForLog(String value) {
+        if (value == null || value.length() <= MAX_LOGGED_RECORD_LENGTH) {
+            return value;
+        }
+        return value.substring(0, MAX_LOGGED_RECORD_LENGTH) + "… (truncated)";
     }
 
     private static boolean isIOFailure(Throwable e) {

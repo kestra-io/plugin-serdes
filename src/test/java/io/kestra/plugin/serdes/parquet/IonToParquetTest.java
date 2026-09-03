@@ -36,6 +36,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
@@ -442,6 +443,39 @@ class IonToParquetTest {
         List<Map<String, Object>> result = readBackAsRows(writerOutput.getUri());
         assertThat(result.size(), is(2));
         assertThat(result.stream().map(r -> r.get("id")).toList(), is(List.of(1, 3)));
+    }
+
+    @Test
+    void warnLogsTruncateOversizedRecordButKeepFieldAndSchemaNameIntact() throws Exception {
+        String hugeValue = "s".repeat(5000);
+        Map<String, Object> bad = new HashMap<>();
+        bad.put("id", null); // null into a non-nullable "int" field
+        bad.put("s", hugeValue);
+        URI uri = uploadIonRows(List.of(bad));
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(NON_NULLABLE_INT_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+
+        writer.run(runContext);
+
+        String message = listAppender.list.stream()
+            .map(ILoggingEvent::getFormattedMessage)
+            .filter(m -> m.contains("onBadLines=WARN"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Expected a WARN log for the bad record"));
+
+        assertThat(message, containsString("field 'id'"));
+        assertThat(message, containsString("schema 'BadLine'"));
+        assertThat(message, containsString("(truncated)"));
+        assertThat(message.length(), lessThan(hugeValue.length()));
     }
 
     @Test
