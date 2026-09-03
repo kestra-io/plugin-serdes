@@ -1,21 +1,30 @@
 package io.kestra.plugin.serdes.json;
 
 import java.io.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import com.amazon.ion.*;
 import com.amazon.ion.system.IonSystemBuilder;
 import com.amazon.ion.system.IonTextWriterBuilder;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.ion.IonFactory;
 
 import io.kestra.core.models.annotations.Example;
@@ -106,7 +115,11 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Timezone to use when no timezone can be parsed on the source"
+        title = "Timezone to use when rendering timestamps",
+        description = """
+            All ION timestamp values are rendered using this timezone, even if the \
+            source timestamp carries its own offset. Defaults to the system \
+            timezone."""
     )
     @PluginProperty(group = "execution")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
@@ -130,9 +143,21 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         var outputCharset = Charset.forName(runContext.render(this.charset).as(String.class).orElse(StandardCharsets.UTF_8.name()));
 
         var zoneId = ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElse(ZoneId.systemDefault().toString()));
+
+        // Default ION path yields raw embedded Timestamp objects and NON_NULL inclusion, neither handled by a plain JSON mapper.
+        var ionTimestampModule = new SimpleModule()
+            .addSerializer(Timestamp.class, new JsonSerializer<Timestamp>() {
+                @Override
+                public void serialize(Timestamp value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+                    gen.writeString(formatTimestamp(toInstant(value), zoneId));
+                }
+            });
+
+        // No .setTimeZone(...): ION's only temporal type is rendered by ionTimestampModule via the closed-over zoneId, not the mapper's TimeZone.
         var jsonObjectMapper = JacksonMapper.ofJson().copy()
             .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-            .setTimeZone(TimeZone.getTimeZone(zoneId));
+            .setDefaultPropertyInclusion(JsonInclude.Include.ALWAYS)
+            .registerModule(ionTimestampModule);
 
         var rKeepAnnotations = runContext.render(this.shouldKeepAnnotations).as(Boolean.class).orElse(false);
         Long recordCount = null;
@@ -303,6 +328,29 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             .build();
     }
 
+    // com.amazon.ion.Timestamp.dateValue() truncates to millisecond precision; build the Instant from the
+    // Z-normalized (UTC) fields directly so fractional seconds beyond milliseconds are preserved. Rounding a
+    // >9-digit fraction (e.g. .9999999999) up can overflow to 1_000_000_000 nanos: Instant.ofEpochSecond's
+    // nanoAdjustment is unrestricted and carries the overflow into the next second instead of throwing.
+    private static Instant toInstant(Timestamp timestamp) {
+        var decimalSecond = timestamp.getZDecimalSecond();
+        var wholeSeconds = decimalSecond.intValue();
+        var epochSecond = LocalDateTime.of(
+            timestamp.getZYear(), timestamp.getZMonth(), timestamp.getZDay(),
+            timestamp.getZHour(), timestamp.getZMinute(), wholeSeconds
+        ).toEpochSecond(ZoneOffset.UTC);
+        var nanos = decimalSecond.subtract(BigDecimal.valueOf(wholeSeconds))
+            .movePointRight(9)
+            .setScale(0, RoundingMode.HALF_UP)
+            .longValueExact();
+
+        return Instant.ofEpochSecond(epochSecond, nanos);
+    }
+
+    private static String formatTimestamp(Instant instant, ZoneId zoneId) {
+        return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(instant.atZone(zoneId));
+    }
+
     private void writeIonValueWithAnnotations(ObjectMapper mapper, JsonGenerator jsonGenerator, IonValue value, ZoneId zoneId, String parentFieldName) throws IOException {
         var type = value.getType();
 
@@ -397,10 +445,7 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             case DECIMAL -> jsonGenerator.writeNumber(((IonDecimal) value).decimalValue());
             case TIMESTAMP -> {
                 var ionTimestamp = ((IonTimestamp) value).timestampValue();
-                var date = ionTimestamp.dateValue();
-                var instant = date.toInstant();
-                var zonedDateTime = instant.atZone(zoneId);
-                jsonGenerator.writeString(zonedDateTime.toString());
+                jsonGenerator.writeString(formatTimestamp(toInstant(ionTimestamp), zoneId));
             }
             case STRING, SYMBOL -> {
                 var text = ((IonText) value).stringValue();

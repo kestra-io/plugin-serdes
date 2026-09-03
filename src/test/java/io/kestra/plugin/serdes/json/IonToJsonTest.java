@@ -95,6 +95,207 @@ public class IonToJsonTest {
     }
 
     @Test
+    void should_render_timestamps_as_iso_strings_on_default_path() throws Exception {
+        var ion = "{ts:2024-01-15T10:30:00Z,n:null,s:\"keep\"}\n";
+        var expectedJson = "{\"ts\":\"2024-01-15T10:30:00Z\",\"n\":null,\"s\":\"keep\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+        assertThat(output.getSize(), is(1L));
+    }
+
+    @Test
+    void should_render_timestamps_as_iso_strings_on_default_path_without_newline() throws Exception {
+        var ion = "{ts:2024-01-15T10:30:00Z,n:null,s:\"keep\"}\n{ts:2024-02-20T08:00:00Z,n:null,s:\"keep2\"}\n";
+        var expectedJson = "[{\"ts\":\"2024-01-15T10:30:00Z\",\"n\":null,\"s\":\"keep\"},{\"ts\":\"2024-02-20T08:00:00Z\",\"n\":null,\"s\":\"keep2\"}]";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .newLine(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_keep_null_fields_on_default_path() throws Exception {
+        var ion = "{n:null,s:\"keep\"}\n";
+        var expectedJson = "{\"n\":null,\"s\":\"keep\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_honour_timezone_id_on_default_path() throws Exception {
+        var ion = "{ts:2024-01-15T10:30:00Z}\n";
+
+        var runContextUtc = getRunContext(ion);
+        var taskUtc = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var outputUtc = taskUtc.run(runContextUtc);
+
+        var runContextParis = getRunContext(ion);
+        var taskParis = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("Europe/Paris"))
+            .build();
+        var outputParis = taskParis.run(runContextParis);
+
+        String resultUtc;
+        try (var stream = storageInterface.get(MAIN_TENANT, null, outputUtc.getUri())) {
+            resultUtc = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        String resultParis;
+        try (var stream = storageInterface.get(MAIN_TENANT, null, outputParis.getUri())) {
+            resultParis = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        assertThat(resultUtc, containsString("2024-01-15T10:30:00Z"));
+        assertThat(resultParis, containsString("2024-01-15T11:30:00+01:00"));
+    }
+
+    @Test
+    void should_preserve_sub_millisecond_precision_on_default_path() throws Exception {
+        var ion = "{ts:2024-01-15T10:30:00.123456Z}\n";
+        var expectedJson = "{\"ts\":\"2024-01-15T10:30:00.123456Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_carry_overflowing_fractional_seconds_into_next_second_on_default_path() throws Exception {
+        // A >9-digit fractional second (e.g. .9999999999) rounds up to 1_000_000_000 nanos, which must
+        // carry into the next whole second instead of throwing a DateTimeException.
+        var ion = "{ts:2024-01-15T10:30:00.9999999999Z}\n";
+        var expectedJson = "{\"ts\":\"2024-01-15T10:30:01Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_not_carry_exact_nine_digit_fractional_seconds_on_default_path() throws Exception {
+        // Exactly 9 digits (.999999999) is a legal nanoOfSecond and must NOT carry into the next second.
+        var ion = "{ts:2024-01-15T10:30:00.999999999Z}\n";
+        var expectedJson = "{\"ts\":\"2024-01-15T10:30:00.999999999Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_carry_overflowing_fractional_seconds_across_year_boundary_on_default_path() throws Exception {
+        // A >9-digit fractional second on the last instant of the year must carry through minute,
+        // hour, day and month boundaries into the next year instead of throwing or truncating.
+        var ion = "{ts:2023-12-31T23:59:59.9999999999Z}\n";
+        var expectedJson = "{\"ts\":\"2024-01-01T00:00:00Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_render_low_precision_timestamps_on_default_path() throws Exception {
+        var ion = "{y:2024T,m:2024-01T,d:2024-01-15T}\n";
+        var expectedJson = "{\"y\":\"2024-01-01T00:00:00Z\",\"m\":\"2024-01-01T00:00:00Z\",\"d\":\"2024-01-15T00:00:00Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_render_nested_timestamps_on_default_path() throws Exception {
+        var ion = "{outer:{ts:2024-01-15T10:30:00Z},items:[{ts:2024-02-20T08:00:00Z}]}\n";
+        var expectedJson = "{\"outer\":{\"ts\":\"2024-01-15T10:30:00Z\"},\"items\":[{\"ts\":\"2024-02-20T08:00:00Z\"}]}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(false))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
+    void should_render_timestamps_with_seconds_and_no_zone_suffix_on_annotations_path() throws Exception {
+        // Locks in a behaviour change: the annotations path used to render "2024-01-15T10:30Z[Etc/UTC]"
+        // (missing seconds, zone-id suffix); it now matches the default path's ISO offset format.
+        var ion = "{ts:2024-01-15T10:30:00Z}\n";
+        var expectedJson = "{\"ts\":\"2024-01-15T10:30:00Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(true))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @Test
     void should_stream_large_ion_without_memory_issue() throws Exception {
         var builder = new StringBuilder();
         builder.append("[");
