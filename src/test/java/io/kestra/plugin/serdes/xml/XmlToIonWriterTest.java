@@ -163,6 +163,9 @@ class XmlToIonWriterTest {
 
     @Test
     void readItemsListUnwrapsToIndividualRecords() throws Exception {
+        // Without a query, a root wrapping a single repeated complex child element (the
+        // pattern produced by IonToXml) unwraps into individual ION records — and this must
+        // hold regardless of how many occurrences there are (see #371).
         File sourceFile = SerdesUtils.resourceToFile("xml/items.xml");
         URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
 
@@ -174,7 +177,6 @@ class XmlToIonWriterTest {
 
         XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
 
-        // Read back ION records
         var records = new java.util.ArrayList<>();
         try (
             var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
@@ -185,16 +187,168 @@ class XmlToIonWriterTest {
         // Should produce 3 individual records, not 1 nested record
         assertThat(records.size(), is(3));
 
-        // Each record should contain job_title and avg_salary directly
         @SuppressWarnings("unchecked")
         Map<String, Object> first = (Map<String, Object>) records.getFirst();
-        assertThat(first.containsKey("job_title"), is(true));
         assertThat(first.get("job_title"), is("BI Data Analyst"));
     }
 
     @Test
+    void singleBookStillUnwrapsToOneRecord() throws Exception {
+        // A single occurrence of the repeated child must take the same unwrap path as
+        // several occurrences, so the output shape does not depend on record count (#371).
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<catalog><book><id>r1</id></book></catalog>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        var records = new java.util.ArrayList<>();
+        try (
+            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
+        ) {
+            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
+        }
+
+        assertThat(records.size(), is(1));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> first = (Map<String, Object>) records.getFirst();
+        assertThat(first.get("id"), is("r1"));
+    }
+
+    @Test
+    void twoBooksProduceSameShapeAsOneBook() throws Exception {
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<catalog><book><id>r1</id></book><book><id>r2</id></book></catalog>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        var records = new java.util.ArrayList<>();
+        try (
+            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
+        ) {
+            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
+        }
+
+        assertThat(records.size(), is(2));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> first = (Map<String, Object>) records.get(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> second = (Map<String, Object>) records.get(1);
+        assertThat(first.get("id"), is("r1"));
+        assertThat(second.get("id"), is("r2"));
+        // Same flat shape as the single-book case: only an "id" key, no "catalog"/"book" nesting.
+        assertThat(first.keySet(), is(second.keySet()));
+        assertThat(first.keySet(), is(java.util.Set.of("id")));
+    }
+
+    @Test
+    void multipleDistinctChildrenStaySingleRecord() throws Exception {
+        // A root with more than one distinct child element name is not a record collection.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<root><book><id>r1</id></book><author><id>a1</id></author></root>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        var records = new java.util.ArrayList<>();
+        try (
+            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
+        ) {
+            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
+        }
+
+        assertThat(records.size(), is(1));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> record = (Map<String, Object>) records.getFirst();
+        assertThat(record.containsKey("root"), is(true));
+    }
+
+    @Test
+    void scalarChildStaysSingleRecord() throws Exception {
+        // <root><value>5</value></root>: "value" is a scalar leaf (no attributes, no nested
+        // elements), so it must not be mistaken for a one-record collection.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<root><value>5</value></root>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        var records = new java.util.ArrayList<>();
+        try (
+            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
+        ) {
+            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
+        }
+
+        assertThat(records.size(), is(1));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> record = (Map<String, Object>) records.getFirst();
+        assertThat(record.containsKey("root"), is(true));
+    }
+
+    @Test
+    void unwrapRootCollectionFalseKeepsSingleNestedRecord() throws Exception {
+        // The escape hatch for genuinely ambiguous, config-shaped XML.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<catalog><book><id>r1</id></book><book><id>r2</id></book></catalog>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .unwrapRootCollection(Property.ofValue(false))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        var records = new java.util.ArrayList<>();
+        try (
+            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
+        ) {
+            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
+        }
+
+        assertThat(records.size(), is(1));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> record = (Map<String, Object>) records.getFirst();
+        assertThat(record.containsKey("catalog"), is(true));
+    }
+
+    @Test
     void roundTripIonToXmlAndBack() throws Exception {
-        // Write ION records to XML, then read back and verify we get the original records
+        // Write ION records to XML, then read back and verify we get the original records,
+        // without setting `query` (this is the whole point of #86).
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(

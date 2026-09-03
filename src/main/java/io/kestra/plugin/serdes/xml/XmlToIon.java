@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import javax.xml.stream.XMLInputFactory;
@@ -42,10 +43,16 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
 @Schema(
     title = "Convert an XML file to the Amazon ION format",
     description = """
-        Without a `query`, the entire file is parsed into a single ION record. \
-        When `query` is set (e.g., `/catalog/book`), uses StAX streaming to \
-        extract each matching element as a separate ION record — suitable for \
-        large files. External entity resolution is disabled for security."""
+        Without a `query`, the whole document is inspected: if the root element has \
+        exactly one repeated, complex child element (e.g. `<catalog><book>...</book>\
+        <book>...</book></catalog>`), each occurrence of that child becomes its own \
+        flat ION record — this also applies when there is only a single occurrence, \
+        so the output shape does not depend on record count. Otherwise, the whole \
+        document is parsed into a single nested ION record. Set `unwrapRootCollection` \
+        to `false` to always get a single nested record. When `query` is set (e.g., \
+        `/catalog/book`), uses StAX streaming to extract each matching element as a \
+        separate ION record — suitable for large files. External entity resolution is \
+        disabled for security."""
 )
 @Plugin(
     examples = {
@@ -93,10 +100,29 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         description = """
             When set, uses StAX streaming to extract elements matching the given path
             (e.g. `/catalog/book`). Each matching element is written as a separate ION record.
-            When not set, the entire XML file is parsed into a single ION record."""
+            When not set, the root's single repeated child element (if any) is unwrapped into
+            separate ION records; see `unwrapRootCollection`."""
     )
     @PluginProperty(group = "main")
     private Property<String> query;
+
+    @Builder.Default
+    @Schema(
+        title = "Whether to unwrap the root element's repeated child into individual records",
+        description = """
+            Only used when `query` is not set. When the root element has exactly one \
+            distinct, complex child element name (an element with attributes or child \
+            elements of its own) and no meaningful text of its own, each occurrence of \
+            that child is written as a separate, flat ION record — regardless of whether \
+            there is one occurrence or several, so the output shape is stable. \
+            Set to `false` to always parse the whole document into a single nested ION \
+            record instead. This is useful for config-shaped XML such as \
+            `<config><database><host>x</host></database></config>`, which is structurally \
+            ambiguous with a one-record collection and would otherwise lose the \
+            `database` nesting level. Default value is `true`."""
+    )
+    @PluginProperty(group = "advanced")
+    private final Property<Boolean> unwrapRootCollection = Property.ofValue(true);
 
     @Schema(
         title = "XML parser configuration"
@@ -109,6 +135,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         var from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
         var rCharset = runContext.render(charset).as(String.class).orElseThrow();
         var rQuery = runContext.render(this.query).as(String.class);
+        var rUnwrapRootCollection = runContext.render(this.unwrapRootCollection).as(Boolean.class).orElse(true);
 
         var tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
@@ -122,7 +149,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         if (rQuery.isPresent()) {
             count = runStreaming(runContext, from, rCharset, rQuery.get(), xmlParserConfiguration, tempFile);
         } else {
-            count = runBatch(runContext, from, rCharset, xmlParserConfiguration, tempFile);
+            count = runBatch(runContext, from, rCharset, xmlParserConfiguration, rUnwrapRootCollection, tempFile);
         }
 
         return Output
@@ -132,7 +159,16 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             .build();
     }
 
-    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
+    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, boolean unwrapRootCollection, File tempFile) throws Exception {
+        var collectionChildName = unwrapRootCollection ? detectRootCollectionChild(runContext, from, charset) : null;
+
+        var effectiveParserConfiguration = xmlParserConfiguration;
+        if (collectionChildName != null) {
+            var forceList = new HashSet<>(xmlParserConfiguration.getForceList());
+            forceList.add(collectionChildName);
+            effectiveParserConfiguration = xmlParserConfiguration.withForceList(forceList);
+        }
+
         try (
             Reader input = new BufferedReader(
                 new InputStreamReader(runContext.storage().getFile(from), charset),
@@ -140,20 +176,18 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             );
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
-            var jsonObject = XML.toJSONObject(input, xmlParserConfiguration);
-            var result = unwrapRootArray(jsonObject);
+            var jsonObject = XML.toJSONObject(input, effectiveParserConfiguration);
 
             long count;
-            if (result instanceof JSONArray array) {
-                var list = array.toList();
+            if (collectionChildName != null) {
+                var rootKey = jsonObject.keys().next();
+                var rootValue = jsonObject.getJSONObject(rootKey);
+                var list = rootValue.getJSONArray(collectionChildName).toList();
                 list.forEach(throwConsumer(o -> FileSerde.write(output, o)));
                 count = list.size();
-            } else if (result instanceof JSONObject obj) {
-                var map = obj.toMap();
-                FileSerde.write(output, map);
-                count = 1L;
             } else {
-                FileSerde.write(output, result);
+                var map = jsonObject.toMap();
+                FileSerde.write(output, map);
                 count = 1L;
             }
 
@@ -164,37 +198,104 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     }
 
     /**
-     * Unwraps the root XML structure to extract the inner array of records when the XML
-     * follows the common pattern produced by {@link IonToXml}: {@code <items><item>...</item></items>}.
+     * Structurally detects whether the root element is a wrapper around a repeated record
+     * collection, e.g. {@code <catalog><book>...</book><book>...</book></catalog>}, so that
+     * a single occurrence and several occurrences of the same child element produce the same
+     * ION output shape (see #371).
      * <p>
-     * Handles two patterns:
+     * The root qualifies as a collection when ALL of the following hold:
      * <ul>
-     * <li>{@code {"root": [...]}} — root element directly contains an array</li>
-     * <li>{@code {"root": {"child": [...]}}} — root element wraps a single child element containing an array</li>
+     * <li>it has exactly one distinct direct child element name;</li>
+     * <li>it has no meaningful (non-whitespace) text content of its own;</li>
+     * <li>that child element is complex (it has attributes or child elements of its own),
+     * so a scalar leaf like {@code <root><value>5</value></root>} is never unwrapped.</li>
      * </ul>
-     * Falls back to returning the original JSONObject if the structure doesn't match.
+     * Returns the qualified child element name (including its namespace prefix, if any, to
+     * match the key {@link XML#toJSONObject} would produce) to unwrap, or {@code null} if the
+     * root does not match this pattern.
      */
-    private Object unwrapRootArray(JSONObject jsonObject) {
-        if (jsonObject.length() != 1) {
-            return jsonObject;
-        }
+    private String detectRootCollectionChild(RunContext runContext, URI from, String charset) throws Exception {
+        var factory = XMLInputFactory.newInstance();
+        // Disable external entities for security
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
 
-        var rootKey = jsonObject.keys().next();
-        var rootValue = jsonObject.get(rootKey);
+        try (
+            InputStream is = runContext.storage().getFile(from);
+            BufferedInputStream bis = new BufferedInputStream(is, FileSerde.BUFFER_SIZE)
+        ) {
+            XMLStreamReader reader;
+            try {
+                reader = factory.createXMLStreamReader(bis, charset);
+            } catch (XMLStreamException e) {
+                return null;
+            }
 
-        if (rootValue instanceof JSONArray) {
-            return rootValue;
-        }
+            try {
+                while (reader.hasNext() && reader.next() != XMLStreamConstants.START_ELEMENT) {
+                    // skip prolog / DOCTYPE / comments until the root element
+                }
+                if (reader.getEventType() != XMLStreamConstants.START_ELEMENT) {
+                    return null;
+                }
 
-        if (rootValue instanceof JSONObject innerObj && innerObj.length() == 1) {
-            var innerKey = innerObj.keys().next();
-            var innerValue = innerObj.get(innerKey);
-            if (innerValue instanceof JSONArray) {
-                return innerValue;
+                var childNames = new LinkedHashSet<String>();
+                var complexChild = false;
+                var hasRootText = false;
+
+                while (reader.hasNext()) {
+                    int event = reader.next();
+                    if (event == XMLStreamConstants.START_ELEMENT) {
+                        childNames.add(qualifiedName(reader));
+                        var hasAttributes = reader.getAttributeCount() > 0;
+                        var hasNestedElement = skipElementTrackingNestedElement(reader);
+                        if (hasAttributes || hasNestedElement) {
+                            complexChild = true;
+                        }
+                    } else if (event == XMLStreamConstants.END_ELEMENT) {
+                        // Children are fully skipped above, so this can only be the root's own end tag.
+                        break;
+                    } else if ((event == XMLStreamConstants.CHARACTERS || event == XMLStreamConstants.CDATA)
+                        && !reader.getText().isBlank()) {
+                        hasRootText = true;
+                    }
+                }
+
+                if (childNames.size() == 1 && !hasRootText && complexChild) {
+                    return childNames.iterator().next();
+                }
+                return null;
+            } catch (XMLStreamException e) {
+                return null;
+            } finally {
+                reader.close();
             }
         }
+    }
 
-        return jsonObject;
+    private static String qualifiedName(XMLStreamReader reader) {
+        var prefix = reader.getPrefix();
+        return prefix == null || prefix.isEmpty() ? reader.getLocalName() : prefix + ":" + reader.getLocalName();
+    }
+
+    /**
+     * Skip the current element and all its children, like {@link #skipElement}, but also
+     * report whether it contains at least one nested child element.
+     * The reader must be positioned on a START_ELEMENT.
+     */
+    private boolean skipElementTrackingNestedElement(XMLStreamReader reader) throws Exception {
+        var hasNestedElement = false;
+        int depth = 1;
+        while (reader.hasNext() && depth > 0) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) {
+                depth++;
+                hasNestedElement = true;
+            } else if (event == XMLStreamConstants.END_ELEMENT) {
+                depth--;
+            }
+        }
+        return hasNestedElement;
     }
 
     private long runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
