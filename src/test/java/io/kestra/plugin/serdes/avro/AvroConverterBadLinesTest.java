@@ -53,6 +53,29 @@ class AvroConverterBadLinesTest {
 
     @ParameterizedTest
     @EnumSource(OnBadLines.class)
+    void testNonNullableStringNullWithOnBadLines(OnBadLines onBadLines) throws AvroConverter.IllegalRowConvertion, AvroConverter.IllegalStrictRowConversion {
+        Schema stringSchema = SchemaBuilder.record("StringTestRecord").fields()
+            .name("s").type().stringType().noDefault() // Non-nullable string
+            .name("l").type().longType().noDefault() // Non-nullable long
+            .endRecord();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("s", null);
+        data.put("l", 5L);
+
+        if (onBadLines == OnBadLines.ERROR) {
+            assertThrows(AvroConverter.IllegalRowConvertion.class, () -> converter.fromMap(stringSchema, data, onBadLines));
+        } else {
+            var record = converter.fromMap(stringSchema, data, onBadLines);
+            assertNotNull(record);
+            // Must not be silently written as the literal "null" string
+            assertNull(record.get("s"));
+            assertEquals(5L, record.get("l"));
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(OnBadLines.class)
     void testTypeMismatchWithOnBadLines(OnBadLines onBadLines) throws AvroConverter.IllegalRowConvertion, AvroConverter.IllegalStrictRowConversion {
         Map<String, Object> data = new HashMap<>();
         data.put("id", "123");

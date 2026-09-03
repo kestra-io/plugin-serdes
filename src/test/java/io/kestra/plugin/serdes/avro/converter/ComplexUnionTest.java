@@ -20,7 +20,11 @@ public class ComplexUnionTest {
             Arguments.of("null", Arrays.asList(Schema.Type.BOOLEAN, Schema.Type.NULL), null),
             Arguments.of("1", Arrays.asList(Schema.Type.INT, Schema.Type.NULL), 1),
             Arguments.of("n/a", Arrays.asList(Schema.Type.NULL, Schema.Type.STRING), null),
-            Arguments.of("n/a", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), new Utf8("n/a"))
+            Arguments.of("n/a", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), new Utf8("n/a")),
+            // A real (non-string) null value must resolve to the NULL branch regardless of declaration order,
+            // never fall through to STRING and get stringified into the literal "null".
+            Arguments.of(null, Arrays.asList(Schema.Type.NULL, Schema.Type.STRING), null),
+            Arguments.of(null, Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), null)
         );
     }
 

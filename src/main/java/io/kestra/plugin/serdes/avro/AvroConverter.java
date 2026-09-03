@@ -580,6 +580,12 @@ public class AvroConverter {
     }
 
     public String primitiveString(Object data) {
+        if (data == null) {
+            // Kept consistent with primitiveLong/primitiveInt which fail on unboxing null: a null value
+            // must never be silently stringified into the literal "null" for a non-nullable string field.
+            throw new IllegalArgumentException("Cannot convert null value to non-nullable string");
+        }
+
         return String.valueOf(data);
     }
 

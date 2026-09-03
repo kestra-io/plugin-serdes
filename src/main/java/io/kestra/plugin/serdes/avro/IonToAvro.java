@@ -118,14 +118,6 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
-    @Builder.Default
-    @PluginProperty(group = "advanced")
-    @Schema(
-        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)",
-        description = "Can be `ERROR`, `WARN`, or `SKIP`."
-    )
-    private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
-
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader

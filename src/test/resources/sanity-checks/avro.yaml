@@ -20,7 +20,7 @@ tasks:
         "namespace": "com.example.orders",
         "fields": [
           { "name": "order_id", "type": "int" },
-          { "name": "ustomer_name", "type": "string" },
+          { "name": "customer_name", "type": "string" },
           { "name": "customer_email", "type": "string" },
           { "name": "product_id", "type": "int" },
           { "name": "price", "type": "float" },

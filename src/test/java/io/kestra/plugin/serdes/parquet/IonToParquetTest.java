@@ -20,6 +20,7 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.serdes.OnBadLines;
 
 import jakarta.inject.Inject;
 
@@ -148,6 +149,54 @@ class IonToParquetTest {
             assertThat(result.size(), is(1));
             assertThat(result.get(0).get("String"), is("string"));
         }
+    }
+
+    @Test
+    void nullIntoNonNullableStringFieldFailsWithOnBadLinesError() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_null_string_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("s", null);
+            row.put("l", 5L);
+            FileSerde.write(output, row);
+        }
+
+        URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IonToParquet.class.getSimpleName())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema("{\"type\":\"record\",\"name\":\"T\",\"fields\":[{\"name\":\"s\",\"type\":\"string\"},{\"name\":\"l\",\"type\":\"long\"}]}")
+            .build();
+
+        assertThrows(RuntimeException.class, () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of())));
+    }
+
+    @Test
+    void nullIntoNonNullableStringFieldFailsWithOnBadLinesSkip() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_null_string_skip_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("s", null);
+            row.put("l", 5L);
+            FileSerde.write(output, row);
+        }
+
+        URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IonToParquet.class.getSimpleName())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema("{\"type\":\"record\",\"name\":\"T\",\"fields\":[{\"name\":\"s\",\"type\":\"string\"},{\"name\":\"l\",\"type\":\"long\"}]}")
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        // The underlying Parquet writer cannot safely resume after a required-field write failure without
+        // corrupting the row group, so a row that can't be converted still fails the task even with SKIP —
+        // it must never be silently written as the literal "null" string either way.
+        assertThrows(RuntimeException.class, () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of())));
     }
 
     @Test

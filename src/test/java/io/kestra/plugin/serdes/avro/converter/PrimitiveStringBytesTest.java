@@ -5,6 +5,7 @@ import java.util.stream.Stream;
 
 import org.apache.avro.Schema;
 import org.apache.avro.util.Utf8;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -16,7 +17,6 @@ public class PrimitiveStringBytesTest {
         return Stream.of(
             Arguments.of("a", "a"),
             Arguments.of("true", "true"),
-            Arguments.of(null, "null"),
             Arguments.of(1, "1"),
             Arguments.of(42D, "42.0"),
             Arguments.of(42F, "42.0"),
@@ -39,5 +39,16 @@ public class PrimitiveStringBytesTest {
             v, ByteBuffer.wrap(new Utf8(expected.getBytes()).getBytes()), Schema.create(Schema.Type.BYTES),
             false
         );
+    }
+
+    // A null value into a non-nullable string/bytes field must be rejected, not stringified to the literal "null".
+    @Test
+    void convertNullFailsOnNonNullableString() {
+        AvroConverterTest.Utils.oneFieldFailed(null, Schema.create(Schema.Type.STRING), false);
+    }
+
+    @Test
+    void convertNullFailsOnNonNullableBytes() {
+        AvroConverterTest.Utils.oneFieldFailed(null, Schema.create(Schema.Type.BYTES), false);
     }
 }
