@@ -5,8 +5,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -17,7 +15,6 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
-import io.kestra.core.serializers.JacksonMapper;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -69,7 +66,9 @@ import reactor.core.publisher.Mono;
     }
 )
 public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
-    private static final ObjectMapper YAML_MAPPER = JacksonMapper.ofYaml();
+    // Flux.generate forbids emitting a null element (Reactive Streams spec); a YAML document that legitimately
+    // resolves to null (e.g. an empty "---" section) is substituted with this marker purely to drive the count.
+    private static final Object NULL_DOCUMENT = new Object();
 
     @NotNull
     @PluginProperty(internalStorageURI = true, group = "main")
@@ -96,7 +95,7 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
             Reader yamlReader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(rFrom), rCharset), FileSerde.BUFFER_SIZE);
             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
-            Iterator<Object> docs = YAML_MAPPER.readerFor(Object.class).readValues(yamlReader);
+            Iterator<Object> docs = YamlDocumentReader.readAll(yamlReader);
 
             Flux<Object> flow = Flux.generate(
                 () -> docs,
@@ -106,7 +105,7 @@ public class YamlToIon extends Task implements RunnableTask<YamlToIon.Output> {
                         if (iterator.hasNext()) {
                             Object doc = iterator.next();
                             FileSerde.write(outputStream, doc);
-                            sink.next(doc);
+                            sink.next(doc != null ? doc : NULL_DOCUMENT);
                         } else {
                             sink.complete();
                         }

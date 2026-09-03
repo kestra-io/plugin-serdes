@@ -74,8 +74,11 @@ import reactor.core.publisher.SynchronousSink;
     }
 )
 public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> {
-    private static final ObjectMapper YAML_MAPPER = JacksonMapper.ofYaml();
     private static final ObjectMapper JSON_MAPPER = JacksonMapper.ofJson();
+
+    // Flux.generate forbids emitting a null element (Reactive Streams spec); a YAML document that legitimately
+    // resolves to null (e.g. an empty "---" section) is substituted with this marker purely to drive the count.
+    private static final Object NULL_DOCUMENT = new Object();
 
     @NotNull
     @Schema(title = "Source file URI")
@@ -112,7 +115,7 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
             Writer writer = new BufferedWriter(new FileWriter(tempFile, Charset.forName(rCharset)), FileSerde.BUFFER_SIZE);
             JsonGenerator jsonGen = JSON_MAPPER.createGenerator(writer)
         ) {
-            Iterator<Object> docs = YAML_MAPPER.readerFor(Object.class).readValues(reader);
+            Iterator<Object> docs = YamlDocumentReader.readAll(reader);
 
             if (rJsonl) {
                 Flux<Object> flow = Flux.generate(
@@ -127,7 +130,7 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
 
                             Object doc = it.next();
                             writeJsonlRecord(writer, doc);
-                            sink.next(doc);
+                            sink.next(doc != null ? doc : NULL_DOCUMENT);
                         } catch (Exception e) {
                             sink.error(e);
                         }
@@ -138,7 +141,7 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
                 count = flow.count().block();
             } else {
                 Flux<Object> flow = Flux.generate(
-                    () -> new Object[] { docs, null, false },
+                    () -> new Object[] { docs, false, false },
                     (state, sink) ->
                     {
                         try {
@@ -170,10 +173,13 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
 
     private Object[] processJsonArrayState(Object[] state, JsonGenerator jsonGenerator, SynchronousSink<Object> sink) throws IOException {
         Iterator<Object> it = (Iterator<Object>) state[0];
-        Object first = state[1];
+        boolean started = (boolean) state[1];
         boolean isArray = (boolean) state[2];
 
-        if (first == null) {
+        // `started` tracks whether the first document has already been consumed, instead of checking the first
+        // document's value for null: a YAML document can legitimately resolve to null (e.g. an empty "---"
+        // section), which would otherwise be indistinguishable from "not started yet" and silently dropped.
+        if (!started) {
             if (!it.hasNext()) {
                 jsonGenerator.writeStartObject();
                 jsonGenerator.writeEndObject();
@@ -181,8 +187,8 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
                 return state;
             }
 
-            first = it.next();
-            state[1] = first;
+            Object first = it.next();
+            state[1] = true;
 
             if (it.hasNext() || first instanceof List) {
                 jsonGenerator.writeStartArray();
@@ -191,14 +197,14 @@ public class YamlToJson extends Task implements RunnableTask<YamlToJson.Output> 
             }
 
             jsonGenerator.writeObject(first);
-            sink.next(first);
+            sink.next(first != null ? first : NULL_DOCUMENT);
             return state;
         }
 
         if (it.hasNext()) {
             Object next = it.next();
             jsonGenerator.writeObject(next);
-            sink.next(next);
+            sink.next(next != null ? next : NULL_DOCUMENT);
             return state;
         }
 

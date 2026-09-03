@@ -104,6 +104,81 @@ class YamlToJsonTest {
     }
 
     @Test
+    void json_anchorsAliasesAndMergeKeys() throws Exception {
+        String yaml = """
+            base: &b
+              x: 1
+            copy: *b
+            merged:
+              <<: *b
+              y: 2
+            """;
+        URI src = put(yaml);
+
+        var task = YamlToJson.builder()
+            .jsonl(Property.ofValue(false))
+            .from(Property.ofValue(src.toString()))
+            .build();
+
+        var out = task.run(runContextFactory.of(Map.of()));
+        String result = read(out.getUri());
+
+        var mapper = new ObjectMapper();
+        assertThat(
+            mapper.readTree(result),
+            is(mapper.readTree("{\"base\":{\"x\":1},\"copy\":{\"x\":1},\"merged\":{\"x\":1,\"y\":2}}"))
+        );
+    }
+
+    @Test
+    void json_dateLikeScalarsStayStrings() throws Exception {
+        String yaml = """
+            date: 2024-01-01
+            datetime: 2024-01-01T10:15:30Z
+            """;
+        URI src = put(yaml);
+
+        var task = YamlToJson.builder()
+            .jsonl(Property.ofValue(false))
+            .from(Property.ofValue(src.toString()))
+            .build();
+
+        var out = task.run(runContextFactory.of(Map.of()));
+        String result = read(out.getUri());
+
+        var mapper = new ObjectMapper();
+        assertThat(
+            mapper.readTree(result),
+            is(mapper.readTree("{\"date\":\"2024-01-01\",\"datetime\":\"2024-01-01T10:15:30Z\"}"))
+        );
+    }
+
+    @Test
+    void json_nullFirstDocumentAmongMultipleDocs() throws Exception {
+        String yaml = """
+            ---
+            ---
+            a: 1
+            """;
+        URI src = put(yaml);
+
+        var task = YamlToJson.builder()
+            .jsonl(Property.ofValue(false))
+            .from(Property.ofValue(src.toString()))
+            .build();
+
+        var out = task.run(runContextFactory.of(Map.of()));
+        String result = read(out.getUri());
+
+        var mapper = new ObjectMapper();
+        assertThat(
+            mapper.readTree(result),
+            is(mapper.readTree("[null,{\"a\":1}]"))
+        );
+        assertThat(out.getSize(), is(2L));
+    }
+
+    @Test
     void json_listRoot() throws Exception {
         String yaml = """
             - a
