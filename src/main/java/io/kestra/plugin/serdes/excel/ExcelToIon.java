@@ -273,6 +273,10 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
     }
 
     private Object getFormula(Cell cell, DateTimeRender dateTimeRender) {
+        // getCachedFormulaResultType() is only valid on an actual formula cell (StreamingCell throws otherwise)
+        if (cell.getCellType() != CellType.FORMULA) {
+            return getUnformattedValue(cell, dateTimeRender);
+        }
         return switch (cell.getCachedFormulaResultType()) {
             case NUMERIC -> convertNumeric(cell, dateTimeRender);
             case STRING -> cell.getRichStringCellValue().getString();
