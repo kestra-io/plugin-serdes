@@ -431,6 +431,68 @@ public class ExcelToIonTest {
     }
 
     @Test
+    void formulaRenderDoesNotThrowOnNonFormulaHeaderCells() throws Exception {
+        // valueRender=FORMULA routes every cell through getFormula(), including the header row,
+        // which never holds formula cells; it must not crash on those.
+        File sourceFile = SerdesUtils.resourceToFile("excel/insurance_sample.xlsx");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(true))
+            .valueRender(Property.ofValue(ValueRender.FORMULA))
+            .build();
+
+        ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        String out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Worksheet")));
+        assertThat(out, containsString("policyID:\"333743\""));
+    }
+
+    @Test
+    void formulaRenderReturnsCachedFormulaResultAndPlainValueForNonFormulaCells() throws Exception {
+        // FORMULA render mode yields the formula cell's cached evaluated result, not the formula text.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("a");
+            headerRow.createCell(1).setCellValue("b");
+            headerRow.createCell(2).setCellValue("total");
+
+            Row dataRow = sheet.createRow(1);
+            dataRow.createCell(0).setCellValue(2);
+            dataRow.createCell(1).setCellValue(3);
+            dataRow.createCell(2).setCellFormula("A2*B2");
+
+            workbook.getCreationHelper().createFormulaEvaluator().evaluateAll();
+
+            try (var out = new FileOutputStream(sourceFile)) {
+                workbook.write(out);
+            }
+        }
+
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(true))
+            .valueRender(Property.ofValue(ValueRender.FORMULA))
+            .build();
+        ExcelToIon.Output ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        String out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
+        assertThat(out, containsString("a:2"));
+        assertThat(out, containsString("b:3"));
+        assertThat(out, containsString("total:6"));
+    }
+
+    @Test
     void malformedNonFormulaNumericCellStillThrows() throws Exception {
         // the NumberFormatException fallback is scoped to formula cells; a plain numeric cell with
         // an empty cached value is a genuinely malformed file and must still surface as an error.
