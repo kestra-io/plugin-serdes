@@ -31,7 +31,6 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.hamcrest.Matchers.equalTo;
 
 @KestraTest
 public class IonToJsonTest {
@@ -116,6 +115,7 @@ public class IonToJsonTest {
     @ParameterizedTest
     @ValueSource(strings = {"Instant", "Date", "timestampMillis", "timestampMicros", "LocalDate"})
     void should_keep_writing_scalar_under_temporal_field_name(String fieldName) throws Exception {
+        // Generic regression guard: scalars never entered the removed STRUCT branches, but pin the behaviour anyway.
         // "timeMillis" scalars go through a dedicated H:mm reformatting branch (unrelated to this fix), so it is excluded here.
         var ion = "{" + fieldName + ":\"2020-01-02T03:04:05Z\"}\n";
         var expectedJson = "{\"" + fieldName + "\":\"2020-01-02T03:04:05Z\"}\n";
