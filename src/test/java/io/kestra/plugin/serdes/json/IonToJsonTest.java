@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
@@ -29,6 +31,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.hamcrest.Matchers.equalTo;
 
 @KestraTest
 public class IonToJsonTest {
@@ -92,6 +95,39 @@ public class IonToJsonTest {
         var output = task.run(runContext);
 
         assertEquality(expectedJsonWithAnnotation, output.getUri());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Instant", "Date", "timestampMillis", "timestampMicros", "LocalDate", "timeMillis"})
+    void should_write_struct_under_temporal_field_name_as_plain_object(String fieldName) throws Exception {
+        var ion = "{" + fieldName + ":{year:2024,month:1,day:15}}\n";
+        var expectedJson = "{\"" + fieldName + "\":{\"year\":2024,\"month\":1,\"day\":15}}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(true))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Instant", "Date", "timestampMillis", "timestampMicros", "LocalDate"})
+    void should_keep_writing_scalar_under_temporal_field_name(String fieldName) throws Exception {
+        // "timeMillis" scalars go through a dedicated H:mm reformatting branch (unrelated to this fix), so it is excluded here.
+        var ion = "{" + fieldName + ":\"2020-01-02T03:04:05Z\"}\n";
+        var expectedJson = "{\"" + fieldName + "\":\"2020-01-02T03:04:05Z\"}\n";
+
+        var runContext = getRunContext(ion);
+        var task = IonToJson.builder()
+            .from(Property.ofExpression("{{file}}"))
+            .shouldKeepAnnotations(Property.ofValue(true))
+            .build();
+        var output = task.run(runContext);
+
+        assertEquality(expectedJson, output.getUri());
     }
 
     @Test

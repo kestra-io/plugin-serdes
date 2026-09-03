@@ -331,33 +331,6 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
             case STRUCT -> {
                 IonStruct struct = (IonStruct) value;
 
-                if (parentFieldName != null && List.of("Instant", "Date", "timestampMillis", "timestampMicros").contains(parentFieldName)) {
-                    var asMap = readIonStructAsMap(struct);
-                    var reconstructed = mapper.convertValue(asMap, Date.class);
-                    jsonGenerator.writeString(reconstructed.toInstant().toString());
-                    break;
-                }
-
-                if (parentFieldName != null && parentFieldName.equals("LocalDate")) {
-                    var asMap = readIonStructAsMap(struct);
-                    var reconstructed = mapper.convertValue(asMap, LocalDate.class);
-                    jsonGenerator.writeString(reconstructed.toString());
-                    break;
-                }
-
-                if ("timeMillis".equals(parentFieldName)) {
-                    if (value instanceof IonStruct ionStruct) {
-                        var asMap = readIonStructAsMap(ionStruct);
-                        var localTime = mapper.convertValue(asMap, java.time.LocalTime.class);
-                        jsonGenerator.writeString(localTime.toString());
-                    } else if (value instanceof IonText ionText) {
-                        jsonGenerator.writeString(ionText.stringValue());
-                    } else {
-                        jsonGenerator.writeString(value.toString());
-                    }
-                    return;
-                }
-
                 jsonGenerator.writeStartObject();
                 for (var child : struct) {
                     var fieldName = child.getFieldName();
@@ -438,26 +411,6 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
                 mapper.writeTree(jsonGenerator, node);
             }
         }
-    }
-
-    private Map<String, Object> readIonStructAsMap(IonStruct struct) {
-        Map<String, Object> result = new HashMap<>();
-        for (IonValue field : struct) {
-            if (field instanceof IonInt) {
-                result.put(field.getFieldName(), ((IonInt) field).intValue());
-            } else if (field instanceof IonFloat) {
-                result.put(field.getFieldName(), ((IonFloat) field).doubleValue());
-            } else if (field instanceof IonDecimal) {
-                result.put(field.getFieldName(), ((IonDecimal) field).decimalValue());
-            } else if (field instanceof IonString || field instanceof IonSymbol) {
-                result.put(field.getFieldName(), ((IonText) field).stringValue());
-            } else if (field instanceof IonBool) {
-                result.put(field.getFieldName(), ((IonBool) field).booleanValue());
-            } else {
-                result.put(field.getFieldName(), field.toString());
-            }
-        }
-        return result;
     }
 
     @Builder
