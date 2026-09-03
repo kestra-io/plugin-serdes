@@ -188,25 +188,15 @@ public abstract class AbstractAvroConverter extends Task {
             .map(this.convertToAvro(schema, converter, rOnBadLines))
             .doOnNext(datum -> this.writeRecord(datum, consumer, rOnBadLines, runContext, writtenCount));
 
-        // metrics & finalize: count only rows actually written, not rows skipped under WARN/SKIP
+        // rows skipped under WARN/SKIP must not be counted
         flowable.then().block();
         return writtenCount.get();
     }
 
     /**
-     * A record that fails to write is not safely resumable: {@code AvroParquetWriter} streams field values into
-     * column writers as it walks the record, so a partially-written record can leave a row group with columns of
-     * unequal length. Under {@code WARN}/{@code SKIP} we therefore validate the record *before* handing it to the
-     * consumer, so a bad record never reaches {@code writer.write()} in the first place. Under {@code ERROR},
-     * validation is skipped so the existing exception type, message and behaviour are preserved exactly.
-     * <p>
-     * The only way {@link AvroConverter#fromMap} produces an invalid record under {@code WARN}/{@code SKIP} is by
-     * putting {@code null} into a field whose conversion failed (see {@code AvroConverter.fromMap}'s catch blocks):
-     * so gating on "does any non-nullable field hold null" catches exactly that failure mode. We deliberately do
-     * not use {@code GenericData.validate()} here: it switches on each field's physical Avro type and ignores
-     * registered logical-type conversions, so it rejects the {@code BigDecimal}/{@code UUID}/{@code LocalDate}/
-     * {@code Instant}/... values {@link AvroConverter#convert} legitimately produces for logical-typed fields,
-     * dropping every row of any schema that uses a logical type.
+     * Under {@code WARN}/{@code SKIP}, validates the record before handing it to the consumer: a writer such as
+     * {@code AvroParquetWriter} is not resumable after a failed {@code write()}, so a bad record must never reach
+     * it. {@code ERROR} skips validation, preserving its exact exception type and message.
      */
     private <E extends Exception> void writeRecord(
         GenericData.Record datum,
@@ -229,7 +219,7 @@ public abstract class AbstractAvroConverter extends Task {
             consumer.accept(datum);
             writtenCount.incrementAndGet();
         } catch (Throwable e) {
-            // an I/O failure (disk full, closed stream) is an infrastructure failure, not a bad line: it must fail the task under every mode
+            // an I/O failure is infrastructure, not a bad line: fail the task under every mode
             if (isIOFailure(e)) {
                 throw new RuntimeException(e);
             }
@@ -244,15 +234,10 @@ public abstract class AbstractAvroConverter extends Task {
     }
 
     /**
-     * Returns the name of the first field that is {@code null} while its schema does not admit {@code NULL}, or
-     * {@code null} if the record is well-formed. Conversion-agnostic on purpose: it inspects the physical
-     * nullability of the declared schema, never the Java type a logical-type conversion produced.
-     * Recurses into nested records wherever they actually live in the converted value -- as a direct field
-     * value, or nested inside a {@code List}/{@code Map} produced by {@code AvroConverter.complexArray}/
-     * {@code complexMap} for an ARRAY-of-record or MAP-of-record field -- since {@code AvroConverter.fromMap}
-     * resolves a nested record's own bad fields to null internally without failing the value that holds it.
-     * Walks the converted <em>data</em>, not the schema, so recursive named-type schemas can't cause infinite
-     * recursion: the data itself is always a finite tree.
+     * Name of the first field holding {@code null} under a schema that doesn't admit it, or {@code null} if the
+     * record is well-formed -- the single way {@link AvroConverter#fromMap} reports a failed cell under WARN/SKIP.
+     * Checks declared nullability only, never the Java type a logical-type conversion produced. Walks the data
+     * rather than the schema, so recursive named types cannot loop.
      */
     private static String firstNonNullableFieldHoldingNull(GenericData.Record datum) {
         return firstNonNullableFieldHoldingNull(datum, null);
@@ -269,11 +254,7 @@ public abstract class AbstractAvroConverter extends Task {
         return null;
     }
 
-    /**
-     * Checks one field/element/map-value slot: a {@code null} value is invalid unless its (possibly unresolved)
-     * schema admits {@code NULL}; a non-null value is inspected further for a nested invalid null. Shared by the
-     * record field loop and the array/map loops below so the null-vs-recurse decision lives in exactly one place.
-     */
+    /** Checks one field/element/map-value slot; fails open when {@code schema} could not be resolved. */
     private static String checkChildValue(Object value, org.apache.avro.Schema schema, String fieldName) {
         if (value == null) {
             return (schema == null || acceptsNull(schema)) ? null : fieldName;
@@ -282,10 +263,8 @@ public abstract class AbstractAvroConverter extends Task {
     }
 
     /**
-     * Inspects a single non-null value for a nested invalid null: a nested record's fields, or -- for a
-     * {@code List}/{@code Map} produced by {@code complexArray}/{@code complexMap} -- each element/value in turn.
-     * {@code schema} is the declared schema of the container the value came from (a field, an array element type,
-     * or a map value type); it may be a UNION, so the matching branch is resolved before use.
+     * Looks for a nested invalid null inside a non-null value: a nested record's fields, or each element of a
+     * {@code List}/{@code Map} built by {@code complexArray}/{@code complexMap}. {@code schema} may be a UNION.
      */
     private static String firstNonNullableValueHoldingNull(Object value, org.apache.avro.Schema schema, String fieldName) {
         if (value instanceof GenericData.Record nested) {
@@ -346,14 +325,14 @@ public abstract class AbstractAvroConverter extends Task {
         };
     }
 
-    /** Cap on the size of a bad-record dump or exception message embedded in a WARN log line, to bound log volume across many bad rows. */
+    /** Caps record dumps in WARN lines, to bound log volume across many bad rows. */
     private static final int MAX_LOGGED_RECORD_LENGTH = 1000;
 
     private static String truncateForLog(String value) {
         if (value == null || value.length() <= MAX_LOGGED_RECORD_LENGTH) {
             return value;
         }
-        // never cut between a surrogate pair, which would leave a dangling unpaired surrogate in the log line
+        // cutting inside a surrogate pair would leave a dangling half
         int cut = Character.isHighSurrogate(value.charAt(MAX_LOGGED_RECORD_LENGTH - 1))
             ? MAX_LOGGED_RECORD_LENGTH - 1
             : MAX_LOGGED_RECORD_LENGTH;

@@ -266,8 +266,8 @@ class IonToAvroTest {
         return storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
     }
 
-    // Permanent regression test (plan task 9): a null value into a non-nullable field must not make
-    // IonToAvro fail under WARN. This is the reference behaviour the IonToParquet fix must match.
+    // A null into a non-nullable field must not fail IonToAvro under WARN: the reference behaviour
+    // IonToParquet has to match.
     @Test
     void onBadLinesWarnSkipsBadRowAndSucceeds() throws Exception {
         URI uri = uploadRowsWithOneBadId();
@@ -357,9 +357,8 @@ class IonToAvroTest {
         return storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
     }
 
-    // Regression for the gate missing records nested inside an ARRAY field: same gap as
-    // IonToParquetTest#warnSkipsBadRowInArrayOfRecordsField, exercised through IonToAvro. Must fail against the
-    // pre-fix gate, which only checked `instanceof GenericData.Record` on direct field values.
+    // A bad record nested in an ARRAY field: the pre-fix gate only looked at direct field values.
+    // See IonToParquetTest#warnSkipsBadRowInArrayOfRecordsField.
     @Test
     void warnSkipsBadRowInArrayOfRecordsField() throws Exception {
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -392,7 +391,7 @@ class IonToAvroTest {
         );
     }
 
-    // Same gap as above but for a MAP field: see IonToParquetTest#warnSkipsBadRowInMapOfRecordsField.
+    // Same gap for a MAP field: see IonToParquetTest#warnSkipsBadRowInMapOfRecordsField.
     @Test
     void warnSkipsBadRowInMapOfRecordsField() throws Exception {
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -449,8 +448,8 @@ class IonToAvroTest {
         return row;
     }
 
-    // Same regression as IonToParquetTest#warnKeepsAllRowsWhenSchemaHasLogicalTypesAndDataIsValid: the
-    // GenericData.validate() gate used to drop every row of a logical-typed schema, even fully valid data.
+    // The GenericData.validate() gate dropped every row of a logical-typed schema, valid data included.
+    // See IonToParquetTest#warnKeepsAllRowsWhenSchemaHasLogicalTypesAndDataIsValid.
     @Test
     void warnKeepsAllRowsWhenSchemaHasLogicalTypesAndDataIsValid() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_logical_", ".ion");
@@ -511,8 +510,7 @@ class IonToAvroTest {
         return row;
     }
 
-    // Counterpart to the logical-type gate regression, for container fields: see
-    // IonToParquetTest#warnKeepsAllRowsWhenArrayAndMapOfRecordsAreValidWithLogicalSubfields.
+    // Same, for logical types inside container fields.
     @Test
     void warnKeepsAllRowsWhenArrayAndMapOfRecordsAreValidWithLogicalSubfields() throws Exception {
         List<Map<String, Object>> rows = IntStream.rangeClosed(1, 5).mapToObj(IonToAvroTest::validNestedLogicalRow).toList();

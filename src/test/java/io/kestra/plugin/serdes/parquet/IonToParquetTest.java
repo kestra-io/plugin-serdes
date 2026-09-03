@@ -549,7 +549,7 @@ class IonToParquetTest {
         assertThat(writerOutput.getSize(), is(2L));
         assertThat(listAppender.list.isEmpty(), is(true));
 
-        // round-trip through ParquetToIon: this is what actually proves the row group was not left corrupted
+        // a round-trip is what actually proves the row group was not left corrupted
         List<Map<String, Object>> result = readBackAsRows(writerOutput.getUri());
         assertThat(result.size(), is(2));
         assertThat(result.stream().map(r -> r.get("id")).toList(), is(List.of(1, 3)));
@@ -643,10 +643,8 @@ class IonToParquetTest {
           ]
         }""";
 
-    // Regression for the gate missing records nested inside an ARRAY field: AvroConverter.complexArray resolves
-    // a bad element the same way fromMap does (null the field, keep the record), so this row must still fail the
-    // pre-write gate instead of reaching the writer. Must fail against the pre-fix gate, which only checked
-    // `instanceof GenericData.Record` on direct field values, never descending into List/Map contents.
+    // AvroConverter.complexArray resolves a bad element the way fromMap does -- null the field, keep the
+    // record -- so the row must still fail the gate. The pre-fix gate never descended into List/Map contents.
     @Test
     void warnSkipsBadRowInArrayOfRecordsField() throws Exception {
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -698,9 +696,7 @@ class IonToParquetTest {
           ]
         }""";
 
-    // Same gap as above but for a MAP field: AvroConverter.complexMap routes each value through the same
-    // fromMap(...) call, so a null in a non-nullable sub-field of a map value is just as invisible to a gate
-    // that only recurses into direct field values.
+    // Same gap for a MAP field: complexMap routes each value through the same fromMap(...) call.
     @Test
     void warnSkipsBadRowInMapOfRecordsField() throws Exception {
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -770,10 +766,8 @@ class IonToParquetTest {
         return row;
     }
 
-    // Counterpart to the logical-type gate regression, for container fields: an array-of-records and a
-    // map-of-records whose sub-fields legitimately hold non-null logical-typed values (uuid, date) must not
-    // be mistaken for the "null in a non-nullable field" bad-record shape, so every row must survive with zero
-    // warnings. Stops a future over-broad container gate from silently dropping valid nested data.
+    // Non-null logical-typed sub-fields (uuid, date) inside array/map records must not be mistaken for the
+    // bad-record shape: every row survives with zero warnings, so an over-broad container gate can't creep back.
     @Test
     void warnKeepsAllRowsWhenArrayAndMapOfRecordsAreValidWithLogicalSubfields() throws Exception {
         List<Map<String, Object>> rows = IntStream.rangeClosed(1, 5).mapToObj(IonToParquetTest::validNestedLogicalRow).toList();
@@ -815,8 +809,8 @@ class IonToParquetTest {
             () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
         );
 
-        // unchanged: the exact same wrapping chain and root cause as before this fix, since validation is
-        // skipped entirely under ERROR and the failure still originates from field conversion, not from writer.write()
+        // unchanged by this fix: ERROR skips validation, so the wrapping chain and root cause still come
+        // from field conversion, not from writer.write()
         Throwable current = ex;
         boolean sawIllegalRowConvertion = false;
         while (current.getCause() != null) {
@@ -827,10 +821,9 @@ class IonToParquetTest {
         assertThat(current, instanceOf(NullPointerException.class));
     }
 
-    // Regression for the GenericData.validate() gate: it switches on each field's physical Avro type and ignores
-    // registered logical-type conversions, so it used to reject the BigDecimal/Instant/LocalDate/UUID values
-    // AvroConverter legitimately produces for decimal/timestamp/date/uuid fields, dropping every row of any
-    // schema using a logical type -- even fully valid data. This test must fail against that gate.
+    // GenericData.validate() switches on physical Avro types and ignores logical-type conversions, so it
+    // rejected the BigDecimal/Instant/LocalDate/UUID values AvroConverter legitimately produces -- dropping
+    // every row of any logical-typed schema, valid data included.
     @Test
     void warnKeepsAllRowsWhenSchemaHasLogicalTypesAndDataIsValid() throws Exception {
         List<Map<String, Object>> rows = IntStream.rangeClosed(1, 5).mapToObj(IonToParquetTest::logicalRow).toList();
@@ -883,9 +876,8 @@ class IonToParquetTest {
         assertThat(result.stream().map(r -> r.get("id")).toList(), is(List.of(1, 3)));
     }
 
-    // A "fixed"-backed decimal whose unscaled value does not fit in the declared byte size passes conversion and
-    // the null-field gate (it's a legitimate, non-null BigDecimal) but is rejected by Parquet's encoder at write
-    // time, only once consumer.accept(datum) is actually called.
+    // A "fixed"-backed decimal overflowing its declared byte size is a legitimate non-null BigDecimal, so it
+    // passes the gate and is only rejected by Parquet's encoder at write time.
     private static final String FIXED_DECIMAL_SCHEMA = """
         {
           "type": "record",
@@ -897,13 +889,10 @@ class IonToParquetTest {
           ]
         }""";
 
-    // Regression coverage for the writer-abort cascade (peer review finding 2, non-blocking): the pre-write gate
-    // only catches the "null into a non-nullable field" failure mode. A decimal that overflows its declared fixed
-    // size is rejected by Parquet's encoder, not by the gate. InternalParquetRecordWriter marks itself aborted on
-    // that failure, so the *next* row's write() throws a fresh "Writer has been aborted..." IOException -- which
-    // isIOFailure() correctly treats as an infrastructure failure and escalates, hard-failing the task even under
-    // WARN, but attributing the failure to the row after the one that actually caused it. This is documented,
-    // accepted behaviour, not fixed here: see finding 2 on PR #394.
+    // Documents the writer-abort cascade, accepted behaviour rather than a fix: the encoder rejection above
+    // makes InternalParquetRecordWriter mark itself aborted, so the *next* write() throws "Writer has been
+    // aborted..." -- an IOException, so isIOFailure() escalates it even under WARN, blaming the row after the
+    // one that actually failed.
     @Test
     void writerAbortAfterEncodeFailureHardFailsSubsequentRowUnderWarn() throws Exception {
         List<Map<String, Object>> rows = List.of(
