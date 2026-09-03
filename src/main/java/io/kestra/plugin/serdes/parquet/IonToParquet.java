@@ -96,19 +96,24 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
         ),
         @Example(
             full = true,
-            title = "Convert an ION file to Parquet, logging a warning and skipping any row that fails to match the schema instead of failing the task.",
+            title = "Convert a CSV file to Parquet, logging a warning and skipping any row that fails to match the schema instead of failing the task.",
             code = """
                 id: ion_to_parquet_on_bad_lines
                 namespace: company.team
 
                 tasks:
-                  - id: download_csv
-                    type: io.kestra.plugin.core.http.Download
-                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/salaries.csv
+                  - id: write_csv
+                    type: io.kestra.plugin.core.storage.Write
+                    extension: .csv
+                    content: |
+                      work_year,job_title,salary_in_usd
+                      2023,Data Scientist,120000
+                      2023,Data Engineer,
+                      2022,Data Analyst,95000
 
                   - id: convert
                     type: io.kestra.plugin.serdes.csv.CsvToIon
-                    from: "{{ outputs.download_csv.uri }}"
+                    from: "{{ outputs.write_csv.uri }}"
 
                   - id: result
                     type: io.kestra.plugin.serdes.parquet.IonToParquet

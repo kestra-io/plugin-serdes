@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.avro;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
@@ -9,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -294,5 +296,56 @@ class IonToAvroTest {
 
         assertThat(output.getSize(), is(2L));
         assertThat(avroSize(storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())), is(2));
+    }
+
+    private static final String LOGICAL_TYPES_SCHEMA = """
+        {
+          "type": "record",
+          "name": "LogicalTypes",
+          "namespace": "com.example.logical",
+          "fields": [
+            {"name": "id", "type": "int"},
+            {"name": "amount", "type": {"type": "bytes", "logicalType": "decimal", "precision": 10, "scale": 2}},
+            {"name": "createdAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+            {"name": "eventDate", "type": {"type": "int", "logicalType": "date"}},
+            {"name": "externalId", "type": {"type": "string", "logicalType": "uuid"}}
+          ]
+        }""";
+
+    private static Map<String, Object> logicalRow(int id) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", id);
+        row.put("amount", new BigDecimal("12.34"));
+        row.put("createdAt", Instant.parse("2024-01-01T12:34:56Z"));
+        row.put("eventDate", LocalDate.of(2024, 1, 1));
+        row.put("externalId", UUID.randomUUID().toString());
+        return row;
+    }
+
+    // Same regression as IonToParquetTest#warnKeepsAllRowsWhenSchemaHasLogicalTypesAndDataIsValid: the
+    // GenericData.validate() gate used to drop every row of a logical-typed schema, even fully valid data.
+    @Test
+    void warnKeepsAllRowsWhenSchemaHasLogicalTypesAndDataIsValid() throws Exception {
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_logical_", ".ion");
+        List<Map<String, Object>> rows = IntStream.rangeClosed(1, 5).mapToObj(IonToAvroTest::logicalRow).toList();
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            rows.forEach(throwConsumer(row -> FileSerde.write(output, row)));
+        }
+
+        URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+        IonToAvro writer = IonToAvro.builder()
+            .id(IdUtils.create())
+            .type(IonToAvro.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(LOGICAL_TYPES_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+
+        IonToAvro.Output output = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        assertThat(output.getSize(), is((long) rows.size()));
+        assertThat(avroSize(storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())), is(rows.size()));
     }
 }

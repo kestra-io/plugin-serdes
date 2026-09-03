@@ -199,6 +199,14 @@ public abstract class AbstractAvroConverter extends Task {
      * unequal length. Under {@code WARN}/{@code SKIP} we therefore validate the record *before* handing it to the
      * consumer, so a bad record never reaches {@code writer.write()} in the first place. Under {@code ERROR},
      * validation is skipped so the existing exception type, message and behaviour are preserved exactly.
+     * <p>
+     * The only way {@link AvroConverter#fromMap} produces an invalid record under {@code WARN}/{@code SKIP} is by
+     * putting {@code null} into a field whose conversion failed (see {@code AvroConverter.fromMap}'s catch blocks):
+     * so gating on "does any non-nullable field hold null" catches exactly that failure mode. We deliberately do
+     * not use {@code GenericData.validate()} here: it switches on each field's physical Avro type and ignores
+     * registered logical-type conversions, so it rejects the {@code BigDecimal}/{@code UUID}/{@code LocalDate}/
+     * {@code Instant}/... values {@link AvroConverter#convert} legitimately produces for logical-typed fields,
+     * dropping every row of any schema that uses a logical type.
      */
     private <E extends Exception> void writeRecord(
         GenericData.Record datum,
@@ -207,11 +215,14 @@ public abstract class AbstractAvroConverter extends Task {
         RunContext runContext,
         AtomicLong writtenCount
     ) {
-        if (rOnBadLines != OnBadLines.ERROR && !AvroConverter.genericData().validate(datum.getSchema(), datum)) {
-            if (rOnBadLines == OnBadLines.WARN) {
-                runContext.logger().warn("Bad record skipped (onBadLines=WARN): record does not conform to schema '{}': {}", datum.getSchema().getName(), datum);
+        if (rOnBadLines != OnBadLines.ERROR) {
+            var invalidField = firstNonNullableFieldHoldingNull(datum);
+            if (invalidField != null) {
+                if (rOnBadLines == OnBadLines.WARN) {
+                    runContext.logger().warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), datum);
+                }
+                return;
             }
-            return;
         }
 
         try {
@@ -230,6 +241,44 @@ public abstract class AbstractAvroConverter extends Task {
             }
             // SKIP: silently drop the row
         }
+    }
+
+    /**
+     * Returns the name of the first field that is {@code null} while its schema does not admit {@code NULL}, or
+     * {@code null} if the record is well-formed. Conversion-agnostic on purpose: it inspects the physical
+     * nullability of the field's declared schema, never the Java type a logical-type conversion produced.
+     * Recurses into nested records: {@code AvroConverter.fromMap} resolves a nested record's own bad fields to
+     * null internally without failing the outer field, so the outer field itself is a well-formed (non-null)
+     * record that can still contain an invalid null deeper down.
+     */
+    private static String firstNonNullableFieldHoldingNull(GenericData.Record datum) {
+        return firstNonNullableFieldHoldingNull(datum, null);
+    }
+
+    private static String firstNonNullableFieldHoldingNull(GenericData.Record datum, String parentFieldName) {
+        for (org.apache.avro.Schema.Field field : datum.getSchema().getFields()) {
+            String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
+            Object value = datum.get(field.name());
+            if (value == null) {
+                if (!acceptsNull(field.schema())) {
+                    return currentFieldName;
+                }
+            } else if (value instanceof GenericData.Record nested) {
+                String nestedInvalidField = firstNonNullableFieldHoldingNull(nested, currentFieldName);
+                if (nestedInvalidField != null) {
+                    return nestedInvalidField;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean acceptsNull(org.apache.avro.Schema schema) {
+        return switch (schema.getType()) {
+            case NULL -> true;
+            case UNION -> schema.getTypes().stream().anyMatch(type -> type.getType() == org.apache.avro.Schema.Type.NULL);
+            default -> false;
+        };
     }
 
     private static boolean isIOFailure(Throwable e) {

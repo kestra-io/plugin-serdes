@@ -1,6 +1,7 @@
 package io.kestra.plugin.serdes.parquet;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
@@ -346,6 +347,30 @@ class IonToParquetTest {
           ]
         }""";
 
+    private static final String LOGICAL_TYPES_SCHEMA = """
+        {
+          "type": "record",
+          "name": "LogicalTypes",
+          "namespace": "com.example.logical",
+          "fields": [
+            {"name": "id", "type": "int"},
+            {"name": "amount", "type": {"type": "bytes", "logicalType": "decimal", "precision": 10, "scale": 2}},
+            {"name": "createdAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+            {"name": "eventDate", "type": {"type": "int", "logicalType": "date"}},
+            {"name": "externalId", "type": {"type": "string", "logicalType": "uuid"}}
+          ]
+        }""";
+
+    private static Map<String, Object> logicalRow(int id) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", id);
+        row.put("amount", new BigDecimal("12.34"));
+        row.put("createdAt", Instant.parse("2024-01-01T12:34:56Z"));
+        row.put("eventDate", LocalDate.of(2024, 1, 1));
+        row.put("externalId", UUID.randomUUID().toString());
+        return row;
+    }
+
     private URI uploadIonRows(List<Map<String, Object>> rows) throws Exception {
         File tempFile = File.createTempFile("iontoparquet_onbadlines_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
@@ -543,5 +568,113 @@ class IonToParquetTest {
         }
         assertThat(sawIllegalRowConvertion, is(true));
         assertThat(current, instanceOf(NullPointerException.class));
+    }
+
+    // Regression for the GenericData.validate() gate: it switches on each field's physical Avro type and ignores
+    // registered logical-type conversions, so it used to reject the BigDecimal/Instant/LocalDate/UUID values
+    // AvroConverter legitimately produces for decimal/timestamp/date/uuid fields, dropping every row of any
+    // schema using a logical type -- even fully valid data. This test must fail against that gate.
+    @Test
+    void warnKeepsAllRowsWhenSchemaHasLogicalTypesAndDataIsValid() throws Exception {
+        List<Map<String, Object>> rows = IntStream.rangeClosed(1, 5).mapToObj(IonToParquetTest::logicalRow).toList();
+        URI uri = uploadIonRows(rows);
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(LOGICAL_TYPES_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+
+        IonToParquet.Output writerOutput = writer.run(runContext);
+
+        assertThat(writerOutput.getSize(), is((long) rows.size()));
+        assertThat(listAppender.list.isEmpty(), is(true));
+        assertThat(readBackAsRows(writerOutput.getUri()).size(), is(rows.size()));
+    }
+
+    @Test
+    void warnSkipsGenuinelyBadRowButKeepsValidLogicalTypedRows() throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(logicalRow(1));
+        Map<String, Object> bad = logicalRow(2);
+        bad.put("externalId", null); // null into a non-nullable "uuid" field
+        rows.add(bad);
+        rows.add(logicalRow(3));
+
+        URI uri = uploadIonRows(rows);
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(LOGICAL_TYPES_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .timeZoneId(Property.ofValue("UTC"))
+            .build();
+
+        IonToParquet.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        assertThat(writerOutput.getSize(), is(2L));
+        List<Map<String, Object>> result = readBackAsRows(writerOutput.getUri());
+        assertThat(result.size(), is(2));
+        assertThat(result.stream().map(r -> r.get("id")).toList(), is(List.of(1, 3)));
+    }
+
+    // A "fixed"-backed decimal whose unscaled value does not fit in the declared byte size passes conversion and
+    // the null-field gate (it's a legitimate, non-null BigDecimal) but is rejected by Parquet's encoder at write
+    // time, only once consumer.accept(datum) is actually called.
+    private static final String FIXED_DECIMAL_SCHEMA = """
+        {
+          "type": "record",
+          "name": "FixedDecimal",
+          "namespace": "com.example.fixeddecimal",
+          "fields": [
+            {"name": "id", "type": "int"},
+            {"name": "amount", "type": {"type": "fixed", "name": "AmountFixed", "size": 2, "logicalType": "decimal", "precision": 4, "scale": 2}}
+          ]
+        }""";
+
+    // Regression coverage for the writer-abort cascade (peer review finding 2, non-blocking): the pre-write gate
+    // only catches the "null into a non-nullable field" failure mode. A decimal that overflows its declared fixed
+    // size is rejected by Parquet's encoder, not by the gate. InternalParquetRecordWriter marks itself aborted on
+    // that failure, so the *next* row's write() throws a fresh "Writer has been aborted..." IOException -- which
+    // isIOFailure() correctly treats as an infrastructure failure and escalates, hard-failing the task even under
+    // WARN, but attributing the failure to the row after the one that actually caused it. This is documented,
+    // accepted behaviour, not fixed here: see finding 2 on PR #394.
+    @Test
+    void writerAbortAfterEncodeFailureHardFailsSubsequentRowUnderWarn() throws Exception {
+        List<Map<String, Object>> rows = List.of(
+            ImmutableMap.of("id", 1, "amount", new BigDecimal("12.34")),
+            ImmutableMap.of("id", 2, "amount", new BigDecimal("999999.99")), // unscaled value overflows the 2-byte fixed size
+            ImmutableMap.of("id", 3, "amount", new BigDecimal("56.78"))
+        );
+
+        URI uri = uploadIonRows(rows);
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(FIXED_DECIMAL_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .build();
+
+        RuntimeException ex = assertThrows(
+            RuntimeException.class,
+            () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
+        );
+
+        Throwable root = ex;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+        assertThat(root, instanceOf(IOException.class));
+        assertThat(root.getMessage(), containsString("aborted"));
     }
 }
