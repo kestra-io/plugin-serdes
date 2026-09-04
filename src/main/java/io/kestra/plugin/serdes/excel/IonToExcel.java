@@ -274,7 +274,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
                 cell.setCellType(CellType.NUMERIC);
             }
-            case Boolean b -> cell.setCellType(CellType.BOOLEAN);
+            case Boolean b -> cell.setCellValue(b);
             case Date date -> {
                 cell.setCellValue(DateUtil.getExcelDate(date));
                 cell.setCellType(CellType.NUMERIC);
@@ -309,7 +309,8 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                 }
                 cell.setCellType(CellType.NUMERIC);
             }
-            case null, default -> {
+            case null -> cell.setBlank();
+            default -> {
                 String valueStr = String.valueOf(value);
                 if (valueStr.startsWith("Formula:")) {
                     cell.setCellFormula(valueStr.substring(8));

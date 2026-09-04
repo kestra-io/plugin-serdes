@@ -6,8 +6,13 @@ import java.io.FileOutputStream;
 import java.net.URI;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +35,7 @@ import jakarta.inject.Inject;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 
 @KestraTest
 class IonToExcelTest {
@@ -174,6 +180,70 @@ class IonToExcelTest {
         ExcelToIon.Output outputWriter = reader.run(runContext);
 
         assertThat(outputWriter.getSize(), is(ROWS_COUNT));
+    }
+
+    @Test
+    void booleanAndNull() throws Exception {
+        URI inputUri = this.serdesUtils.resourceToStorageObject(SerdesUtils.resourceToFile("excel/boolean_and_null.ion"));
+
+        IonToExcel writer = IonToExcel.builder()
+            .id(IonToExcelTest.class.getSimpleName())
+            .type(IonToExcel.class.getName())
+            .sheetsTitle(Property.ofValue("Worksheet"))
+            .from(inputUri.toString())
+            .build();
+        IonToExcel.Output excelOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        XSSFWorkbook actual = new XSSFWorkbook(storageInterface.get(TenantService.MAIN_TENANT, null, excelOutput.getUri()));
+        XSSFSheet sheet = actual.getSheet("Worksheet");
+
+        Row headerRow = sheet.getRow(0);
+        assertThat(headerRow.getCell(0).getStringCellValue(), is("flag_true"));
+        assertThat(headerRow.getCell(1).getStringCellValue(), is("flag_false"));
+        assertThat(headerRow.getCell(2).getStringCellValue(), is("nothing"));
+
+        Row dataRow = sheet.getRow(1);
+        Cell flagTrue = dataRow.getCell(0);
+        assertThat(flagTrue.getCellType(), is(CellType.BOOLEAN));
+        assertThat(flagTrue.getBooleanCellValue(), is(true));
+
+        Cell flagFalse = dataRow.getCell(1);
+        assertThat(flagFalse.getCellType(), is(CellType.BOOLEAN));
+        assertThat(flagFalse.getBooleanCellValue(), is(false));
+
+        assertThat(dataRow.getCell(2, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL), is(nullValue()));
+    }
+
+    @Test
+    void booleanAndNullRoundTrip() throws Exception {
+        URI inputUri = this.serdesUtils.resourceToStorageObject(SerdesUtils.resourceToFile("excel/boolean_and_null.ion"));
+
+        IonToExcel writer = IonToExcel.builder()
+            .id(IonToExcelTest.class.getSimpleName())
+            .type(IonToExcel.class.getName())
+            .sheetsTitle(Property.ofValue("Worksheet"))
+            .from(inputUri.toString())
+            .build();
+        IonToExcel.Output excelOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        ExcelToIon reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(excelOutput.getUri().toString()))
+            .build();
+        ExcelToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows = FileSerde.readAll(storageInterface.get(TenantService.MAIN_TENANT, null, readerOutput.getUris().get("Worksheet")))
+            .collectList()
+            .block();
+
+        assertThat(rows, is(notNullValue()));
+        assertThat(rows.size(), is(1));
+
+        Map<String, Object> row = (Map<String, Object>) rows.getFirst();
+        assertThat(row.get("flag_true"), is(true));
+        assertThat(row.get("flag_false"), is(false));
+        assertThat(row.get("nothing"), is(nullValue()));
     }
 
     @Test
