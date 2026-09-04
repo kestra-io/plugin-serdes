@@ -444,7 +444,11 @@ public class AvroConverterTest {
             AvroConverter avroConverter = AvroConverter.builder().inferAllFields(inferAllFields).build();
             Schema schema = oneFieldSchema(type);
 
-            assertThrows(AvroConverter.IllegalRowConvertion.class, () -> avroConverter.fromMap(schema, ImmutableMap.of("fieldName", v)));
+            // HashMap (not ImmutableMap.of) so a null value under test doesn't blow up the map builder itself
+            HashMap<String, Object> map = new HashMap<>();
+            map.put("fieldName", v);
+
+            assertThrows(AvroConverter.IllegalRowConvertion.class, () -> avroConverter.fromMap(schema, map));
         }
 
         public static Schema oneFieldSchema(Schema type) {
