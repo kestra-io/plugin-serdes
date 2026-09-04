@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -25,7 +26,7 @@ import org.junit.jupiter.api.Test;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
+import ch.qos.logback.core.AppenderBase;
 import com.devskiller.friendly_id.FriendlyId;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
@@ -47,7 +48,9 @@ import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 class IonToAvroTest {
@@ -304,15 +307,26 @@ class IonToAvroTest {
         assertThat(avroSize(storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())), is(2));
     }
 
+    // ListAppender's backing list is a plain ArrayList; capture on a CopyOnWriteArrayList to avoid
+    // ConcurrentModificationException when logs are appended from another thread while tests read them.
+    private static final class CapturingAppender extends AppenderBase<ILoggingEvent> {
+        final List<ILoggingEvent> list = new CopyOnWriteArrayList<>();
+
+        @Override
+        protected void append(ILoggingEvent event) {
+            list.add(event);
+        }
+    }
+
     // runContext.logger() returns a Logback logger from an isolated LoggerContext; attach directly to capture logs.
-    private static ListAppender<ILoggingEvent> attachLogCapture(RunContext runContext) {
+    private static CapturingAppender attachLogCapture(RunContext runContext) {
         Logger contextLogger = (Logger) runContext.logger();
         contextLogger.setLevel(Level.DEBUG);
-        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
-        listAppender.setContext(contextLogger.getLoggerContext());
-        listAppender.start();
-        contextLogger.addAppender(listAppender);
-        return listAppender;
+        CapturingAppender appender = new CapturingAppender();
+        appender.setContext(contextLogger.getLoggerContext());
+        appender.start();
+        contextLogger.addAppender(appender);
+        return appender;
     }
 
     private static final String ARRAY_OF_RECORDS_SCHEMA = """
@@ -379,7 +393,7 @@ class IonToAvroTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToAvro.Output output = writer.run(runContext);
 
@@ -412,7 +426,7 @@ class IonToAvroTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToAvro.Output output = writer.run(runContext);
 
@@ -526,12 +540,55 @@ class IonToAvroTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToAvro.Output output = writer.run(runContext);
 
         assertThat(output.getSize(), is((long) rows.size()));
         assertThat(avroSize(storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())), is(rows.size()));
         assertThat(listAppender.list.isEmpty(), is(true));
+    }
+
+    // Under ERROR, an IOException raised by the write itself must still be wrapped as IllegalRowConvertion:
+    // isIOFailure() escalates infrastructure failures for WARN/SKIP only, and must not reorder ERROR's contract.
+    @Test
+    void errorWrapsWriteTimeIoFailureAsIllegalRowConvertion() throws Exception {
+        URI uri = uploadIonRows(List.of(ImmutableMap.of("id", 1, "s", "a")));
+
+        IonToAvro writer = IonToAvro.builder()
+            .id(IdUtils.create())
+            .type(IonToAvro.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(NON_NULLABLE_INT_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.ERROR))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        org.apache.avro.Schema schema = new org.apache.avro.Schema.Parser().parse(NON_NULLABLE_INT_SCHEMA);
+
+        RuntimeException exception;
+        try (InputStream inputStream = storageInterface.get(TenantService.MAIN_TENANT, null, uri)) {
+            exception = assertThrows(
+                RuntimeException.class,
+                () -> writer.convert(inputStream, schema, record -> {
+                    throw new IOException("disk full");
+                }, runContext)
+            );
+        }
+
+        boolean wrapped = false;
+        for (Throwable current = exception; current != null; current = current.getCause()) {
+            wrapped |= current instanceof AvroConverter.IllegalRowConvertion;
+        }
+        assertThat(wrapped, is(true));
+        assertThat(rootCause(exception), instanceOf(IOException.class));
+    }
+
+    private static Throwable rootCause(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 }

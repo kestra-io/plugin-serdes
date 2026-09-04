@@ -209,7 +209,7 @@ public abstract class AbstractAvroConverter extends Task {
             var invalidField = firstNonNullableFieldHoldingNull(datum);
             if (invalidField != null) {
                 if (rOnBadLines == OnBadLines.WARN) {
-                    runContext.logger().warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), truncateForLog(String.valueOf(datum)));
+                    runContext.logger().warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), describeRecord(datum));
                 }
                 return;
             }
@@ -219,14 +219,17 @@ public abstract class AbstractAvroConverter extends Task {
             consumer.accept(datum);
             writtenCount.incrementAndGet();
         } catch (Throwable e) {
-            // an I/O failure is infrastructure, not a bad line: fail the task under every mode
+            // ERROR wraps every write failure exactly as it did before this fix, IOException included
+            if (rOnBadLines == OnBadLines.ERROR) {
+                throw new RuntimeException(illegalRowConvertion(datum, e));
+            }
+
+            // an I/O failure is infrastructure, not a bad line: WARN/SKIP must not swallow it
             if (isIOFailure(e)) {
                 throw new RuntimeException(e);
             }
 
-            if (rOnBadLines == OnBadLines.ERROR) {
-                throw new RuntimeException(illegalRowConvertion(datum, e));
-            } else if (rOnBadLines == OnBadLines.WARN) {
+            if (rOnBadLines == OnBadLines.WARN) {
                 runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", truncateForLog(e.getMessage()));
             }
             // SKIP: silently drop the row
@@ -244,7 +247,7 @@ public abstract class AbstractAvroConverter extends Task {
     }
 
     private static String firstNonNullableFieldHoldingNull(GenericData.Record datum, String parentFieldName) {
-        for (org.apache.avro.Schema.Field field : datum.getSchema().getFields()) {
+        for (var field : datum.getSchema().getFields()) {
             String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
             String invalidField = checkChildValue(datum.get(field.name()), field.schema(), currentFieldName);
             if (invalidField != null) {
@@ -272,8 +275,8 @@ public abstract class AbstractAvroConverter extends Task {
         }
 
         if (value instanceof Collection<?> collection) {
-            org.apache.avro.Schema elementSchema = resolveSchema(schema, org.apache.avro.Schema.Type.ARRAY);
-            org.apache.avro.Schema elementType = elementSchema != null ? elementSchema.getElementType() : null;
+            var elementSchema = resolveSchema(schema, org.apache.avro.Schema.Type.ARRAY);
+            var elementType = elementSchema != null ? elementSchema.getElementType() : null;
             int index = 0;
             for (Object element : collection) {
                 String invalidField = checkChildValue(element, elementType, fieldName + "[" + index + "]");
@@ -286,8 +289,8 @@ public abstract class AbstractAvroConverter extends Task {
         }
 
         if (value instanceof Map<?, ?> map) {
-            org.apache.avro.Schema mapSchema = resolveSchema(schema, org.apache.avro.Schema.Type.MAP);
-            org.apache.avro.Schema valueType = mapSchema != null ? mapSchema.getValueType() : null;
+            var mapSchema = resolveSchema(schema, org.apache.avro.Schema.Type.MAP);
+            var valueType = mapSchema != null ? mapSchema.getValueType() : null;
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 String invalidField = checkChildValue(entry.getValue(), valueType, fieldName + "{'" + entry.getKey() + "'}");
                 if (invalidField != null) {
@@ -337,6 +340,26 @@ public abstract class AbstractAvroConverter extends Task {
             ? MAX_LOGGED_RECORD_LENGTH - 1
             : MAX_LOGGED_RECORD_LENGTH;
         return value.substring(0, cut) + "… (truncated)";
+    }
+
+    // builds the dump field by field so a single oversized field can't force materializing the whole record first
+    private static String describeRecord(GenericData.Record datum) {
+        var builder = new StringBuilder("{");
+        var fields = datum.getSchema().getFields();
+        var truncated = false;
+        for (int i = 0; i < fields.size(); i++) {
+            if (builder.length() >= MAX_LOGGED_RECORD_LENGTH) {
+                truncated = true;
+                break;
+            }
+            if (i > 0) {
+                builder.append(", ");
+            }
+            var field = fields.get(i);
+            builder.append('"').append(field.name()).append("\": ").append(truncateForLog(String.valueOf(datum.get(field.name()))));
+        }
+        builder.append(truncated ? ", …}" : "}");
+        return builder.toString();
     }
 
     private static boolean isIOFailure(Throwable e) {
