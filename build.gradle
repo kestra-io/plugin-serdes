@@ -40,6 +40,8 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add("-parameters")
 }
 
+ext.ionVersion = '1.11.11'
+
 dependencies {
     // Platform
     annotationProcessor enforcedPlatform("io.kestra:platform:$kestraVersion")
@@ -77,7 +79,17 @@ dependencies {
     implementation group: 'org.apache.poi', name: 'poi', version: '5.5.1'
     implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
     implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.2.0'
-    implementation("com.amazon.ion:ion-java:1.12.0")
+    // ION, provided at runtime by io.kestra:core, whose FileSerde is ION-based. Bundling a second copy
+    // would let the child-first PluginClassLoader define its own com.amazon.ion.* classes, so values
+    // produced by core would no longer match the classes this plugin compiled against (#365).
+    // The platform BOM does not manage ION, so the version is pinned to the one core ships.
+    compileOnly "com.amazon.ion:ion-java:$ionVersion"
+    // core exposes ION as a runtime-only transitive, so tests must declare it to compile against it.
+    testImplementation "com.amazon.ion:ion-java:$ionVersion"
+    // For IonFactory. Its transitive ion-java is excluded for the same reason.
+    implementation('com.fasterxml.jackson.dataformat:jackson-dataformat-ion') {
+        exclude group: 'com.amazon.ion', module: 'ion-java'
+    }
     implementation("org.apache.hadoop:hadoop-common:3.5.0") {
         exclude group: "org.slf4j"
         exclude group: "com.fasterxml.jackson.core"
@@ -91,8 +103,6 @@ dependencies {
         exclude group: "com.fasterxml.jackson.core"
     }
     implementation group: 'org.json', name: 'json', version: '20260814'
-
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion' // for IonFactory
 
     implementation "org.commonmark:commonmark:0.30.0" // for Markdown
     implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
