@@ -42,7 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * therefore a {@code decimal}, which is a {@code bytes} logical type) could not be read back by
  * {@link AvroToIon}.
  *
- * <p>Also covers the defensive failure branches of the three validators added for those types.
+ * <p>
+ * Also covers the defensive failure branches of the three validators added for those types.
  */
 @KestraTest
 class AvroToIonBytesFixedEnumTest {
@@ -56,7 +57,7 @@ class AvroToIonBytesFixedEnumTest {
     void bytes() throws Exception {
         List<Object> rows = roundTrip(
             """
-            {"type":"record","name":"T","fields":[{"name":"v","type":"bytes"}]}""",
+                {"type":"record","name":"T","fields":[{"name":"v","type":"bytes"}]}""",
             List.of(Map.of("v", "abc"))
         );
 
@@ -68,7 +69,7 @@ class AvroToIonBytesFixedEnumTest {
     void fixed() throws Exception {
         List<Object> rows = roundTrip(
             """
-            {"type":"record","name":"T","fields":[{"name":"v","type":{"type":"fixed","name":"F","size":3}}]}""",
+                {"type":"record","name":"T","fields":[{"name":"v","type":{"type":"fixed","name":"F","size":3}}]}""",
             List.of(Map.of("v", "abc"))
         );
 
@@ -80,7 +81,7 @@ class AvroToIonBytesFixedEnumTest {
     void enums() throws Exception {
         List<Object> rows = roundTrip(
             """
-            {"type":"record","name":"T","fields":[{"name":"v","type":{"type":"enum","name":"E","symbols":["A","B"]}}]}""",
+                {"type":"record","name":"T","fields":[{"name":"v","type":{"type":"enum","name":"E","symbols":["A","B"]}}]}""",
             List.of(Map.of("v", "B"))
         );
 
@@ -92,7 +93,7 @@ class AvroToIonBytesFixedEnumTest {
     void decimal() throws Exception {
         List<Object> rows = roundTrip(
             """
-            {"type":"record","name":"T","fields":[{"name":"v","type":{"type":"bytes","logicalType":"decimal","precision":10,"scale":2}}]}""",
+                {"type":"record","name":"T","fields":[{"name":"v","type":{"type":"bytes","logicalType":"decimal","precision":10,"scale":2}}]}""",
             List.of(Map.of("v", "12.34"))
         );
 
@@ -104,7 +105,7 @@ class AvroToIonBytesFixedEnumTest {
     void nullableBytes() throws Exception {
         List<Object> rows = roundTrip(
             """
-            {"type":"record","name":"T","fields":[{"name":"v","type":["null","bytes"],"default":null}]}""",
+                {"type":"record","name":"T","fields":[{"name":"v","type":["null","bytes"],"default":null}]}""",
             List.of(Map.of("v", "abc"), Collections.singletonMap("v", null))
         );
 
@@ -117,7 +118,7 @@ class AvroToIonBytesFixedEnumTest {
     void bytesOfDecreasingLengthAreNotPaddedByRecordReuse() throws Exception {
         List<Object> rows = roundTrip(
             """
-            {"type":"record","name":"T","fields":[{"name":"v","type":"bytes"}]}""",
+                {"type":"record","name":"T","fields":[{"name":"v","type":"bytes"}]}""",
             List.of(Map.of("v", "abcdef"), Map.of("v", "xy"))
         );
 
@@ -130,7 +131,7 @@ class AvroToIonBytesFixedEnumTest {
     void arrayOfBytes() throws Exception {
         List<Object> rows = roundTrip(
             """
-            {"type":"record","name":"T","fields":[{"name":"v","type":{"type":"array","items":"bytes"}}]}""",
+                {"type":"record","name":"T","fields":[{"name":"v","type":{"type":"array","items":"bytes"}}]}""",
             List.of(Map.of("v", List.of("ab", "cd")))
         );
 
@@ -157,7 +158,7 @@ class AvroToIonBytesFixedEnumTest {
 
         AvroToIon.IllegalCellConversion e = assertThrows(
             AvroToIon.IllegalCellConversion.class,
-            () -> reader().validateFixed(new byte[]{1, 2}, fixedSchema, "v", OnBadLines.ERROR, runContext())
+            () -> reader().validateFixed(new byte[] { 1, 2 }, fixedSchema, "v", OnBadLines.ERROR, runContext())
         );
 
         assertThat(e.getMessage(), is("Invalid length for FIXED field 'v': expected 3, got 2"));

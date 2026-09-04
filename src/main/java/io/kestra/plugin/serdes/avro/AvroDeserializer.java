@@ -46,10 +46,12 @@ public class AvroDeserializer {
         // whose type is ARRAY. This wrapper is added by the write path to satisfy Avro's
         // requirement that the top-level schema be a RECORD. Strip it transparently so the
         // roundtrip output matches the original input (a bare list, not a map).
-        if ("root".equals(schema.getName())
+        if (
+            "root".equals(schema.getName())
                 && fields.size() == 1
                 && "value".equals(fields.getFirst().name())
-                && fields.getFirst().schema().getType() == Type.ARRAY) {
+                && fields.getFirst().schema().getType() == Type.ARRAY
+        ) {
             return AvroDeserializer.objectDeserializer(record.get("value"), fields.getFirst().schema());
         }
         return fields
