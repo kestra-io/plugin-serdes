@@ -155,6 +155,8 @@ dependencies {
     testImplementation group: 'com.devskiller.friendly-id', name: 'friendly-id'
 
     testImplementation("org.skyscreamer:jsonassert:1.5.3")
+
+    testImplementation "ch.qos.logback:logback-classic"
 }
 
 

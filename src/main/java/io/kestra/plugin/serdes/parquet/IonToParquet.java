@@ -48,7 +48,13 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
         An Avro schema is required to define column types; if none is provided, \
         one is inferred by scanning up to `numberOfRowsToScan` rows. Supports \
         configurable compression (default: `GZIP`), Parquet format version, \
-        row group size, page size, and dictionary page size."""
+        row group size, page size, and dictionary page size.
+
+        Under `onBadLines: WARN` or `SKIP`, only rows that fail conversion to the Avro schema are skipped. \
+        A value that converts successfully but is later rejected by the Parquet encoder — for example a \
+        `decimal` whose unscaled value overflows its declared `fixed` size — aborts the underlying writer, \
+        so the task fails on the row following the one that actually caused the problem, with a \
+        "Writer has been aborted" error."""
 )
 @Plugin(
     examples = {
@@ -93,10 +99,48 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
                         ]
                       }
                 """
+        ),
+        @Example(
+            full = true,
+            title = "Convert a CSV file to Parquet, logging a warning and skipping any row that fails to match the schema instead of failing the task.",
+            code = """
+                id: ion_to_parquet_on_bad_lines
+                namespace: company.team
+
+                tasks:
+                  - id: write_csv
+                    type: io.kestra.plugin.core.storage.Write
+                    extension: .csv
+                    content: |
+                      work_year,job_title,salary_in_usd
+                      2023,Data Scientist,120000
+                      2023,Data Engineer,
+                      2022,Data Analyst,95000
+
+                  - id: convert
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.write_csv.uri }}"
+
+                  - id: result
+                    type: io.kestra.plugin.serdes.parquet.IonToParquet
+                    from: "{{ outputs.convert.uri }}"
+                    onBadLines: WARN
+                    schema: |
+                      {
+                        "type": "record",
+                        "name": "Salary",
+                        "namespace": "com.example.salary",
+                        "fields": [
+                          {"name": "work_year", "type": "int"},
+                          {"name": "job_title", "type": "string"},
+                          {"name": "salary_in_usd", "type": "int"}
+                        ]
+                      }
+                """
         )
     },
     metrics = {
-        @Metric(name = "records", description = "Number of records converted", type = Counter.TYPE),
+        @Metric(name = "records", description = "Number of records written", type = Counter.TYPE),
     },
     aliases = "io.kestra.plugin.serdes.parquet.ParquetWriter"
 )
@@ -218,7 +262,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         )
         private URI uri;
 
-        @Schema(title = "The number of records converted")
+        @Schema(title = "The number of records written", description = "Rows skipped under `onBadLines: WARN` or `SKIP` are not counted.")
         private long size;
     }
 

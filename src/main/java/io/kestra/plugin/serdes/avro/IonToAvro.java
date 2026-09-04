@@ -21,7 +21,6 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
-import io.kestra.plugin.serdes.OnBadLines;
 import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -106,7 +105,7 @@ import lombok.experimental.SuperBuilder;
         )
     },
     metrics = {
-        @Metric(name = "records", description = "Number of records converted", type = Counter.TYPE),
+        @Metric(name = "records", description = "Number of records written", type = Counter.TYPE),
     },
     aliases = "io.kestra.plugin.serdes.avro.AvroWriter"
 )
@@ -118,20 +117,10 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
     @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
-    @Builder.Default
-    @PluginProperty(group = "advanced")
-    @Schema(
-        title = "How to handle bad records (e.g., null values in non-nullable fields or type mismatches)",
-        description = "Can be `ERROR`, `WARN`, or `SKIP`."
-    )
-    private final Property<OnBadLines> onBadLines = Property.ofValue(OnBadLines.ERROR);
-
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader
         URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
-
-        OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
 
         // temp file
         File tempFile = runContext.workingDir().createTempFile(".avro").toFile();
@@ -166,20 +155,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
-            lineCount = this.convert(inputStream, schema, record ->
-            {
-                try {
-                    dataFileWriter.append(record);
-                } catch (Exception e) {
-                    if (rOnBadLinesValue == OnBadLines.ERROR) {
-                        throw e;
-                    } else if (rOnBadLinesValue == OnBadLines.WARN) {
-                        runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", e.getMessage());
-                        return;
-                    }
-                    // OnBadLines.SKIP or others: silently skip
-                }
-            }, runContext);
+            lineCount = this.convert(inputStream, schema, dataFileWriter::append, runContext);
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));
@@ -204,7 +180,7 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
         )
         private URI uri;
 
-        @Schema(title = "The number of records converted")
+        @Schema(title = "The number of records written", description = "Rows skipped under `onBadLines: WARN` or `SKIP` are not counted.")
         private long size;
     }
 }

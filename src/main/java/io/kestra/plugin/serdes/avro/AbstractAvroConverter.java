@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -23,7 +24,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 @SuperBuilder
 @ToString
@@ -182,30 +182,206 @@ public abstract class AbstractAvroConverter extends Task {
             .onBadLines(rOnBadLines)
             .build();
 
+        var writtenCount = new AtomicLong();
+
         Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
             .map(this.convertToAvro(schema, converter, rOnBadLines))
-            .doOnNext(datum ->
-            {
-                try {
-                    consumer.accept(datum);
-                } catch (Throwable e) {
-                    var avroException = new AvroConverter.IllegalRowConvertion(
-                        datum.getSchema()
-                            .getFields()
-                            .stream()
-                            .map(field -> new AbstractMap.SimpleEntry<>(field.name(), datum.get(field.name())))
-                            // https://bugs.openjdk.java.net/browse/JDK-8148463
-                            .collect(HashMap::new, (m, v) -> m.put(v.getKey(), v.getValue()), HashMap::putAll),
-                        e,
-                        null
-                    );
-                    throw new RuntimeException(avroException);
-                }
-            });
+            .doOnNext(datum -> this.writeRecord(datum, consumer, rOnBadLines, runContext, writtenCount));
 
-        // metrics & finalize
-        Mono<Long> count = flowable.count();
-        return count.block();
+        // rows skipped under WARN/SKIP must not be counted
+        flowable.then().block();
+        return writtenCount.get();
+    }
+
+    /**
+     * Under {@code WARN}/{@code SKIP}, validates the record before handing it to the consumer: a writer such as
+     * {@code AvroParquetWriter} is not resumable after a failed {@code write()}, so a bad record must never reach
+     * it. {@code ERROR} skips validation, preserving its exact exception type and message.
+     */
+    private <E extends Exception> void writeRecord(
+        GenericData.Record datum,
+        Rethrow.ConsumerChecked<GenericData.Record, E> consumer,
+        OnBadLines rOnBadLines,
+        RunContext runContext,
+        AtomicLong writtenCount
+    ) {
+        if (rOnBadLines != OnBadLines.ERROR) {
+            var invalidField = firstNonNullableFieldHoldingNull(datum);
+            if (invalidField != null) {
+                if (rOnBadLines == OnBadLines.WARN) {
+                    runContext.logger().warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), describeRecord(datum));
+                }
+                return;
+            }
+        }
+
+        try {
+            consumer.accept(datum);
+            writtenCount.incrementAndGet();
+        } catch (Throwable e) {
+            // ERROR wraps every write failure exactly as it did before this fix, IOException included
+            if (rOnBadLines == OnBadLines.ERROR) {
+                throw new RuntimeException(illegalRowConvertion(datum, e));
+            }
+
+            // an I/O failure is infrastructure, not a bad line: WARN/SKIP must not swallow it
+            if (isIOFailure(e)) {
+                throw new RuntimeException(e);
+            }
+
+            if (rOnBadLines == OnBadLines.WARN) {
+                runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", truncateForLog(e.getMessage()));
+            }
+            // SKIP: silently drop the row
+        }
+    }
+
+    /**
+     * Name of the first field holding {@code null} under a schema that doesn't admit it, or {@code null} if the
+     * record is well-formed -- the single way {@link AvroConverter#fromMap} reports a failed cell under WARN/SKIP.
+     * Checks declared nullability only, never the Java type a logical-type conversion produced. Walks the data
+     * rather than the schema, so recursive named types cannot loop.
+     */
+    private static String firstNonNullableFieldHoldingNull(GenericData.Record datum) {
+        return firstNonNullableFieldHoldingNull(datum, null);
+    }
+
+    private static String firstNonNullableFieldHoldingNull(GenericData.Record datum, String parentFieldName) {
+        for (var field : datum.getSchema().getFields()) {
+            var currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
+            var invalidField = checkChildValue(datum.get(field.name()), field.schema(), currentFieldName);
+            if (invalidField != null) {
+                return invalidField;
+            }
+        }
+        return null;
+    }
+
+    /** Checks one field/element/map-value slot; fails open when {@code schema} could not be resolved. */
+    private static String checkChildValue(Object value, org.apache.avro.Schema schema, String fieldName) {
+        if (value == null) {
+            return (schema == null || acceptsNull(schema)) ? null : fieldName;
+        }
+        return firstNonNullableValueHoldingNull(value, schema, fieldName);
+    }
+
+    /**
+     * Looks for a nested invalid null inside a non-null value: a nested record's fields, or each element of a
+     * {@code List}/{@code Map} built by {@code complexArray}/{@code complexMap}. {@code schema} may be a UNION.
+     */
+    private static String firstNonNullableValueHoldingNull(Object value, org.apache.avro.Schema schema, String fieldName) {
+        if (value instanceof GenericData.Record nested) {
+            return firstNonNullableFieldHoldingNull(nested, fieldName);
+        }
+
+        if (value instanceof Collection<?> collection) {
+            var elementSchema = resolveSchema(schema, org.apache.avro.Schema.Type.ARRAY);
+            var elementType = elementSchema != null ? elementSchema.getElementType() : null;
+            int index = 0;
+            for (Object element : collection) {
+                var invalidField = checkChildValue(element, elementType, fieldName + "[" + index + "]");
+                if (invalidField != null) {
+                    return invalidField;
+                }
+                index++;
+            }
+            return null;
+        }
+
+        if (value instanceof Map<?, ?> map) {
+            var mapSchema = resolveSchema(schema, org.apache.avro.Schema.Type.MAP);
+            var valueType = mapSchema != null ? mapSchema.getValueType() : null;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                var invalidField = checkChildValue(entry.getValue(), valueType, fieldName + "{'" + entry.getKey() + "'}");
+                if (invalidField != null) {
+                    return invalidField;
+                }
+            }
+            return null;
+        }
+
+        return null;
+    }
+
+    /** Returns {@code schema} if it already is of {@code type}, or its matching branch if it's a UNION, else {@code null}. */
+    private static org.apache.avro.Schema resolveSchema(org.apache.avro.Schema schema, org.apache.avro.Schema.Type type) {
+        if (schema == null) {
+            return null;
+        }
+        if (schema.getType() == type) {
+            return schema;
+        }
+        if (schema.getType() == org.apache.avro.Schema.Type.UNION) {
+            return schema.getTypes().stream()
+                .filter(candidate -> candidate.getType() == type)
+                .findFirst()
+                .orElse(null);
+        }
+        return null;
+    }
+
+    private static boolean acceptsNull(org.apache.avro.Schema schema) {
+        return switch (schema.getType()) {
+            case NULL -> true;
+            case UNION -> schema.getTypes().stream().anyMatch(type -> type.getType() == org.apache.avro.Schema.Type.NULL);
+            default -> false;
+        };
+    }
+
+    /** Caps record dumps in WARN lines, to bound log volume across many bad rows. */
+    private static final int MAX_LOGGED_RECORD_LENGTH = 1000;
+
+    private static String truncateForLog(String value) {
+        if (value == null || value.length() <= MAX_LOGGED_RECORD_LENGTH) {
+            return value;
+        }
+        // cutting inside a surrogate pair would leave a dangling half
+        int cut = Character.isHighSurrogate(value.charAt(MAX_LOGGED_RECORD_LENGTH - 1))
+            ? MAX_LOGGED_RECORD_LENGTH - 1
+            : MAX_LOGGED_RECORD_LENGTH;
+        return value.substring(0, cut) + "… (truncated)";
+    }
+
+    // builds the dump field by field so a single oversized field can't force materializing the whole record first
+    private static String describeRecord(GenericData.Record datum) {
+        var builder = new StringBuilder("{");
+        var fields = datum.getSchema().getFields();
+        var truncated = false;
+        for (int i = 0; i < fields.size(); i++) {
+            if (builder.length() >= MAX_LOGGED_RECORD_LENGTH) {
+                truncated = true;
+                break;
+            }
+            if (i > 0) {
+                builder.append(", ");
+            }
+            var field = fields.get(i);
+            builder.append('"').append(field.name()).append("\": ").append(truncateForLog(String.valueOf(datum.get(field.name()))));
+        }
+        builder.append(truncated ? ", …}" : "}");
+        return builder.toString();
+    }
+
+    private static boolean isIOFailure(Throwable e) {
+        for (Throwable current = e; current != null; current = current.getCause()) {
+            if (current instanceof IOException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static AvroConverter.IllegalRowConvertion illegalRowConvertion(GenericData.Record datum, Throwable e) {
+        return new AvroConverter.IllegalRowConvertion(
+            datum.getSchema()
+                .getFields()
+                .stream()
+                .map(field -> new AbstractMap.SimpleEntry<>(field.name(), datum.get(field.name())))
+                // https://bugs.openjdk.java.net/browse/JDK-8148463
+                .collect(HashMap::new, (m, v) -> m.put(v.getKey(), v.getValue()), HashMap::putAll),
+            e,
+            null
+        );
     }
 
     @SuppressWarnings("unchecked")
