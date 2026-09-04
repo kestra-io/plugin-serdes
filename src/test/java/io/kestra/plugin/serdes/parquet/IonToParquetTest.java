@@ -6,17 +6,16 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.IntStream;
 
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
+import ch.qos.logback.core.AppenderBase;
 import com.google.common.collect.ImmutableMap;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -29,7 +28,6 @@ import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.OnBadLines;
-import io.kestra.plugin.serdes.avro.AvroConverter;
 
 import jakarta.inject.Inject;
 
@@ -394,15 +392,26 @@ class IonToParquetTest {
         return rows;
     }
 
+    // ListAppender's backing list is a plain ArrayList; capture on a CopyOnWriteArrayList to avoid
+    // ConcurrentModificationException when logs are appended from another thread while tests read them.
+    private static final class CapturingAppender extends AppenderBase<ILoggingEvent> {
+        final List<ILoggingEvent> list = new CopyOnWriteArrayList<>();
+
+        @Override
+        protected void append(ILoggingEvent event) {
+            list.add(event);
+        }
+    }
+
     // runContext.logger() returns a Logback logger from an isolated LoggerContext; attach directly to capture logs.
-    private static ListAppender<ILoggingEvent> attachLogCapture(RunContext runContext) {
+    private static CapturingAppender attachLogCapture(RunContext runContext) {
         Logger contextLogger = (Logger) runContext.logger();
         contextLogger.setLevel(Level.DEBUG);
-        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
-        listAppender.setContext(contextLogger.getLoggerContext());
-        listAppender.start();
-        contextLogger.addAppender(listAppender);
-        return listAppender;
+        CapturingAppender appender = new CapturingAppender();
+        appender.setContext(contextLogger.getLoggerContext());
+        appender.start();
+        contextLogger.addAppender(appender);
+        return appender;
     }
 
     @SuppressWarnings("unchecked")
@@ -433,7 +442,7 @@ class IonToParquetTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToParquet.Output writerOutput = writer.run(runContext);
 
@@ -465,7 +474,7 @@ class IonToParquetTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         writer.run(runContext);
 
@@ -484,19 +493,8 @@ class IonToParquetTest {
     // Regression test: the truncation cap must never land on the low half of a surrogate pair.
     @Test
     void warnLogsTruncateOnSurrogatePairBoundaryWithoutMojibake() throws Exception {
-        Schema schema = new Schema.Parser().parse(NON_NULLABLE_INT_SCHEMA);
-        AvroConverter converter = AvroConverter.builder().build();
-
-        // probe the exact prefix Avro's GenericData.Record#toString() prepends before the "s" field value,
-        // so the astral character below can be positioned deterministically at the 1000th character
-        Map<String, Object> probeData = new HashMap<>();
-        probeData.put("id", null);
-        probeData.put("s", "Z".repeat(3000));
-        GenericData.Record probeRecord = converter.fromMap(schema, probeData, OnBadLines.SKIP);
-        int prefixLength = probeRecord.toString().indexOf('Z');
-
-        int localIndex = 999 - prefixLength;
-        String hugeValue = "Z".repeat(localIndex) + "😀" + "Z".repeat(1000);
+        // each field value is truncated on its own, so the astral char just needs to sit at index 999 of the value
+        String hugeValue = "Z".repeat(999) + "😀" + "Z".repeat(1000);
 
         Map<String, Object> bad = new HashMap<>();
         bad.put("id", null); // null into a non-nullable "int" field
@@ -512,7 +510,7 @@ class IonToParquetTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         writer.run(runContext);
 
@@ -522,7 +520,7 @@ class IonToParquetTest {
             .findFirst()
             .orElseThrow(() -> new AssertionError("Expected a WARN log for the bad record"));
 
-        String value = message.substring(message.indexOf("nullable: ") + "nullable: ".length());
+        String value = message.substring(message.indexOf("\"s\": ") + "\"s\": ".length());
         String truncatedPart = value.substring(0, value.indexOf("… (truncated)"));
         assertThat(truncatedPart.length(), is(999));
         assertThat(Character.isHighSurrogate(truncatedPart.charAt(truncatedPart.length() - 1)), is(false));
@@ -542,7 +540,7 @@ class IonToParquetTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToParquet.Output writerOutput = writer.run(runContext);
 
@@ -665,7 +663,7 @@ class IonToParquetTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToParquet.Output writerOutput = writer.run(runContext);
 
@@ -717,7 +715,7 @@ class IonToParquetTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToParquet.Output writerOutput = writer.run(runContext);
 
@@ -783,7 +781,7 @@ class IonToParquetTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToParquet.Output writerOutput = writer.run(runContext);
 
@@ -839,7 +837,7 @@ class IonToParquetTest {
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
-        ListAppender<ILoggingEvent> listAppender = attachLogCapture(runContext);
+        CapturingAppender listAppender = attachLogCapture(runContext);
 
         IonToParquet.Output writerOutput = writer.run(runContext);
 
@@ -922,5 +920,40 @@ class IonToParquetTest {
         }
         assertThat(root, instanceOf(IOException.class));
         assertThat(root.getMessage(), containsString("aborted"));
+    }
+
+    // The overflowing decimal converts to a valid Avro record and only fails inside consumer.accept(datum) in
+    // writeRecord's catch block -- the write-time path errorOnBadRowFailsUnchanged never reaches. The encoder
+    // failure is not an IOException, so isIOFailure() is not what wraps it here; see
+    // IonToAvroTest#errorWrapsWriteTimeIoFailureAsIllegalRowConvertion for the IOException ordering guard.
+    @Test
+    void errorOnWriteTimeFailureStillWrapsAsIllegalRowConvertion() throws Exception {
+        List<Map<String, Object>> rows = List.of(
+            ImmutableMap.of("id", 1, "amount", new BigDecimal("999999.99")) // unscaled value overflows the 2-byte fixed size
+        );
+
+        URI uri = uploadIonRows(rows);
+
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(FIXED_DECIMAL_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.ERROR))
+            .build();
+
+        RuntimeException ex = assertThrows(
+            RuntimeException.class,
+            () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()))
+        );
+
+        Throwable current = ex;
+        boolean sawIllegalRowConvertion = false;
+        while (current.getCause() != null) {
+            current = current.getCause();
+            sawIllegalRowConvertion |= current instanceof io.kestra.plugin.serdes.avro.AvroConverter.IllegalRowConvertion;
+        }
+        assertThat(sawIllegalRowConvertion, is(true));
+        assertThat(ex.getCause(), instanceOf(io.kestra.plugin.serdes.avro.AvroConverter.IllegalRowConvertion.class));
     }
 }
