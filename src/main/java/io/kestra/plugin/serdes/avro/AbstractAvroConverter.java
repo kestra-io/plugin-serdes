@@ -182,7 +182,7 @@ public abstract class AbstractAvroConverter extends Task {
             .onBadLines(rOnBadLines)
             .build();
 
-        AtomicLong writtenCount = new AtomicLong();
+        var writtenCount = new AtomicLong();
 
         Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
             .map(this.convertToAvro(schema, converter, rOnBadLines))
@@ -248,8 +248,8 @@ public abstract class AbstractAvroConverter extends Task {
 
     private static String firstNonNullableFieldHoldingNull(GenericData.Record datum, String parentFieldName) {
         for (var field : datum.getSchema().getFields()) {
-            String currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
-            String invalidField = checkChildValue(datum.get(field.name()), field.schema(), currentFieldName);
+            var currentFieldName = parentFieldName != null ? parentFieldName + "." + field.name() : field.name();
+            var invalidField = checkChildValue(datum.get(field.name()), field.schema(), currentFieldName);
             if (invalidField != null) {
                 return invalidField;
             }
@@ -279,7 +279,7 @@ public abstract class AbstractAvroConverter extends Task {
             var elementType = elementSchema != null ? elementSchema.getElementType() : null;
             int index = 0;
             for (Object element : collection) {
-                String invalidField = checkChildValue(element, elementType, fieldName + "[" + index + "]");
+                var invalidField = checkChildValue(element, elementType, fieldName + "[" + index + "]");
                 if (invalidField != null) {
                     return invalidField;
                 }
@@ -292,7 +292,7 @@ public abstract class AbstractAvroConverter extends Task {
             var mapSchema = resolveSchema(schema, org.apache.avro.Schema.Type.MAP);
             var valueType = mapSchema != null ? mapSchema.getValueType() : null;
             for (Map.Entry<?, ?> entry : map.entrySet()) {
-                String invalidField = checkChildValue(entry.getValue(), valueType, fieldName + "{'" + entry.getKey() + "'}");
+                var invalidField = checkChildValue(entry.getValue(), valueType, fieldName + "{'" + entry.getKey() + "'}");
                 if (invalidField != null) {
                     return invalidField;
                 }

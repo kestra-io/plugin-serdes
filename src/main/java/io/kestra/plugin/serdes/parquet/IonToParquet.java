@@ -140,7 +140,7 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
         )
     },
     metrics = {
-        @Metric(name = "records", description = "Number of records converted", type = Counter.TYPE),
+        @Metric(name = "records", description = "Number of records written", type = Counter.TYPE),
     },
     aliases = "io.kestra.plugin.serdes.parquet.ParquetWriter"
 )
@@ -262,7 +262,7 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         )
         private URI uri;
 
-        @Schema(title = "The number of records converted")
+        @Schema(title = "The number of records written", description = "Rows skipped under `onBadLines: WARN` or `SKIP` are not counted.")
         private long size;
     }
 

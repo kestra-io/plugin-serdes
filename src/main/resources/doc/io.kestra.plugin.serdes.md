@@ -26,7 +26,7 @@ All tasks require `from` (a `kestra://` URI pointing to the source file) and ret
 
 `avro.AvroToIon` converts an Avro file to ION — set `from`. Set `onBadLines` to control error handling (default `ERROR`).
 
-`avro.IonToAvro` converts an ION file to Avro — set `from`. Optionally provide `schema` (Avro schema JSON). Configure type coercion with `trueValues`, `falseValues`, `nullValues`, `decimalSeparator` (default `.`), `strictSchema` (default `false`), and `inferAllFields` (default `false`).
+`avro.IonToAvro` converts an ION file to Avro — set `from`. Optionally provide `schema` (Avro schema JSON). Configure type coercion with `trueValues`, `falseValues`, `nullValues`, `decimalSeparator` (default `.`), `strictSchema` (default `false`), and `inferAllFields` (default `false`). Set `onBadLines` (default `ERROR`; also `WARN` or `SKIP`) to skip rows that cannot be converted to the schema instead of failing the task — `WARN` logs each skipped row, `SKIP` drops it silently. Skipped rows are not counted in `size` or the `records` metric.
 
 `avro.InferAvroSchemaFromIon` infers an Avro schema from an ION file — set `from`. Control inference with `numberOfRowsToScan` (default 100).
 
@@ -34,7 +34,7 @@ All tasks require `from` (a `kestra://` URI pointing to the source file) and ret
 
 `parquet.ParquetToIon` converts a Parquet file to ION — set `from`.
 
-`parquet.IonToParquet` converts an ION file to Parquet — set `from`. Control output with `compressionCodec` (default `GZIP`; also `UNCOMPRESSED`, `SNAPPY`, `ZSTD`), `parquetVersion` (default `V2`), `rowGroupSize`, `pageSize`, and `dictionaryPageSize`. Inherits Avro type coercion options.
+`parquet.IonToParquet` converts an ION file to Parquet — set `from`. Control output with `compressionCodec` (default `GZIP`; also `UNCOMPRESSED`, `SNAPPY`, `ZSTD`), `parquetVersion` (default `V2`), `rowGroupSize`, `pageSize`, and `dictionaryPageSize`. Inherits Avro type coercion options. `onBadLines` (default `ERROR`; also `WARN` or `SKIP`) behaves as for `avro.IonToAvro`, with one caveat: only rows failing *conversion* are skipped. A value that converts successfully but is rejected by the Parquet encoder (for example a decimal overflowing its declared `fixed` byte size) aborts the underlying writer, so the task then fails on the *following* row with `Writer has been aborted due to a previous error and cannot accept further writes` — an error that names the wrong row. If you hit that message under `WARN`/`SKIP`, look at the row before the one reported.
 
 ### Excel
 
