@@ -228,6 +228,34 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void negativeSkipRowsIsTreatedAsZero() throws Exception {
+        String csv = "h1,h2\n1,2\n3,4\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/negativeSkipRowsIsTreatedAsZero.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("negativeSkipRowsIsTreatedAsZero")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .skipRows(Property.ofValue(-3))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) Map.of("h1", "1", "h2", "2")));
+        assertThat(rows.get(1), is((Object) Map.of("h1", "3", "h2", "4")));
+    }
+
+    @Test
     void exceedsBufferThrows() throws Exception {
         int n = 50;
         String csv = "col1\n\"" + "x".repeat(n) + "\"\n";
