@@ -48,7 +48,13 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
         An Avro schema is required to define column types; if none is provided, \
         one is inferred by scanning up to `numberOfRowsToScan` rows. Supports \
         configurable compression (default: `GZIP`), Parquet format version, \
-        row group size, page size, and dictionary page size."""
+        row group size, page size, and dictionary page size.
+
+        Under `onBadLines: WARN` or `SKIP`, only rows that fail conversion to the Avro schema are skipped. \
+        A value that converts successfully but is later rejected by the Parquet encoder — for example a \
+        `decimal` whose unscaled value overflows its declared `fixed` size — aborts the underlying writer, \
+        so the task fails on the row following the one that actually caused the problem, with a \
+        "Writer has been aborted" error."""
 )
 @Plugin(
     examples = {
