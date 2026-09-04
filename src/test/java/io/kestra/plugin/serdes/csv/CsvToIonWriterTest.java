@@ -144,6 +144,90 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void skipRowsWithHeader() throws Exception {
+        String csv = "junkA,junkB\nh1,h2\n1,2\n3,4\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/skipRowsWithHeader.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("skipRowsWithHeader")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .skipRows(Property.ofValue(1))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) Map.of("h1", "1", "h2", "2")));
+        assertThat(rows.get(1), is((Object) Map.of("h1", "3", "h2", "4")));
+    }
+
+    @Test
+    void skipRowsWithHeaderAndDifferentColumnCount() throws Exception {
+        String csv = "onlyOneColumn\nh1,h2\n1,2\n3,4\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/skipRowsWithHeaderAndDifferentColumnCount.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("skipRowsWithHeaderAndDifferentColumnCount")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .skipRows(Property.ofValue(1))
+            .header(Property.ofValue(true))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) Map.of("h1", "1", "h2", "2")));
+        assertThat(rows.get(1), is((Object) Map.of("h1", "3", "h2", "4")));
+    }
+
+    @Test
+    void skipRowsBeyondFileEnd() throws Exception {
+        String csv = "h1,h2\n1,2\n3,4\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/skipRowsBeyondFileEnd.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("skipRowsBeyondFileEnd")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .skipRows(Property.ofValue(10))
+            .header(Property.ofValue(true))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        CsvToIon.Output out = reader.run(runContext);
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        assertThat(rows, is(empty()));
+        assertThat(out.getSize(), is(0L));
+    }
+
+    @Test
     void exceedsBufferThrows() throws Exception {
         int n = 50;
         String csv = "col1\n\"" + "x".repeat(n) + "\"\n";
