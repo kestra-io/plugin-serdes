@@ -183,7 +183,7 @@ class IonToParquetTest {
     }
 
     @Test
-    void nullIntoNonNullableStringFieldFailsWithOnBadLinesSkip() throws Exception {
+    void nullIntoNonNullableStringFieldIsDroppedWithOnBadLinesSkip() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_null_string_skip_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             Map<String, Object> row = new HashMap<>();
@@ -202,10 +202,12 @@ class IonToParquetTest {
             .onBadLines(Property.ofValue(OnBadLines.SKIP))
             .build();
 
-        // The underlying Parquet writer cannot safely resume after a required-field write failure without
-        // corrupting the row group, so a row that can't be converted still fails the task even with SKIP —
-        // it must never be silently written as the literal "null" string either way.
-        assertThrows(RuntimeException.class, () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of())));
+        // SKIP drops the row before it reaches the writer, so the task succeeds with an empty but readable
+        // parquet — the row must never be written as the literal "null" string.
+        IonToParquet.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        assertThat(writerOutput.getSize(), is(0L));
+        assertThat(readBackAsRows(writerOutput.getUri()), is(List.of()));
     }
 
     @Test
