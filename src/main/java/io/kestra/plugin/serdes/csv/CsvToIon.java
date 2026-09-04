@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -141,7 +142,13 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     @Builder.Default
     @Schema(
-        title = "Number of lines to skip at the start of the file"
+        title = "Number of rows to skip at the start of the file, before the header row is read",
+        description = """
+            Rows are counted at the CSV-record level, not by raw physical line: a quoted field \
+            spanning several physical lines counts as a single row. When `header` is `true`, \
+            skipped rows are removed first and the header is then read from the next row; when \
+            `header` is `false`, the same number of rows is removed from the start of the data. \
+            A negative value is treated as `0`."""
     )
     @PluginProperty(group = "advanced")
     private final Property<Integer> skipRows = Property.ofValue(0);
@@ -193,6 +200,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             var rSkipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
             Map<Integer, String> headers = new TreeMap<>();
             AtomicInteger effectiveHeaderCount = new AtomicInteger();
+            AtomicBoolean headerResolved = new AtomicBoolean();
+            int rSkipRowsBound = Math.max(rSkipRowsValue, 0);
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
             OnEmptyHeader rOnEmptyHeaderValue = runContext.render(this.onEmptyHeader).as(OnEmptyHeader.class).orElse(OnEmptyHeader.DROP);
 
@@ -211,12 +220,12 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 })
                 .filter(csvRecord ->
                 {
-                    if (rHeaderValue && csvRecord.getStartingLineNumber() == 1) {
-                        effectiveHeaderCount.set(this.resolveHeaders(csvRecord, headers, rOnEmptyHeaderValue, runContext));
+                    if (skipped.get() < rSkipRowsBound) {
+                        skipped.incrementAndGet();
                         return false;
                     }
-                    if (rSkipRowsValue > 0 && skipped.get() < rSkipRowsValue) {
-                        skipped.incrementAndGet();
+                    if (rHeaderValue && headerResolved.compareAndSet(false, true)) {
+                        effectiveHeaderCount.set(this.resolveHeaders(csvRecord, headers, rOnEmptyHeaderValue, runContext));
                         return false;
                     }
                     return true;

@@ -8,7 +8,7 @@ All tasks require `from` (a `kestra://` URI pointing to the source file) and ret
 
 ### CSV
 
-`csv.CsvToIon` converts a CSV file to ION — set `from`. Control parsing with `header` (default `true`), `fieldSeparator` (default `,`), `textDelimiter` (default `"`), `skipEmptyRows` (default `false`), `skipRows` (default 0), `charset` (default `UTF-8`), and `onBadLines` (default `ERROR`; also `WARN` or `SKIP`). A leading UTF-8 byte-order mark is stripped automatically. Use `onEmptyHeader` (default `DROP`) to drop trailing unnamed header columns, or `RENAME` to keep them with generated names (`col_0`, `col_1`, ...).
+`csv.CsvToIon` converts a CSV file to ION — set `from`. Control parsing with `header` (default `true`), `fieldSeparator` (default `,`), `textDelimiter` (default `"`), `skipEmptyRows` (default `false`), `skipRows` (default 0), `charset` (default `UTF-8`), and `onBadLines` (default `ERROR`; also `WARN` or `SKIP`). `skipRows` removes that many rows from the start of the file *before* the header row is read (row = one CSV record, so a quoted field spanning several physical lines counts as one row); a negative value is treated as `0`. A leading UTF-8 byte-order mark is stripped automatically. Use `onEmptyHeader` (default `DROP`) to drop trailing unnamed header columns, or `RENAME` to keep them with generated names (`col_0`, `col_1`, ...).
 
 `csv.IonToCsv` converts an ION file to CSV — set `from`. Control output with `header` (default `true`), `fieldSeparator` (default `,`), `textDelimiter` (default `"`), `lineDelimiter` (default `\n`), `quoteMode` (`ALWAYS`, `REQUIRED`, or `NON_NUMERIC`), and `charset` (default `UTF-8`). Inherits date/time formatting from the base writer.
 
