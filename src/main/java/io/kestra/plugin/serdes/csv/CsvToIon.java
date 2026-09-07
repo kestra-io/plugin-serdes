@@ -148,7 +148,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             spanning several physical lines counts as a single row. When `header` is `true`, \
             skipped rows are removed first and the header is then read from the next row; when \
             `header` is `false`, the same number of rows is removed from the start of the data. \
-            A negative value is treated as `0`."""
+            A negative value is treated as `0`. Rows dropped by `onBadLines` (`WARN` or `SKIP`) \
+            never reach the skip counter, so a malformed row inside the skip window does not \
+            count against `skipRows`."""
     )
     @PluginProperty(group = "advanced")
     private final Property<Integer> skipRows = Property.ofValue(0);
@@ -197,11 +199,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
-            var rSkipRowsValue = runContext.render(this.skipRows).as(Integer.class).orElseThrow();
             Map<Integer, String> headers = new TreeMap<>();
             AtomicInteger effectiveHeaderCount = new AtomicInteger();
             AtomicBoolean headerResolved = new AtomicBoolean();
-            int rSkipRowsBound = Math.max(rSkipRowsValue, 0);
+            int rSkipRowsBound = Math.max(runContext.render(this.skipRows).as(Integer.class).orElse(0), 0);
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
             OnEmptyHeader rOnEmptyHeaderValue = runContext.render(this.onEmptyHeader).as(OnEmptyHeader.class).orElse(OnEmptyHeader.DROP);
 

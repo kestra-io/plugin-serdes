@@ -256,6 +256,37 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void badRowInsideSkipWindowDoesNotCountAgainstSkipRows() throws Exception {
+        // the first row is unparseable (quoted field larger than the buffer) and sits inside the skip window
+        String csv = "\"" + "x".repeat(50) + "\"\nh1,h2\n1,2\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/badRowInsideSkipWindow.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("badRowInsideSkipWindowDoesNotCountAgainstSkipRows")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .maxBufferSize(Property.ofValue(8))
+            .skipRows(Property.ofValue(1))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        List<Object> rows;
+        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+
+        // the bad row is dropped by onBadLines before the skip filter, so it never consumes the skip budget;
+        // the parse error also ends the stream, leaving no rows at all
+        assertThat(rows, is(empty()));
+    }
+
+    @Test
     void exceedsBufferThrows() throws Exception {
         int n = 50;
         String csv = "col1\n\"" + "x".repeat(n) + "\"\n";
