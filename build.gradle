@@ -40,7 +40,7 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add("-parameters")
 }
 
-ext.ionVersion = '1.11.11'
+ext.ionVersion = '1.12.1'
 
 dependencies {
     // Platform
