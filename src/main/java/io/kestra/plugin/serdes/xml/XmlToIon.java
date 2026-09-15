@@ -1,11 +1,15 @@
 package io.kestra.plugin.serdes.xml;
 
 import java.io.*;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
@@ -52,7 +56,10 @@ import static io.kestra.core.utils.Rethrow.throwConsumer;
         to `false` to always get a single nested record. When `query` is set (e.g., \
         `/catalog/book`), uses StAX streaming to extract each matching element as a \
         separate ION record — suitable for large files. External entity resolution is \
-        disabled for security."""
+        disabled for security. Scalar text values keep their XML lexical form when they \
+        would otherwise be corrupted by numeric coercion (e.g. `25E2568` is not mistaken \
+        for scientific notation and overflowed to `Infinity`); see `parserConfiguration` \
+        to control number/boolean typing explicitly."""
 )
 @Plugin(
     examples = {
@@ -125,7 +132,14 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
     private final Property<Boolean> unwrapRootCollection = Property.ofValue(true);
 
     @Schema(
-        title = "XML parser configuration"
+        title = "XML parser configuration",
+        description = """
+            Controls how repeated elements and scalar text values are typed. By default, \
+            values that look numeric or boolean (e.g. `true`, `12.5`) are converted to the \
+            matching ION type, except when doing so would silently corrupt the value — for \
+            example `25E2568` looks like scientific notation but is far outside the range \
+            of a `double`, so it is kept as the string `"25E2568"` instead of becoming \
+            `Infinity`."""
     )
     @PluginProperty(group = "advanced")
     private ParserConfiguration parserConfiguration;
@@ -139,17 +153,27 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
 
         var tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
-        var xmlParserConfiguration = new XMLParserConfiguration();
+        // Never let org.json coerce scalars at parse time — the lexical form would be destroyed
+        // before we can guard it. We re-apply the same typing ourselves in coerce() (see #412).
+        var xmlParserConfiguration = new XMLParserConfiguration()
+            .withKeepNumberAsString(true)
+            .withKeepBooleanAsString(true);
+        var rForceString = new HashSet<String>();
+        var rKeepNumberAsString = false;
+        var rKeepBooleanAsString = false;
         if (parserConfiguration != null) {
-            var rParserConfig = runContext.render(parserConfiguration.getForceList()).asList(String.class);
-            xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(rParserConfig));
+            var rForceList = runContext.render(parserConfiguration.getForceList()).asList(String.class);
+            xmlParserConfiguration = xmlParserConfiguration.withForceList(new HashSet<>(rForceList));
+            rForceString.addAll(runContext.render(parserConfiguration.getForceString()).asList(String.class));
+            rKeepNumberAsString = runContext.render(parserConfiguration.getKeepNumberAsString()).as(Boolean.class).orElse(false);
+            rKeepBooleanAsString = runContext.render(parserConfiguration.getKeepBooleanAsString()).as(Boolean.class).orElse(false);
         }
 
         long count;
         if (rQuery.isPresent()) {
-            count = runStreaming(runContext, from, rCharset, rQuery.get(), xmlParserConfiguration, tempFile);
+            count = runStreaming(runContext, from, rCharset, rQuery.get(), xmlParserConfiguration, tempFile, rForceString, rKeepNumberAsString, rKeepBooleanAsString);
         } else {
-            count = runBatch(runContext, from, rCharset, xmlParserConfiguration, rUnwrapRootCollection, tempFile);
+            count = runBatch(runContext, from, rCharset, xmlParserConfiguration, rUnwrapRootCollection, tempFile, rForceString, rKeepNumberAsString, rKeepBooleanAsString);
         }
 
         return Output
@@ -159,7 +183,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             .build();
     }
 
-    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, boolean unwrapRootCollection, File tempFile) throws Exception {
+    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, boolean unwrapRootCollection, File tempFile, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
         var collectionChildName = unwrapRootCollection ? detectRootCollectionChild(runContext, from, charset) : null;
 
         var effectiveParserConfiguration = xmlParserConfiguration;
@@ -177,6 +201,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             var jsonObject = XML.toJSONObject(input, effectiveParserConfiguration);
+            coerce(jsonObject, forceString, keepNumberAsString, keepBooleanAsString, runContext);
 
             long count;
             if (collectionChildName != null) {
@@ -300,7 +325,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         return hasNestedElement;
     }
 
-    private long runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile) throws Exception {
+    private long runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
         // Parse query: "/catalog/book" → parentSegments=["catalog"], elementName="book"
         var segments = query.replaceFirst("^/", "").split("/");
         var parentSegments = new String[segments.length - 1];
@@ -353,6 +378,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                         if (depth == 0 && reader.getLocalName().equals(elementName)) {
                             String xmlFragment = readElementAsXml(reader);
                             JSONObject parsed = XML.toJSONObject(xmlFragment, xmlParserConfiguration);
+                            coerce(parsed, forceString, keepNumberAsString, keepBooleanAsString, runContext);
                             // Unwrap the outer element key
                             Object inner = parsed.opt(elementName);
                             if (inner instanceof JSONObject) {
@@ -501,6 +527,80 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             .replace("'", "&apos;");
     }
 
+    /**
+     * Re-applies org.json's own scalar typing ({@link XML#stringToValue}) on a tree parsed with
+     * {@code keepNumberAsString}/{@code keepBooleanAsString} enabled, so numeric/boolean coercion
+     * happens under our control instead of destroying the original lexical form at parse time.
+     * Walks element text nodes AND attributes, since org.json represents both as plain keys of
+     * the same {@link JSONObject}.
+     */
+    private static void coerce(JSONObject jsonObject, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString, RunContext runContext) {
+        for (var key : new ArrayList<>(jsonObject.keySet())) {
+            jsonObject.put(key, coerceValue(jsonObject.get(key), key, forceString, keepNumberAsString, keepBooleanAsString, runContext));
+        }
+    }
+
+    private static Object coerceValue(Object value, String elementName, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString, RunContext runContext) {
+        if (value instanceof JSONObject nested) {
+            coerce(nested, forceString, keepNumberAsString, keepBooleanAsString, runContext);
+            return nested;
+        }
+        if (value instanceof JSONArray array) {
+            for (var i = 0; i < array.length(); i++) {
+                array.put(i, coerceValue(array.get(i), elementName, forceString, keepNumberAsString, keepBooleanAsString, runContext));
+            }
+            return array;
+        }
+        if (value instanceof String text) {
+            return coerceScalar(text, elementName, forceString, keepNumberAsString, keepBooleanAsString, runContext);
+        }
+        return value;
+    }
+
+    private static Object coerceScalar(String text, String elementName, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString, RunContext runContext) {
+        if (forceString.contains(elementName)) {
+            return text;
+        }
+
+        var value = XML.stringToValue(text);
+
+        if (value instanceof Boolean) {
+            return keepBooleanAsString ? text : value;
+        }
+
+        // stringToValue returns Integer/Long/BigInteger for all-digit text and BigDecimal for
+        // decimal/exponent notation — any of them can narrow to Infinity or 0 on doubleValue(),
+        // e.g. a ~309+ digit integer overflows just like "25E2568" does (see #412).
+        if (value instanceof Number number) {
+            if (keepNumberAsString) {
+                return text;
+            }
+            var asDouble = number.doubleValue();
+            var overflows = Double.isInfinite(asDouble);
+            var underflows = asDouble == 0.0 && !isZero(number);
+            if (overflows || underflows) {
+                runContext.logger().debug(
+                    "XML element '{}' value '{}' would narrow to {} as a double, keeping the original string instead",
+                    elementName, text, overflows ? "Infinity" : "0"
+                );
+                return text;
+            }
+            return number;
+        }
+
+        return value;
+    }
+
+    private static boolean isZero(Number number) {
+        if (number instanceof BigDecimal bigDecimal) {
+            return bigDecimal.compareTo(BigDecimal.ZERO) == 0;
+        }
+        if (number instanceof BigInteger bigInteger) {
+            return bigInteger.signum() == 0;
+        }
+        return number.longValue() == 0;
+    }
+
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
@@ -521,5 +621,38 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             title = "List of XML tags that must be parsed as lists"
         )
         private Property<List<String>> forceList;
+
+        @Schema(
+            title = "List of XML tags that must always be kept as strings",
+            description = """
+                Element and attribute names listed here are never converted to a number or a \
+                boolean, regardless of their text content. Use this for identifiers that \
+                happen to look numeric (lot numbers, SKUs, ZIP codes) so they never get \
+                reformatted. Namespaced elements must be prefixed the same way they appear \
+                in the source XML (e.g. `ns:code`)."""
+        )
+        private Property<List<String>> forceString;
+
+        @Builder.Default
+        @Schema(
+            title = "Whether to keep every numeric-looking value as a string",
+            description = """
+                When `true`, no scalar text value is ever converted to an ION number. \
+                `forceString` still takes precedence for the names it lists, this flag \
+                only widens the same behavior to every element and attribute. Default \
+                value is `false`."""
+        )
+        private final Property<Boolean> keepNumberAsString = Property.ofValue(false);
+
+        @Builder.Default
+        @Schema(
+            title = "Whether to keep every boolean-looking value as a string",
+            description = """
+                When `true`, `true`/`false` text values are never converted to an ION \
+                boolean. `forceString` still takes precedence for the names it lists, \
+                this flag only widens the same behavior to every element and attribute. \
+                Default value is `false`."""
+        )
+        private final Property<Boolean> keepBooleanAsString = Property.ofValue(false);
     }
 }
