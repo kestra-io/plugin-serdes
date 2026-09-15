@@ -163,7 +163,11 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     private final Property<String> charset = Property.ofValue(StandardCharsets.UTF_8.name());
 
     @Builder.Default
-    @Schema(title = "Maximum CSV parser buffer size (bytes)")
+    @Schema(
+        title = "Maximum CSV parser buffer size (characters)",
+        description = "The FastCSV parser's maximum internal buffer size. The value must be positive and cannot exceed "
+            + "2,147,483,647 characters."
+    )
     @PluginProperty(group = "advanced")
     private final Property<Integer> maxBufferSize = Property.ofValue(DEFAULT_MAX_BUFFER_SIZE);
 
