@@ -458,6 +458,52 @@ class XmlToIonWriterTest {
     }
 
     @Test
+    void longAllDigitStringPreservedAsString() throws Exception {
+        // org.json parses an all-digit string longer than ~19 digits into a BigInteger (not
+        // a BigDecimal). A ~320-digit value overflows to Infinity when narrowed to double,
+        // the same corruption class as #412 — the guard must cover BigInteger too.
+        String trackingId = "9".repeat(320);
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<record><TrackingId>" + trackingId + "</TrackingId></record>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> inner = (Map<String, Object>) readSingleRecord(readerOutput.getUri()).get("record");
+        assertThat(inner.get("TrackingId"), instanceOf(String.class));
+        assertThat(inner.get("TrackingId"), is(trackingId));
+    }
+
+    @Test
+    void numericLikeAttributePreservedAsString() throws Exception {
+        // org.json represents attributes as plain keys of the same JSONObject as child
+        // elements, so the coercion walk must cover them too.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<record id=\"25E2568\">text</record>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> inner = (Map<String, Object>) readSingleRecord(readerOutput.getUri()).get("record");
+        assertThat(inner.get("id"), instanceOf(String.class));
+        assertThat(inner.get("id"), is("25E2568"));
+    }
+
+    @Test
     void numericAndBooleanTypesPreserveCurrentBehavior() throws Exception {
         // Parity: ordinary numeric/boolean/non-numeric-looking coercion must be untouched
         // by the fix for #412.

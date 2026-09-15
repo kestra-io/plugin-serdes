@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.xml;
 
 import java.io.*;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -152,10 +153,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
 
         var tempFile = runContext.workingDir().createTempFile(".ion").toFile();
 
-        // Never let org.json coerce scalars at parse time: the lexical form (e.g. "25E2568")
-        // is destroyed the instant it's turned into a Number and cannot be recovered afterwards.
-        // We re-apply the same typing ourselves in coerce() once the tree is parsed, which lets
-        // us guard against values that org.json would otherwise silently corrupt (see #412).
+        // Never let org.json coerce scalars at parse time — the lexical form would be destroyed
+        // before we can guard it. We re-apply the same typing ourselves in coerce() (see #412).
         var xmlParserConfiguration = new XMLParserConfiguration()
             .withKeepNumberAsString(true)
             .withKeepBooleanAsString(true);
@@ -569,13 +568,16 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             return keepBooleanAsString ? text : value;
         }
 
-        if (value instanceof BigDecimal bigDecimal) {
+        // stringToValue returns Integer/Long/BigInteger for all-digit text and BigDecimal for
+        // decimal/exponent notation — any of them can narrow to Infinity or 0 on doubleValue(),
+        // e.g. a ~309+ digit integer overflows just like "25E2568" does (see #412).
+        if (value instanceof Number number) {
             if (keepNumberAsString) {
                 return text;
             }
-            var asDouble = bigDecimal.doubleValue();
+            var asDouble = number.doubleValue();
             var overflows = Double.isInfinite(asDouble);
-            var underflows = asDouble == 0 && bigDecimal.compareTo(BigDecimal.ZERO) != 0;
+            var underflows = asDouble == 0.0 && !isZero(number);
             if (overflows || underflows) {
                 runContext.logger().debug(
                     "XML element '{}' value '{}' would narrow to {} as a double, keeping the original string instead",
@@ -583,14 +585,20 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                 );
                 return text;
             }
-            return value;
-        }
-
-        if (value instanceof Number) {
-            return keepNumberAsString ? text : value;
+            return number;
         }
 
         return value;
+    }
+
+    private static boolean isZero(Number number) {
+        if (number instanceof BigDecimal bigDecimal) {
+            return bigDecimal.compareTo(BigDecimal.ZERO) == 0;
+        }
+        if (number instanceof BigInteger bigInteger) {
+            return bigInteger.signum() == 0;
+        }
+        return number.longValue() == 0;
     }
 
     @Builder
