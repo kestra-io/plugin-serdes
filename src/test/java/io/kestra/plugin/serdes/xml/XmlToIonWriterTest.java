@@ -37,6 +37,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
 @KestraTest
@@ -63,6 +64,16 @@ class XmlToIonWriterTest {
             .build();
 
         return reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+    }
+
+    private Map<String, Object> readSingleRecord(URI uri) throws Exception {
+        try (var inputStream = runContextFactory.of().storage().getFile(uri)) {
+            var records = FileSerde.readAll(inputStream).collectList().block();
+            assertThat(records.size(), is(1));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> record = (Map<String, Object>) records.getFirst();
+            return record;
+        }
     }
 
     private IonToXml.Output writer(URI from) throws Exception {
@@ -422,6 +433,154 @@ class XmlToIonWriterTest {
             records = FileSerde.readAll(inputStream).collectList().block();
         }
         assertThat(records, contains(""));
+    }
+
+    @Test
+    void numericLikeStringPreservedAsString() throws Exception {
+        // #412: org.json parses "25E2568" as scientific notation into a BigDecimal that
+        // overflows to Infinity when narrowed to double. The original string must be kept.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<record><LotNumber>25E2568</LotNumber></record>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        var records = new java.util.ArrayList<>();
+        try (
+            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
+        ) {
+            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
+        }
+
+        assertThat(records.size(), is(1));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> record = (Map<String, Object>) records.getFirst();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> inner = (Map<String, Object>) record.get("record");
+        assertThat(inner.get("LotNumber"), instanceOf(String.class));
+        assertThat(inner.get("LotNumber"), is("25E2568"));
+    }
+
+    @Test
+    void numericAndBooleanTypesPreserveCurrentBehavior() throws Exception {
+        // Parity: ordinary numeric/boolean/non-numeric-looking coercion must be untouched
+        // by the fix for #412.
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), """
+            <root>
+              <a>12.5</a>
+              <b>1E3</b>
+              <c>1e-3</c>
+              <d>true</d>
+              <e>false</e>
+              <f>007</f>
+              <g>+5</g>
+              <h>0x1A</h>
+              <i>1_000</i>
+            </root>
+            """);
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> root = (Map<String, Object>) readSingleRecord(readerOutput.getUri()).get("root");
+
+        assertThat(root.get("a"), instanceOf(Number.class));
+        assertThat(root.get("b"), instanceOf(Number.class));
+        assertThat(root.get("c"), instanceOf(Number.class));
+        assertThat(root.get("d"), is(true));
+        assertThat(root.get("e"), is(false));
+        assertThat(root.get("f"), is("007"));
+        assertThat(root.get("g"), is("+5"));
+        assertThat(root.get("h"), is("0x1A"));
+        assertThat(root.get("i"), is("1_000"));
+    }
+
+    @Test
+    void numericBoundaryOverflowKeptAsString() throws Exception {
+        // 1E308 fits a double and stays a number; 1E309 overflows to Infinity and must be
+        // kept as its original string instead (#412).
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<root><withinRange>1E308</withinRange><overflow>1E309</overflow></root>");
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> root = (Map<String, Object>) readSingleRecord(readerOutput.getUri()).get("root");
+
+        assertThat(root.get("withinRange"), instanceOf(Number.class));
+        assertThat(root.get("overflow"), is("1E309"));
+    }
+
+    @Test
+    void forceStringComposesWithForceListAndRespectsNamespacePrefix() throws Exception {
+        // forceString must keep a numeric-looking value as a string even when the same
+        // element is also force-listed, and must match the qualified (namespace-prefixed)
+        // key org.json produces (#412).
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), """
+            <root xmlns:ns="http://example.com">
+              <item>1</item>
+              <item>2</item>
+              <ns:code>12345</ns:code>
+            </root>
+            """);
+        URI source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        XmlToIon reader = XmlToIon.builder()
+            .id(XmlToIon.class.getSimpleName())
+            .type(XmlToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .parserConfiguration(
+                XmlToIon.ParserConfiguration.builder()
+                    .forceList(Property.ofValue(List.of("item")))
+                    .forceString(Property.ofValue(List.of("item", "ns:code")))
+                    .build()
+            )
+            .build();
+
+        XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> root = (Map<String, Object>) readSingleRecord(readerOutput.getUri()).get("root");
+
+        assertThat(root.get("item"), is(List.of("1", "2")));
+        assertThat(root.get("ns:code"), is("12345"));
+    }
+
+    @Test
+    void numericLikeStringPreservedAsStringWithQuery() throws Exception {
+        // The streaming path (query set) parses each matched element with the same org.json
+        // call and has the identical bug as the batch path (#412).
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), "<catalog><item><LotNumber>25E2568</LotNumber></item></catalog>");
+
+        XmlToIon.Output readerOutput = this.reader(sourceFile, "/catalog/item");
+        Map<String, Object> record = readSingleRecord(readerOutput.getUri());
+
+        assertThat(record.get("LotNumber"), instanceOf(String.class));
+        assertThat(record.get("LotNumber"), is("25E2568"));
     }
 
     @Test
