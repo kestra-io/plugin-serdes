@@ -451,19 +451,8 @@ class XmlToIonWriterTest {
 
         XmlToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(this.runContextFactory, reader, ImmutableMap.of()));
 
-        var records = new java.util.ArrayList<>();
-        try (
-            var inputStream = runContextFactory.of().storage().getFile(readerOutput.getUri())
-        ) {
-            FileSerde.readAll(inputStream).collectList().block().forEach(records::add);
-        }
-
-        assertThat(records.size(), is(1));
-
         @SuppressWarnings("unchecked")
-        Map<String, Object> record = (Map<String, Object>) records.getFirst();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> inner = (Map<String, Object>) record.get("record");
+        Map<String, Object> inner = (Map<String, Object>) readSingleRecord(readerOutput.getUri()).get("record");
         assertThat(inner.get("LotNumber"), instanceOf(String.class));
         assertThat(inner.get("LotNumber"), is("25E2568"));
     }

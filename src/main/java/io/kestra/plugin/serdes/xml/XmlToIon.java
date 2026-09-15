@@ -574,10 +574,12 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                 return text;
             }
             var asDouble = bigDecimal.doubleValue();
-            if (Double.isInfinite(asDouble) || (asDouble == 0 && bigDecimal.compareTo(BigDecimal.ZERO) != 0)) {
+            var overflows = Double.isInfinite(asDouble);
+            var underflows = asDouble == 0 && bigDecimal.compareTo(BigDecimal.ZERO) != 0;
+            if (overflows || underflows) {
                 runContext.logger().debug(
-                    "XML element '{}' value '{}' is out of the finite double range, keeping it as a string instead of {}",
-                    elementName, text, Double.isInfinite(asDouble) ? "Infinity" : "0"
+                    "XML element '{}' value '{}' would narrow to {} as a double, keeping the original string instead",
+                    elementName, text, overflows ? "Infinity" : "0"
                 );
                 return text;
             }
