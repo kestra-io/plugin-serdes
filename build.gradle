@@ -39,7 +39,7 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add("-parameters")
 }
 
-ext.ionVersion = '1.11.11'
+ext.ionVersion = '1.12.1'
 
 dependencies {
     // Platform
@@ -74,10 +74,10 @@ dependencies {
     implementation ('org.apache.avro:avro:1.12.2') {
         exclude group: 'com.fasterxml.jackson.core'
     }
-    implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.18.0'
+    implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.18.1'
     implementation group: 'org.apache.poi', name: 'poi', version: '5.5.1'
     implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
-    implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.2.0'
+    implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.3.0'
     // ION, provided at runtime by io.kestra:core, whose FileSerde is ION-based. Bundling a second copy
     // would let the child-first PluginClassLoader define its own com.amazon.ion.* classes, so values
     // produced by core would no longer match the classes this plugin compiled against (#365).
@@ -165,7 +165,7 @@ dependencies {
 dependencies {
     testImplementation enforcedPlatform("io.kestra:platform:$kestraVersion")
     // io.kestra:platform no longer manages allure's version as of Kestra 2.0, so pin it explicitly.
-    testImplementation "io.qameta.allure:allure-junit5:2.35.4"
+    testImplementation "io.qameta.allure:allure-junit5:2.35.5"
 }
 
 /**********************************************************************************************************************\
