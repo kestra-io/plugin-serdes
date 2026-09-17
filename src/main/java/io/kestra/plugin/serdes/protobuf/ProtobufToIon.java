@@ -127,6 +127,9 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
     @PluginProperty(group = "reliability")
     private final Property<Boolean> errorOnUnknownFields = Property.ofValue(false);
 
+    // Never reset at the start of run(): each retry attempt deserializes a fresh Task instance,
+    // so a flag set here would only ever belong to the run() call that follows it. Resetting it
+    // would let a kill() delivered just before run() on this same instance be silently swallowed.
     @JsonIgnore
     @Getter(AccessLevel.NONE)
     @EqualsAndHashCode.Exclude
@@ -146,6 +149,7 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
 
     @Override
     public Output run(RunContext runContext) throws Exception {
+        // Intentionally no isCancelled reset here (see field declaration).
         // reader
         URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
