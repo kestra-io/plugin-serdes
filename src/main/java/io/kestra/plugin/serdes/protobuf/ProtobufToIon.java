@@ -4,8 +4,10 @@ import java.io.*;
 import java.net.URI;
 import java.util.Collection;
 import java.util.TimeZone;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -15,6 +17,7 @@ import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.util.JsonFormat;
 
+import io.kestra.core.exceptions.KilledException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -124,8 +127,29 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
     @PluginProperty(group = "reliability")
     private final Property<Boolean> errorOnUnknownFields = Property.ofValue(false);
 
+    // Never reset at the start of run(): each retry attempt deserializes a fresh Task instance,
+    // so a flag set here would only ever belong to the run() call that follows it. Resetting it
+    // would let a kill() delivered just before run() on this same instance be silently swallowed.
+    @JsonIgnore
+    @Getter(AccessLevel.NONE)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    @Builder.Default
+    private final AtomicBoolean isCancelled = new AtomicBoolean(false);
+
+    @Override
+    public void kill() {
+        this.isCancelled.set(true);
+    }
+
+    @Override
+    public void stop() {
+        this.kill();
+    }
+
     @Override
     public Output run(RunContext runContext) throws Exception {
+        // Intentionally no isCancelled reset here (see field declaration).
         // reader
         URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
@@ -172,13 +196,20 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
             .build();
     }
 
-    private Consumer<FluxSink<Object>> nextMessage(InputStream inputStream, Descriptor messageDescriptor,
+    // Package-private (rather than private) so tests can call it directly with compile-time
+    // safety instead of reflection.
+    Consumer<FluxSink<Object>> nextMessage(InputStream inputStream, Descriptor messageDescriptor,
         boolean isDelimited, boolean errorOnUnknown) throws IOException {
         ObjectReader objectReader = OBJECT_MAPPER.readerFor(Object.class);
 
         return throwConsumer(s ->
         {
             while (true) {
+                if (this.isCancelled.get()) {
+                    s.error(new KilledException("ProtobufToIon conversion was cancelled"));
+                    return;
+                }
+
                 DynamicMessage message;
 
                 // Read one message
