@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
 
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
@@ -362,10 +363,53 @@ class IonToAvroTest {
             .onBadLines(Property.ofValue(OnBadLines.SKIP))
             .build();
 
-        IonToAvro.Output output = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        CapturingAppender listAppender = attachLogCapture(runContext);
+
+        IonToAvro.Output output = writer.run(runContext);
 
         assertThat(output.getSize(), is(2L));
         assertThat(avroSize(storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())), is(2));
+        assertThat(counter(runContext, "records").getValue(), is(2D));
+        assertThat(counter(runContext, "skippedRecords").getValue(), is(1D));
+        assertThat(
+            listAppender.list.stream()
+                .filter(event -> event.getFormattedMessage().contains("Skipped 1 bad record(s) (onBadLines=SKIP)"))
+                .count(),
+            is(1L)
+        );
+    }
+
+    @Test
+    void onBadLinesSkipEmitsZeroMetricWhenNoRowsAreSkipped() throws Exception {
+        URI uri = uploadIonRows(
+            List.of(
+                ImmutableMap.of("id", 1, "s", "a"),
+                ImmutableMap.of("id", 2, "s", "b")
+            )
+        );
+
+        IonToAvro writer = IonToAvro.builder()
+            .id(IdUtils.create())
+            .type(IonToAvro.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(NON_NULLABLE_INT_SCHEMA)
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of());
+        IonToAvro.Output output = writer.run(runContext);
+
+        assertThat(output.getSize(), is(2L));
+        assertThat(counter(runContext, "skippedRecords").getValue(), is(0D));
+    }
+
+    private static Counter counter(RunContext runContext, String name) {
+        return (Counter) runContext.metrics()
+            .stream()
+            .filter(metric -> metric.getName().equals(name))
+            .findFirst()
+            .orElseThrow();
     }
 
     // ListAppender's backing list is a plain ArrayList; capture on a CopyOnWriteArrayList to avoid

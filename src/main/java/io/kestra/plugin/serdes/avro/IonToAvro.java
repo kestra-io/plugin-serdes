@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.avro.SchemaParseException;
 import org.apache.avro.file.DataFileWriter;
@@ -21,6 +22,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.plugin.serdes.OnBadLines;
 import io.kestra.plugin.serdes.avro.infer.InferAvroSchema;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -106,6 +108,7 @@ import lombok.experimental.SuperBuilder;
     },
     metrics = {
         @Metric(name = "records", description = "Number of records written", type = Counter.TYPE),
+        @Metric(name = "skippedRecords", description = "Number of records skipped under `onBadLines: SKIP`", type = Counter.TYPE),
     },
     aliases = "io.kestra.plugin.serdes.avro.AvroWriter"
 )
@@ -148,6 +151,8 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
 
         DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema, AvroConverter.genericData());
         Long lineCount = null;
+        var skippedCount = new AtomicLong();
+        var rOnBadLines = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
 
         try (
             InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(rFrom), FileSerde.BUFFER_SIZE);
@@ -155,10 +160,14 @@ public class IonToAvro extends AbstractAvroConverter implements RunnableTask<Ion
             DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
             DataFileWriter<GenericRecord> schemaDataFileWriter = dataFileWriter.create(schema, output)
         ) {
-            lineCount = this.convert(inputStream, schema, dataFileWriter::append, runContext);
+            lineCount = this.convert(inputStream, schema, dataFileWriter::append, runContext, skippedCount::incrementAndGet);
 
             // metrics & finalize
             runContext.metric(Counter.of("records", lineCount));
+            runContext.metric(Counter.of("skippedRecords", skippedCount.get()));
+            if (rOnBadLines == OnBadLines.SKIP) {
+                runContext.logger().info("Skipped {} bad record(s) (onBadLines=SKIP).", skippedCount.get());
+            }
 
             schemaDataFileWriter.flush();
             dataFileWriter.flush();

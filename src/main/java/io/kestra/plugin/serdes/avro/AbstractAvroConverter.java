@@ -166,6 +166,17 @@ public abstract class AbstractAvroConverter extends Task {
 
     protected <E extends Exception> Long convert(InputStream inputStream, org.apache.avro.Schema schema, Rethrow.ConsumerChecked<GenericData.Record, E> consumer, RunContext runContext)
         throws IOException, IllegalVariableEvaluationException {
+        return this.convert(inputStream, schema, consumer, runContext, () ->
+        {
+        });
+    }
+
+    protected <E extends Exception> Long convert(
+        InputStream inputStream,
+        org.apache.avro.Schema schema,
+        Rethrow.ConsumerChecked<GenericData.Record, E> consumer,
+        RunContext runContext,
+        Runnable skippedRecordCallback) throws IOException, IllegalVariableEvaluationException {
         OnBadLines rOnBadLines = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
         AvroConverter converter = AvroConverter.builder()
             .schema(runContext.render(this.schema))
@@ -186,7 +197,7 @@ public abstract class AbstractAvroConverter extends Task {
 
         Flux<GenericData.Record> flowable = FileSerde.readAll(inputStream)
             .map(this.convertToAvro(schema, converter, rOnBadLines))
-            .doOnNext(datum -> this.writeRecord(datum, consumer, rOnBadLines, runContext, writtenCount));
+            .doOnNext(datum -> this.writeRecord(datum, consumer, rOnBadLines, runContext, writtenCount, skippedRecordCallback));
 
         // rows skipped under WARN/SKIP must not be counted
         flowable.then().block();
@@ -203,13 +214,15 @@ public abstract class AbstractAvroConverter extends Task {
         Rethrow.ConsumerChecked<GenericData.Record, E> consumer,
         OnBadLines rOnBadLines,
         RunContext runContext,
-        AtomicLong writtenCount
-    ) {
+        AtomicLong writtenCount,
+        Runnable skippedRecordCallback) {
         if (rOnBadLines != OnBadLines.ERROR) {
             var invalidField = firstNonNullableFieldHoldingNull(datum);
             if (invalidField != null) {
                 if (rOnBadLines == OnBadLines.WARN) {
                     runContext.logger().warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), describeRecord(datum));
+                } else {
+                    skippedRecordCallback.run();
                 }
                 return;
             }
@@ -231,8 +244,10 @@ public abstract class AbstractAvroConverter extends Task {
 
             if (rOnBadLines == OnBadLines.WARN) {
                 runContext.logger().warn("Bad record skipped (onBadLines=WARN): {}", truncateForLog(e.getMessage()));
+            } else {
+                skippedRecordCallback.run();
             }
-            // SKIP: silently drop the row
+            // SKIP: drop the row and report it through the aggregate callback
         }
     }
 
