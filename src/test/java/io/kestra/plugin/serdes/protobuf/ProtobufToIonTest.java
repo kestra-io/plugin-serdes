@@ -1,7 +1,6 @@
 package io.kestra.plugin.serdes.protobuf;
 
 import java.io.*;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -185,7 +184,6 @@ class ProtobufToIonTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void testKillMidStreamFailsWithKilledException() throws Exception {
         URI descriptorUri = serdesUtils.resourceToStorageObject(descriptorV10File);
         var task = ProtobufToIon.builder().id("protobuf-to-ion-killed-mid-stream")
@@ -199,14 +197,8 @@ class ProtobufToIonTest {
 
         // Kills the task as soon as the first message has been emitted, so the loop's cancellation
         // check is exercised deterministically on the next iteration instead of racing on timing.
-        Method nextMessage = ProtobufToIon.class.getDeclaredMethod(
-            "nextMessage", InputStream.class, Descriptor.class, boolean.class, boolean.class
-        );
-        nextMessage.setAccessible(true);
-
         try (InputStream inputStream = new FileInputStream(delimitedV10File)) {
-            Consumer<FluxSink<Object>> consumer = (Consumer<FluxSink<Object>>) nextMessage
-                .invoke(task, inputStream, descriptor, true, false);
+            Consumer<FluxSink<Object>> consumer = task.nextMessage(inputStream, descriptor, true, false);
 
             Flux<Object> flux = Flux.create(sink -> consumer.accept(new KillAfterFirstNextSink(sink, task)));
 

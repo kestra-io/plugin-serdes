@@ -196,7 +196,9 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
             .build();
     }
 
-    private Consumer<FluxSink<Object>> nextMessage(InputStream inputStream, Descriptor messageDescriptor,
+    // Package-private (rather than private) so tests can call it directly with compile-time
+    // safety instead of reflection.
+    Consumer<FluxSink<Object>> nextMessage(InputStream inputStream, Descriptor messageDescriptor,
         boolean isDelimited, boolean errorOnUnknown) throws IOException {
         ObjectReader objectReader = OBJECT_MAPPER.readerFor(Object.class);
 
