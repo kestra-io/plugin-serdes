@@ -4,8 +4,10 @@ import java.io.*;
 import java.net.URI;
 import java.util.Collection;
 import java.util.TimeZone;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -15,6 +17,7 @@ import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.util.JsonFormat;
 
+import io.kestra.core.exceptions.KilledException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -124,6 +127,23 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
     @PluginProperty(group = "reliability")
     private final Property<Boolean> errorOnUnknownFields = Property.ofValue(false);
 
+    @JsonIgnore
+    @Getter(AccessLevel.NONE)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    @Builder.Default
+    private final AtomicBoolean isCancelled = new AtomicBoolean(false);
+
+    @Override
+    public void kill() {
+        this.isCancelled.set(true);
+    }
+
+    @Override
+    public void stop() {
+        this.kill();
+    }
+
     @Override
     public Output run(RunContext runContext) throws Exception {
         // reader
@@ -179,6 +199,11 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
         return throwConsumer(s ->
         {
             while (true) {
+                if (this.isCancelled.get()) {
+                    s.error(new KilledException("ProtobufToIon conversion was cancelled"));
+                    return;
+                }
+
                 DynamicMessage message;
 
                 // Read one message

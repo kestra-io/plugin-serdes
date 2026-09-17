@@ -1,9 +1,12 @@
 package io.kestra.plugin.serdes.protobuf;
 
 import java.io.*;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.BeforeAll;
@@ -14,6 +17,7 @@ import com.google.protobuf.*;
 import com.google.protobuf.DescriptorProtos.FileDescriptorSet;
 import com.google.protobuf.Descriptors.Descriptor;
 
+import io.kestra.core.exceptions.KilledException;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
@@ -23,6 +27,10 @@ import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 
 import jakarta.inject.Inject;
+import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.util.context.Context;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -156,6 +164,106 @@ class ProtobufToIonTest {
                 assertThat(ion.contains("turn-key"), is(true));
                 assertThat(output.getSize(), is(2L));
             }
+        }
+    }
+
+    @Test
+    void testKillBeforeRunFailsWithKilledException() throws Exception {
+        URI source = serdesUtils.resourceToStorageObject(delimitedV10File);
+        URI descriptorUri = serdesUtils.resourceToStorageObject(descriptorV10File);
+
+        var task = ProtobufToIon.builder().id("protobuf-to-ion-killed-before-run")
+            .type(ProtobufToIon.class.getName()).from(Property.ofValue(source.toString()))
+            .descriptorFile(Property.ofValue(descriptorUri.toString()))
+            .typeName(Property.ofValue(TYPE_NAME)).delimited(Property.ofValue(true)).build();
+
+        task.kill();
+
+        var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
+        var exception = assertThrows(KilledException.class, () -> task.run(runContext));
+        assertThat(exception.getMessage(), is("ProtobufToIon conversion was cancelled"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testKillMidStreamFailsWithKilledException() throws Exception {
+        URI descriptorUri = serdesUtils.resourceToStorageObject(descriptorV10File);
+        var task = ProtobufToIon.builder().id("protobuf-to-ion-killed-mid-stream")
+            .type(ProtobufToIon.class.getName())
+            .from(Property.ofValue(serdesUtils.resourceToStorageObject(delimitedV10File).toString()))
+            .descriptorFile(Property.ofValue(descriptorUri.toString()))
+            .typeName(Property.ofValue(TYPE_NAME)).delimited(Property.ofValue(true)).build();
+
+        FileDescriptorSet descriptorV10Set = FileDescriptorSet.parseFrom(new FileInputStream(descriptorV10File));
+        Descriptor descriptor = ProtobufTools.findMessageDescriptor(descriptorV10Set, TYPE_NAME);
+
+        // Kills the task as soon as the first message has been emitted, so the loop's cancellation
+        // check is exercised deterministically on the next iteration instead of racing on timing.
+        Method nextMessage = ProtobufToIon.class.getDeclaredMethod(
+            "nextMessage", InputStream.class, Descriptor.class, boolean.class, boolean.class
+        );
+        nextMessage.setAccessible(true);
+
+        try (InputStream inputStream = new FileInputStream(delimitedV10File)) {
+            Consumer<FluxSink<Object>> consumer = (Consumer<FluxSink<Object>>) nextMessage
+                .invoke(task, inputStream, descriptor, true, false);
+
+            Flux<Object> flux = Flux.create(sink -> consumer.accept(new KillAfterFirstNextSink(sink, task)));
+
+            var exception = assertThrows(KilledException.class, () -> flux.collectList().block());
+            assertThat(exception.getMessage(), is("ProtobufToIon conversion was cancelled"));
+        }
+    }
+
+    private record KillAfterFirstNextSink(FluxSink<Object> delegate, ProtobufToIon task) implements FluxSink<Object> {
+        @Override
+        public FluxSink<Object> next(Object o) {
+            delegate.next(o);
+            task.kill();
+            return this;
+        }
+
+        @Override
+        public void complete() {
+            delegate.complete();
+        }
+
+        @Override
+        public void error(Throwable e) {
+            delegate.error(e);
+        }
+
+        @Override
+        public Context currentContext() {
+            return delegate.currentContext();
+        }
+
+        @Override
+        public long requestedFromDownstream() {
+            return delegate.requestedFromDownstream();
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return delegate.isCancelled();
+        }
+
+        @Override
+        public FluxSink<Object> onRequest(LongConsumer consumer) {
+            delegate.onRequest(consumer);
+            return this;
+        }
+
+        @Override
+        public FluxSink<Object> onCancel(Disposable d) {
+            delegate.onCancel(d);
+            return this;
+        }
+
+        @Override
+        public FluxSink<Object> onDispose(Disposable d) {
+            delegate.onDispose(d);
+            return this;
         }
     }
 
