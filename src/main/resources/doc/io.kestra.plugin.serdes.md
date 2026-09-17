@@ -44,7 +44,7 @@ All tasks require `from` (a `kestra://` URI pointing to the source file) and ret
 
 ### XML
 
-`xml.XmlToIon` converts an XML file to ION — set `from`. Optionally set `query` (XPath selector to extract a subset).
+`xml.XmlToIon` converts an XML file to ION — set `from`. Optionally set `query` (XPath selector to extract a subset). Element and attribute text that looks numeric or boolean is coerced to the matching ION type by default, except when a value is out of the finite `double` range (e.g. `25E2568`), which is kept as a string to avoid silently becoming `Infinity`; use `parserConfiguration.forceList`, `forceString`, `keepNumberAsString`, or `keepBooleanAsString` to control list-wrapping and opt individual fields or every field out of that coercion.
 
 `xml.IonToXml` converts an ION file to XML — set `from`. Set `rootName` (default `items`) as the root element name.
 
