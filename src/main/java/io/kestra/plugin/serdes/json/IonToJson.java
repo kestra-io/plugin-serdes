@@ -145,6 +145,9 @@ public class IonToJson extends Task implements RunnableTask<IonToJson.Output> {
         var zoneId = ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElse(ZoneId.systemDefault().toString()));
 
         // Default ION path yields raw embedded Timestamp objects and NON_NULL inclusion, neither handled by a plain JSON mapper.
+        // Registered programmatically (no `using =`) on a JacksonMapper-derived (Jackson 2) mapper, serializing ION payload
+        // data at worker runtime only — never the Micronaut/HTTP task-model mapper. No Jackson 3 twin needed unless
+        // JacksonMapper itself moves to Jackson 3.
         var ionTimestampModule = new SimpleModule()
             .addSerializer(Timestamp.class, new JsonSerializer<Timestamp>() {
                 @Override
