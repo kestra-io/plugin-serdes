@@ -65,7 +65,10 @@ public abstract class AbstractAvroConverter extends Task {
 
     @Builder.Default
     @Schema(
-        title = "Values to consider as null"
+        title = "Values to consider as null",
+        description = "Applies when converting to a NULL type or to a UNION containing a NULL branch, independent of `inferAllFields`. " +
+            "A string listed here resolves to null regardless of union branch order (e.g. both `[\"null\",\"string\"]` and `[\"string\",\"null\"]`). " +
+            "Narrow this list if you need the literal strings."
     )
     @PluginProperty(group = "advanced")
     protected final Property<List<String>> nullValues = Property.ofValue(

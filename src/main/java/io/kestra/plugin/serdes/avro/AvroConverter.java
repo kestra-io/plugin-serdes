@@ -458,6 +458,18 @@ public class AvroConverter {
     }
 
     protected Object complexUnion(Schema schema, Object data, OnBadLines onBadLines, String fieldName) {
+        if (hasNullBranch(schema)) {
+            // #397 (maintainer direction): nullValues wins whenever a NULL branch exists,
+            // regardless of branch order. This keeps inferred ["null", T] behavior unchanged
+            // and fixes ["string", "null"] to agree with ["null", "string"].
+            if (data == null) {
+                return null;
+            }
+            if (data instanceof String && this.contains(this.getNullValues(), (String) data)) {
+                return null;
+            }
+        }
+
         for (Schema current : schema.getTypes()) {
             try {
                 return this.convert(current, data, onBadLines, fieldName);
@@ -466,6 +478,10 @@ public class AvroConverter {
         }
 
         throw new IllegalArgumentException("Invalid data for schema \"" + schema.getType() + "\"");
+    }
+
+    private static boolean hasNullBranch(Schema schema) {
+        return schema.getTypes().stream().anyMatch(branch -> branch.getType() == Schema.Type.NULL);
     }
 
     protected GenericData.Fixed complexFixed(Schema schema, Object data) {
