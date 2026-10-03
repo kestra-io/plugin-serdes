@@ -76,18 +76,21 @@ public class InferAvroSchema {
         if (node instanceof Map) {
             var map = (Map<String, Object>) node;
             var inferredFields = new ArrayList<Field>();
+            var usedNames = new HashSet<String>();
             for (Map.Entry<String, Object> field : map.entrySet()) {
+                String sanitized = deduplicateFieldName(sanitizeFieldName(field.getKey()), usedNames);
+                usedNames.add(sanitized);
                 inferredFields.add(
                     inferField(
                         fieldFullPath + "_" + fieldName + "_" + field.getKey(),
-                        field.getKey(),
+                        sanitized,
                         field.getValue()
                     )
                 );
             }
 
             var recordSchema = Schema.createRecord(
-                fieldName,
+                sanitizeFieldName(fieldName),
                 null,
                 "io.kestra.plugin.serdes.avro",
                 false,
@@ -198,6 +201,29 @@ public class InferAvroSchema {
      *
      * @return the merge Avro Field, same as input if both inputs are relatively equals
      */
+    private static String sanitizeFieldName(String fieldName) {
+        String sanitized = fieldName.replaceAll("[^A-Za-z0-9_]", "_");
+        if (!sanitized.isEmpty() && Character.isDigit(sanitized.charAt(0))) {
+            sanitized = "_" + sanitized;
+        }
+        return sanitized;
+    }
+
+    /**
+     * If {@code name} already exists in {@code usedNames}, append a numeric
+     * suffix ({@code _1}, {@code _2}, …) until the result is unique.
+     */
+    private static String deduplicateFieldName(String name, Set<String> usedNames) {
+        if (!usedNames.contains(name)) {
+            return name;
+        }
+        int counter = 1;
+        while (usedNames.contains(name + "_" + counter)) {
+            counter++;
+        }
+        return name + "_" + counter;
+    }
+
     public static Field mergeTypes(Field a, Field b) {
         if (a.schema().getType() == UNION || b.schema().getType() == UNION) {
             var set = mergeAtLeastOneUnion(a, b);
