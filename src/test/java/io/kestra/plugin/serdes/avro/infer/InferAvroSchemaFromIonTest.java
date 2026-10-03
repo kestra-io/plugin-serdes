@@ -114,6 +114,50 @@ public class InferAvroSchemaFromIonTest {
     }
 
     @Test
+    void field_names_with_special_characters_should_be_sanitized() throws IOException {
+        this.run(
+            """
+                {"fichier-code-nature-voie-ficoba3-20230811": "hello"}
+                """,
+            """
+                {"fields": [{"name": "fichier_code_nature_voie_ficoba3_20230811", "type": ["null","string"]}]}
+                """
+        );
+    }
+    @Test
+    void field_names_starting_with_digit_should_be_sanitized() throws IOException {
+        this.run(
+            """
+                {"123field": "hello"}
+                """,
+            """
+                {"fields": [{"name": "_123field", "type": ["null","string"]}]}
+                """
+        );
+    }
+
+    @Test
+    void field_names_with_special_characters_should_not_collide() throws IOException {
+        this.run(
+            """
+                {
+                    "foo-bar": "one",
+                    "foo_bar": "two"
+                }
+                """,
+            """
+                {
+                  "fields": [
+                    {"name": "foo_bar", "type": ["null","string"]},
+                    {"name": "foo_bar_1", "type": ["null","string"]}
+                  ]
+                }
+                """
+        );
+    }
+
+
+    @Test
     void array_of_objects_with_unmatching_types() throws IOException {
         this.run(
             """
