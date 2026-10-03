@@ -90,7 +90,7 @@ public class InferAvroSchema {
             }
 
             var recordSchema = Schema.createRecord(
-                sanitizeFieldName(fieldName),
+                fieldName,
                 null,
                 "io.kestra.plugin.serdes.avro",
                 false,
