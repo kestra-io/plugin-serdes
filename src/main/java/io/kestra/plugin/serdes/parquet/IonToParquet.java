@@ -191,9 +191,11 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         title = "Compression level",
         description = """
             Only supported with the `ZSTD` codec; setting it with any other codec fails the task. \
-            Higher levels produce smaller files but compress more slowly: `22` is the maximum, \
-            and negative levels trade compression ratio for speed. \
-            When not set, the Zstandard default level (`3`) is used."""
+            Accepts values from `-131072` to `22`. Levels `1` to `22` trade write speed for smaller files: \
+            higher is smaller but slower, and levels `20` to `22` also use much more memory, \
+            so `19` is a practical choice for long-term storage. \
+            Negative levels compress faster than `1` but produce larger files. \
+            `0`, like leaving this property unset, uses the Zstandard default level (`3`)."""
     )
     @PluginProperty(group = "advanced")
     private Property<Integer> compressionLevel;
