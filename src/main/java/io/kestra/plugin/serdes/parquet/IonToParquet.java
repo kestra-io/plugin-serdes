@@ -145,6 +145,12 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
     aliases = "io.kestra.plugin.serdes.parquet.ParquetWriter"
 )
 public class IonToParquet extends AbstractAvroConverter implements RunnableTask<IonToParquet.Output> {
+    // read by org.apache.parquet.hadoop.codec.ZstandardCodec, and part of CodecFactory's codec cache key
+    private static final String ZSTD_LEVEL_CONF_KEY = "parquet.compression.codec.zstd.level";
+    // bounds of the Zstandard library: ZSTD_minCLevel() (negative "fast" levels) and ZSTD_maxCLevel()
+    private static final int ZSTD_MIN_LEVEL = -(1 << 17);
+    private static final int ZSTD_MAX_LEVEL = 22;
+
     @NotNull
     @Schema(
         title = "Source file URI"
@@ -157,6 +163,17 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         title = "Compression codec"
     )
     Property<CompressionCodec> compressionCodec = Property.ofValue(CompressionCodec.GZIP);
+
+    @Schema(
+        title = "Compression level",
+        description = """
+            Only supported with the `ZSTD` codec; setting it with any other codec fails the task. \
+            Higher levels produce smaller files but compress more slowly: `22` is the maximum, \
+            and negative levels trade compression ratio for speed. \
+            When not set, the Zstandard default level (`3`) is used."""
+    )
+    @PluginProperty(group = "advanced")
+    private Property<Integer> compressionLevel;
 
     @Builder.Default
     @Schema(
@@ -221,12 +238,31 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         }
 
         // parquet options
-        CompressionCodecName codec = runContext.render(this.compressionCodec).as(CompressionCodec.class).orElseThrow().parquetCodec();
-        HadoopOutputFile outfileFile = HadoopOutputFile.fromPath(new Path(tempFile.getPath()), new Configuration());
+        CompressionCodec rCompressionCodec = runContext.render(this.compressionCodec).as(CompressionCodec.class).orElseThrow();
+        CompressionCodecName codec = rCompressionCodec.parquetCodec();
+
+        Configuration conf = new Configuration();
+        Integer rCompressionLevel = runContext.render(this.compressionLevel).as(Integer.class).orElse(null);
+        if (rCompressionLevel != null) {
+            if (rCompressionCodec != CompressionCodec.ZSTD) {
+                throw new IllegalArgumentException(
+                    "compressionLevel is only supported with the ZSTD compression codec, but compressionCodec is " + rCompressionCodec
+                );
+            }
+            if (rCompressionLevel < ZSTD_MIN_LEVEL || rCompressionLevel > ZSTD_MAX_LEVEL) {
+                throw new IllegalArgumentException(
+                    "Invalid ZSTD compressionLevel " + rCompressionLevel + ", must be between " + ZSTD_MIN_LEVEL + " and " + ZSTD_MAX_LEVEL
+                );
+            }
+            conf.setInt(ZSTD_LEVEL_CONF_KEY, rCompressionLevel);
+        }
+
+        HadoopOutputFile outfileFile = HadoopOutputFile.fromPath(new Path(tempFile.getPath()), conf);
 
         AvroParquetWriter.Builder<GenericData.Record> parquetWriterBuilder = AvroParquetWriter.<GenericData.Record> builder(outfileFile)
             .withWriterVersion(runContext.render(parquetVersion).as(Version.class).orElseThrow() == Version.V2 ? PARQUET_2_0 : PARQUET_1_0)
             .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
+            .withConf(conf)
             .withCompressionCodec(codec)
             .withDictionaryEncoding(true)
             .withDictionaryPageSize(runContext.render(dictionaryPageSize).as(Integer.class).orElseThrow())
