@@ -137,6 +137,29 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
                         ]
                       }
                 """
+        ),
+        @Example(
+            full = true,
+            title = "Convert a CSV file to a ZSTD-compressed Parquet file with a high compression level, for long-term storage.",
+            code = """
+                id: ion_to_parquet_zstd_level
+                namespace: company.team
+
+                tasks:
+                  - id: download_csv
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/orders.csv
+
+                  - id: convert
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.download_csv.uri }}"
+
+                  - id: result
+                    type: io.kestra.plugin.serdes.parquet.IonToParquet
+                    from: "{{ outputs.convert.uri }}"
+                    compressionCodec: ZSTD
+                    compressionLevel: 19
+                """
         )
     },
     metrics = {
@@ -246,12 +269,14 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         if (rCompressionLevel != null) {
             if (rCompressionCodec != CompressionCodec.ZSTD) {
                 throw new IllegalArgumentException(
-                    "compressionLevel is only supported with the ZSTD compression codec, but compressionCodec is " + rCompressionCodec
+                    "compressionLevel is only supported with the ZSTD compression codec, but compressionCodec is " + rCompressionCodec +
+                        ". Set compressionCodec to ZSTD or remove compressionLevel."
                 );
             }
             if (rCompressionLevel < ZSTD_MIN_LEVEL || rCompressionLevel > ZSTD_MAX_LEVEL) {
                 throw new IllegalArgumentException(
-                    "Invalid ZSTD compressionLevel " + rCompressionLevel + ", must be between " + ZSTD_MIN_LEVEL + " and " + ZSTD_MAX_LEVEL
+                    "Invalid ZSTD compressionLevel " + rCompressionLevel + ". Use a value between " + ZSTD_MIN_LEVEL + " and " + ZSTD_MAX_LEVEL +
+                        " (higher values compress more), or remove compressionLevel to use the default level 3."
                 );
             }
             conf.setInt(ZSTD_LEVEL_CONF_KEY, rCompressionLevel);

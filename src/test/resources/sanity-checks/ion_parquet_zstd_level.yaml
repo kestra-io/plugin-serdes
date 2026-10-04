@@ -1,0 +1,36 @@
+id: ion_parquet_zstd_level
+namespace: sanitychecks.plugin-serdes
+
+description: |
+  Converts ION to Parquet with the ZSTD codec and an explicit compression level,
+  then reads the file back to check the data survives the round trip.
+
+tasks:
+  - id: write_csv
+    type: io.kestra.plugin.core.storage.Write
+    extension: .csv
+    content: |
+      order_id,customer_name,quantity
+      1,Alice,3
+      2,Bob,5
+      3,Charlie,7
+
+  - id: convert_to_ion
+    type: io.kestra.plugin.serdes.csv.CsvToIon
+    from: "{{ outputs.write_csv.uri }}"
+
+  - id: convert_to_parquet
+    type: io.kestra.plugin.serdes.parquet.IonToParquet
+    from: "{{ outputs.convert_to_ion.uri }}"
+    compressionCodec: ZSTD
+    compressionLevel: 19
+
+  - id: convert_back_to_ion
+    type: io.kestra.plugin.serdes.parquet.ParquetToIon
+    from: "{{ outputs.convert_to_parquet.uri }}"
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.convert_to_parquet.size == 3 }}"
+      - '{{ fromIon(read(outputs.convert_to_ion["uri"])).order_id == fromIon(read(outputs.convert_back_to_ion["uri"])).order_id }}'
