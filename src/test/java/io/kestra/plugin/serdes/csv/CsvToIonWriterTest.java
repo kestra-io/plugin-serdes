@@ -341,6 +341,31 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void maxRecordSizeCanBeConfiguredAboveDefault() throws Exception {
+        String csv = "col1\nvalue1\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/largeRecordLimit.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("maxRecordSizeCanBeConfiguredAboveDefault")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .maxBufferSize(Property.ofValue(Integer.MAX_VALUE))
+            .maxFieldSize(Property.ofValue(1_073_741_824))
+            .maxRecordSize(Property.ofValue(1_073_741_824))
+            .header(Property.ofValue(true))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        CsvToIon.Output out = reader.run(runContext);
+
+        assertThat(out.getUri(), is(notNullValue()));
+        assertThat(out.getSize(), is(1L));
+    }
+
+    @Test
     void utf8BomInHeaderIsStripped() throws Exception {
         String csvBody = "code_insee;nom_commune\n1001;L'Abergement-Clémenciat\n";
         byte[] utf8Bom = new byte[] { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF };

@@ -80,6 +80,7 @@ import reactor.core.publisher.Mono;
 public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     private static final int DEFAULT_MAX_BUFFER_SIZE = 16 * 1024 * 1024;
     private static final int DEFAULT_MAX_FIELD_SIZE = 16 * 1024 * 1024;
+    private static final int DEFAULT_MAX_RECORD_SIZE = 4 * DEFAULT_MAX_FIELD_SIZE;
 
     @NotNull
     @Schema(
@@ -177,9 +178,22 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     private final Property<Boolean> allowExtraCharsAfterClosingQuote = Property.ofValue(false);
 
     @Builder.Default
-    @Schema(title = "Maximum field size (characters)")
+    @Schema(
+        title = "Maximum field size (characters)",
+        description = "The maximum number of characters allowed in a field after processing. The default is "
+            + "16,777,216 characters. This value must not exceed `maxRecordSize`."
+    )
     @PluginProperty(group = "advanced")
     private final Property<Integer> maxFieldSize = Property.ofValue(DEFAULT_MAX_FIELD_SIZE);
+
+    @Builder.Default
+    @Schema(
+        title = "Maximum record size (characters)",
+        description = "The maximum total number of characters allowed in a record after processing. The default is "
+            + "67,108,864 characters. This value must be greater than or equal to `maxFieldSize`."
+    )
+    @PluginProperty(group = "advanced")
+    private final Property<Integer> maxRecordSize = Property.ofValue(DEFAULT_MAX_RECORD_SIZE);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -390,6 +404,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         var handlerBuilder = de.siegmar.fastcsv.reader.CsvRecordHandler.builder();
         runContext.render(maxFieldSize).as(Integer.class)
             .ifPresent(handlerBuilder::maxFieldSize);
+        runContext.render(maxRecordSize).as(Integer.class)
+            .ifPresent(handlerBuilder::maxRecordSize);
 
         var handler = handlerBuilder.build();
         return builder.build(handler, reader);
