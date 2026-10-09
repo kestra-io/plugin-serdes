@@ -341,7 +341,7 @@ class CsvToIonWriterTest {
     }
 
     @Test
-    void maxRecordSizeCanBeConfiguredAboveDefault() throws Exception {
+    void maxRecordSizeDefaultsToMaxFieldSizeWhenFieldLimitIsAboveDefault() throws Exception {
         String csv = "col1\nvalue1\n";
         URI src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/largeRecordLimit.csv"),
@@ -349,12 +349,11 @@ class CsvToIonWriterTest {
         );
 
         CsvToIon reader = CsvToIon.builder()
-            .id("maxRecordSizeCanBeConfiguredAboveDefault")
+            .id("maxRecordSizeDefaultsToMaxFieldSizeWhenFieldLimitIsAboveDefault")
             .type(CsvToIon.class.getName())
             .from(Property.ofValue(src.toString()))
             .maxBufferSize(Property.ofValue(Integer.MAX_VALUE))
             .maxFieldSize(Property.ofValue(1_073_741_824))
-            .maxRecordSize(Property.ofValue(1_073_741_824))
             .header(Property.ofValue(true))
             .build();
 
@@ -363,6 +362,32 @@ class CsvToIonWriterTest {
 
         assertThat(out.getUri(), is(notNullValue()));
         assertThat(out.getSize(), is(1L));
+    }
+
+    @Test
+    void maxRecordSizeBelowMaxFieldSizeFailsWithClearError() throws Exception {
+        String csv = "col1\nvalue1\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/invalidRecordLimit.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("maxRecordSizeBelowMaxFieldSizeFailsWithClearError")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .maxFieldSize(Property.ofValue(1024))
+            .maxRecordSize(Property.ofValue(512))
+            .header(Property.ofValue(true))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> reader.run(runContext));
+
+        assertThat(
+            thrown.getMessage(),
+            is("maxRecordSize (512) must be greater than or equal to maxFieldSize (1024).")
+        );
     }
 
     @Test
