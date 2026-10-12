@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -24,10 +25,16 @@ import static org.apache.avro.Schema.Type.*;
 public class InferAvroSchema {
     public static final String NULL_DEFAULT_DESCRIPTION = "";
 
+    private static final Pattern INVALID_NAME_CHARS = Pattern.compile("[^A-Za-z0-9_]");
+
     private final boolean deepSearch = true;
     private int numberOfRowToScan = 100;
 
     private final Map<String, Field> knownFields = new HashMap<>();
+
+    // Stable mapping from fieldFullPath → assigned sanitized name, so that the
+    // same original key always gets the same Avro name regardless of row order.
+    private final Map<String, String> assignedNames = new HashMap<>();
 
     public InferAvroSchema() {
     }
@@ -76,14 +83,38 @@ public class InferAvroSchema {
         if (node instanceof Map) {
             var map = (Map<String, Object>) node;
             var inferredFields = new ArrayList<Field>();
-            for (Map.Entry<String, Object> field : map.entrySet()) {
-                inferredFields.add(
-                    inferField(
-                        fieldFullPath + "_" + fieldName + "_" + field.getKey(),
-                        field.getKey(),
-                        field.getValue()
-                    )
-                );
+
+            // Two passes: first reuse any previously assigned names (stable across rows),
+            // then assign new names for keys we haven't seen before.
+            var usedNames = new LinkedHashSet<String>();
+            var keyToPath = new LinkedHashMap<String, String>();
+            for (var key : map.keySet()) {
+                var path = fieldFullPath + "_" + fieldName + "_" + key;
+                keyToPath.put(key, path);
+                var existing = assignedNames.get(path);
+                if (existing != null) {
+                    usedNames.add(existing);
+                }
+            }
+            for (var key : map.keySet()) {
+                var path = keyToPath.get(key);
+                if (!assignedNames.containsKey(path)) {
+                    var sanitized = deduplicateFieldName(sanitizeFieldName(key), usedNames);
+                    usedNames.add(sanitized);
+                    assignedNames.put(path, sanitized);
+                }
+            }
+
+            for (var entry : map.entrySet()) {
+                var path = keyToPath.get(entry.getKey());
+                var sanitized = assignedNames.get(path);
+                var field = inferField(path, sanitized, entry.getValue());
+                // Register the original key as an alias so AvroConverter can look up
+                // the value from the Ion row even after the field has been renamed.
+                if (!entry.getKey().equals(sanitized) && !field.aliases().contains(entry.getKey())) {
+                    field.addAlias(entry.getKey());
+                }
+                inferredFields.add(field);
             }
 
             var recordSchema = Schema.createRecord(
@@ -193,6 +224,26 @@ public class InferAvroSchema {
         }
     }
 
+    private static String sanitizeFieldName(String fieldName) {
+        var sanitized = INVALID_NAME_CHARS.matcher(fieldName).replaceAll("_");
+        if (sanitized.isEmpty() || Character.isDigit(sanitized.charAt(0))) {
+            sanitized = "_" + sanitized;
+        }
+        return sanitized;
+    }
+
+    // Append _1, _2, … when sanitization causes a collision (e.g. foo-bar and foo_bar).
+    private static String deduplicateFieldName(String name, Set<String> usedNames) {
+        if (!usedNames.contains(name)) {
+            return name;
+        }
+        var counter = 1;
+        while (usedNames.contains(name + "_" + counter)) {
+            counter++;
+        }
+        return name + "_" + counter;
+    }
+
     /**
      * merge two Avro Field types, trying to output the most precise type possible
      *
@@ -264,8 +315,13 @@ public class InferAvroSchema {
                 a.schema().getDoc(),
                 a.schema().getNamespace(),
                 false,
-                // recreate them to reset the position and avoid and error
-                mergedFields.stream().map(field -> new Field(field.name(), field.schema())).collect(Collectors.toList())
+                // Recreate fields to reset position; carry over aliases so
+                // AvroConverter can still look up values by the original Ion key.
+                mergedFields.stream().map(field -> {
+                    var rebuilt = new Field(field.name(), field.schema());
+                    field.aliases().forEach(rebuilt::addAlias);
+                    return rebuilt;
+                }).collect(Collectors.toList())
             )
         );
     }

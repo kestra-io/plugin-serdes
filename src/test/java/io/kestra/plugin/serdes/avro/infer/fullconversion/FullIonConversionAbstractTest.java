@@ -155,5 +155,23 @@ public abstract class FullIonConversionAbstractTest {
         );
     }
 
+    /**
+     * Regression test for <a href="https://github.com/kestra-io/plugin-serdes/issues/414">#414</a>:
+     * Ion field names containing characters invalid in Avro (hyphens, dots, etc.)
+     * must be sanitized during schema inference so the full conversion does not crash.
+     * Original keys are registered as aliases so values survive the roundtrip.
+     */
+    @Test
+    void fieldNames_withSpecialCharacters_shouldNotCrash() throws Exception {
+        this.run(
+            """
+                {"foo-bar": "hello", "baz.qux": "world"}
+                """,
+            """
+                {foo_bar: "hello", baz_qux: "world"}
+                """
+        );
+    }
+
     abstract void run(String ionInput, String expectedOutputIon) throws Exception;
 }

@@ -114,6 +114,111 @@ public class InferAvroSchemaFromIonTest {
     }
 
     @Test
+    void field_names_with_special_characters_should_be_sanitized() throws IOException {
+        this.run(
+            """
+                {"fichier-code-nature-voie-ficoba3-20230811": "hello"}
+                """,
+            """
+                {"fields": [{"name": "fichier_code_nature_voie_ficoba3_20230811", "type": ["null","string"]}]}
+                """
+        );
+    }
+
+    @Test
+    void field_names_starting_with_digit_should_be_sanitized() throws IOException {
+        this.run(
+            """
+                {"123field": "hello"}
+                """,
+            """
+                {"fields": [{"name": "_123field", "type": ["null","string"]}]}
+                """
+        );
+    }
+
+    @Test
+    void field_names_with_special_characters_should_not_collide() throws IOException {
+        this.run(
+            """
+                {
+                    "foo-bar": "one",
+                    "foo_bar": "two"
+                }
+                """,
+            """
+                {
+                  "fields": [
+                    {"name": "foo_bar", "type": ["null","string"]},
+                    {"name": "foo_bar_1", "type": ["null","string"]}
+                  ]
+                }
+                """
+        );
+    }
+
+    @Test
+    void empty_field_name_should_produce_valid_placeholder() throws IOException {
+        this.run(
+            """
+                {"": "hello"}
+                """,
+            """
+                {"fields": [{"name": "_", "type": ["null","string"]}]}
+                """
+        );
+    }
+
+    @Test
+    void nested_record_with_special_characters() throws IOException {
+        this.run(
+            """
+                {"outer-key": {"inner.key": "value"}}
+                """,
+            """
+                {
+                  "fields": [{
+                    "name": "outer_key",
+                    "type": [{
+                      "type": "record",
+                      "name": "outer_key",
+                      "fields": [{"name": "inner_key", "type": ["null","string"]}]
+                    }, "null"]
+                  }]
+                }
+                """
+        );
+    }
+
+    @Test
+    void multi_row_key_order_produces_stable_names() throws IOException {
+        // Even when key iteration order differs between rows, the same original
+        // key must always map to the same sanitized name.
+        var output = new ByteArrayOutputStream();
+        new InferAvroSchema(2).inferAvroSchemaFromIon(
+            new ByteArrayInputStream(
+                """
+                    {"foo-bar": "a", "foo_bar": "b"}
+                    {"foo_bar": "c", "foo-bar": "d"}
+                    """.getBytes()),
+            output
+        );
+        var schema = new String(output.toByteArray());
+        JSONAssert.assertEquals(
+            """
+                {
+                  "fields": [
+                    {"name": "foo_bar", "type": ["null","string"]},
+                    {"name": "foo_bar_1", "type": ["null","string"]}
+                  ]
+                }
+                """,
+            schema,
+            JSONCompareMode.LENIENT
+        );
+    }
+
+    @Test
     void array_of_objects_with_unmatching_types() throws IOException {
         this.run(
             """
