@@ -30,6 +30,7 @@ import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvReader;
 import de.siegmar.fastcsv.reader.CsvRecord;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -80,6 +81,7 @@ import reactor.core.publisher.Mono;
 public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     private static final int DEFAULT_MAX_BUFFER_SIZE = 16 * 1024 * 1024;
     private static final int DEFAULT_MAX_FIELD_SIZE = 16 * 1024 * 1024;
+    private static final int DEFAULT_MAX_RECORD_SIZE = 4 * DEFAULT_MAX_FIELD_SIZE;
 
     @NotNull
     @Schema(
@@ -177,9 +179,23 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     private final Property<Boolean> allowExtraCharsAfterClosingQuote = Property.ofValue(false);
 
     @Builder.Default
-    @Schema(title = "Maximum field size (characters)")
+    @Schema(
+        title = "Maximum field size (characters)",
+        description = "The maximum number of characters allowed in a field after processing. The default is "
+            + "16,777,216 characters. When `maxRecordSize` is not set, the effective maximum record size is "
+            + "the greater of 67,108,864 characters and this value."
+    )
     @PluginProperty(group = "advanced")
     private final Property<Integer> maxFieldSize = Property.ofValue(DEFAULT_MAX_FIELD_SIZE);
+
+    @Schema(
+        title = "Maximum record size (characters)",
+        description = "The maximum total number of characters allowed in a record after processing. When unset, "
+            + "the effective limit is the greater of 67,108,864 characters and `maxFieldSize`. When set, this "
+            + "value must be greater than or equal to `maxFieldSize`."
+    )
+    @PluginProperty(group = "advanced")
+    private Property<@Min(1) Integer> maxRecordSize;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -388,8 +404,20 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             .ifPresent(builder::maxBufferSize);
 
         var handlerBuilder = de.siegmar.fastcsv.reader.CsvRecordHandler.builder();
-        runContext.render(maxFieldSize).as(Integer.class)
-            .ifPresent(handlerBuilder::maxFieldSize);
+        int rMaxFieldSize = runContext.render(maxFieldSize).as(Integer.class).orElse(DEFAULT_MAX_FIELD_SIZE);
+        int rMaxRecordSize = maxRecordSize == null
+            ? Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize)
+            : runContext.render(maxRecordSize).as(Integer.class)
+                .orElse(Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize));
+
+        if (rMaxRecordSize < rMaxFieldSize) {
+            throw new IllegalArgumentException(
+                "maxRecordSize (" + rMaxRecordSize + ") must be greater than or equal to maxFieldSize (" + rMaxFieldSize + ")."
+            );
+        }
+
+        handlerBuilder.maxFieldSize(rMaxFieldSize);
+        handlerBuilder.maxRecordSize(rMaxRecordSize);
 
         var handler = handlerBuilder.build();
         return builder.build(handler, reader);

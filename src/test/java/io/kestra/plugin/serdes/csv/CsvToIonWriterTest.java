@@ -341,6 +341,56 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    void maxRecordSizeDefaultsToMaxFieldSizeWhenFieldLimitIsAboveDefault() throws Exception {
+        String csv = "col1\nvalue1\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/largeRecordLimit.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("maxRecordSizeDefaultsToMaxFieldSizeWhenFieldLimitIsAboveDefault")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .maxBufferSize(Property.ofValue(Integer.MAX_VALUE))
+            .maxFieldSize(Property.ofValue(1_073_741_824))
+            .header(Property.ofValue(true))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        CsvToIon.Output out = reader.run(runContext);
+
+        assertThat(out.getUri(), is(notNullValue()));
+        assertThat(out.getSize(), is(1L));
+    }
+
+    @Test
+    void maxRecordSizeBelowMaxFieldSizeFailsWithClearError() throws Exception {
+        String csv = "col1\nvalue1\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/invalidRecordLimit.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id("maxRecordSizeBelowMaxFieldSizeFailsWithClearError")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .maxFieldSize(Property.ofValue(1024))
+            .maxRecordSize(Property.ofValue(512))
+            .header(Property.ofValue(true))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> reader.run(runContext));
+
+        assertThat(
+            thrown.getMessage(),
+            is("maxRecordSize (512) must be greater than or equal to maxFieldSize (1024).")
+        );
+    }
+
+    @Test
     void utf8BomInHeaderIsStripped() throws Exception {
         String csvBody = "code_insee;nom_commune\n1001;L'Abergement-Clémenciat\n";
         byte[] utf8Bom = new byte[] { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF };
