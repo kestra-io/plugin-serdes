@@ -137,6 +137,29 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
                         ]
                       }
                 """
+        ),
+        @Example(
+            full = true,
+            title = "Convert a CSV file to a ZSTD-compressed Parquet file with a high compression level, for long-term storage.",
+            code = """
+                id: ion_to_parquet_zstd_level
+                namespace: company.team
+
+                tasks:
+                  - id: download_csv
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/raw/main/csv/orders.csv
+
+                  - id: convert
+                    type: io.kestra.plugin.serdes.csv.CsvToIon
+                    from: "{{ outputs.download_csv.uri }}"
+
+                  - id: result
+                    type: io.kestra.plugin.serdes.parquet.IonToParquet
+                    from: "{{ outputs.convert.uri }}"
+                    compressionCodec: ZSTD
+                    compressionLevel: 19
+                """
         )
     },
     metrics = {
@@ -145,6 +168,12 @@ import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_
     aliases = "io.kestra.plugin.serdes.parquet.ParquetWriter"
 )
 public class IonToParquet extends AbstractAvroConverter implements RunnableTask<IonToParquet.Output> {
+    // read by org.apache.parquet.hadoop.codec.ZstandardCodec, and part of CodecFactory's codec cache key
+    private static final String ZSTD_LEVEL_CONF_KEY = "parquet.compression.codec.zstd.level";
+    // bounds of the Zstandard library: ZSTD_minCLevel() (negative "fast" levels) and ZSTD_maxCLevel()
+    private static final int ZSTD_MIN_LEVEL = -(1 << 17);
+    private static final int ZSTD_MAX_LEVEL = 22;
+
     @NotNull
     @Schema(
         title = "Source file URI"
@@ -157,6 +186,19 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         title = "Compression codec"
     )
     Property<CompressionCodec> compressionCodec = Property.ofValue(CompressionCodec.GZIP);
+
+    @Schema(
+        title = "Compression level",
+        description = """
+            Only supported with the `ZSTD` codec; setting it with any other codec fails the task. \
+            Accepts values from `-131072` to `22`. Levels `1` to `22` trade write speed for smaller files: \
+            higher is smaller but slower, and levels `20` to `22` also use much more memory, \
+            so `19` is a practical choice for long-term storage. \
+            Negative levels compress faster than `1` but produce larger files. \
+            `0`, like leaving this property unset, uses the Zstandard default level (`3`)."""
+    )
+    @PluginProperty(group = "advanced")
+    private Property<Integer> compressionLevel;
 
     @Builder.Default
     @Schema(
@@ -221,12 +263,33 @@ public class IonToParquet extends AbstractAvroConverter implements RunnableTask<
         }
 
         // parquet options
-        CompressionCodecName codec = runContext.render(this.compressionCodec).as(CompressionCodec.class).orElseThrow().parquetCodec();
-        HadoopOutputFile outfileFile = HadoopOutputFile.fromPath(new Path(tempFile.getPath()), new Configuration());
+        CompressionCodec rCompressionCodec = runContext.render(this.compressionCodec).as(CompressionCodec.class).orElseThrow();
+        CompressionCodecName codec = rCompressionCodec.parquetCodec();
+
+        Configuration conf = new Configuration();
+        Integer rCompressionLevel = runContext.render(this.compressionLevel).as(Integer.class).orElse(null);
+        if (rCompressionLevel != null) {
+            if (rCompressionCodec != CompressionCodec.ZSTD) {
+                throw new IllegalArgumentException(
+                    "compressionLevel is only supported with the ZSTD compression codec, but compressionCodec is " + rCompressionCodec +
+                        ". Set compressionCodec to ZSTD or remove compressionLevel."
+                );
+            }
+            if (rCompressionLevel < ZSTD_MIN_LEVEL || rCompressionLevel > ZSTD_MAX_LEVEL) {
+                throw new IllegalArgumentException(
+                    "Invalid ZSTD compressionLevel " + rCompressionLevel + ". Use a value between " + ZSTD_MIN_LEVEL + " and " + ZSTD_MAX_LEVEL +
+                        " (higher values compress more), or remove compressionLevel to use the default level 3."
+                );
+            }
+            conf.setInt(ZSTD_LEVEL_CONF_KEY, rCompressionLevel);
+        }
+
+        HadoopOutputFile outfileFile = HadoopOutputFile.fromPath(new Path(tempFile.getPath()), conf);
 
         AvroParquetWriter.Builder<GenericData.Record> parquetWriterBuilder = AvroParquetWriter.<GenericData.Record> builder(outfileFile)
             .withWriterVersion(runContext.render(parquetVersion).as(Version.class).orElseThrow() == Version.V2 ? PARQUET_2_0 : PARQUET_1_0)
             .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
+            .withConf(conf)
             .withCompressionCodec(codec)
             .withDictionaryEncoding(true)
             .withDictionaryPageSize(runContext.render(dictionaryPageSize).as(Integer.class).orElseThrow())

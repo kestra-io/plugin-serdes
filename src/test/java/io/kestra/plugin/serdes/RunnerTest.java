@@ -56,6 +56,13 @@ class RunnerTest {
     }
 
     @Test
+    @ExecuteFlow("sanity-checks/ion_parquet_zstd_level.yaml")
+    void ion_parquet_zstd_level(Execution execution) {
+        assertThat(execution.getTaskRunList(), hasSize(5));
+        assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
+    }
+
+    @Test
     @ExecuteFlow("sanity-checks/schema_inference_roundtrip.yaml")
     void schema_inference_roundtrip(Execution execution) {
         assertThat(execution.getTaskRunList(), hasSize(7));

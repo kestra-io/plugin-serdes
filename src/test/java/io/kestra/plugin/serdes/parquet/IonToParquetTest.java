@@ -1006,4 +1006,100 @@ class IonToParquetTest {
         assertThat(sawIllegalRowConvertion, is(true));
         assertThat(ex.getCause(), instanceOf(io.kestra.plugin.serdes.avro.AvroConverter.IllegalRowConvertion.class));
     }
+
+    private static final String TEXT_SCHEMA = """
+        {
+          "type": "record",
+          "name": "Text",
+          "namespace": "com.example.compression",
+          "fields": [
+            {"name": "id", "type": "int"},
+            {"name": "text", "type": "string"}
+          ]
+        }""";
+
+    // unique but repetitive sentences: too many distinct values for dictionary encoding, so the codec does the work
+    private static List<Map<String, Object>> compressibleTextRows() {
+        Random random = new Random(42);
+        List<String> words = IntStream.range(0, 300).mapToObj(i -> "word" + i).toList();
+        return IntStream.range(0, 20_000)
+            .mapToObj(id -> {
+                StringBuilder text = new StringBuilder();
+                for (int i = 0; i < 20; i++) {
+                    text.append(words.get(random.nextInt(words.size()))).append(' ');
+                }
+                return Map.<String, Object>of("id", id, "text", text.toString());
+            })
+            .toList();
+    }
+
+    private IonToParquet.Output writeWithCompression(URI uri, IonToParquet.CompressionCodec codec, Integer level) throws Exception {
+        IonToParquet writer = IonToParquet.builder()
+            .id(IdUtils.create())
+            .type(IonToParquet.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(TEXT_SCHEMA)
+            .compressionCodec(Property.ofValue(codec))
+            .compressionLevel(level == null ? null : Property.ofValue(level))
+            .build();
+
+        return writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+    }
+
+    private long fileSize(URI uri) throws Exception {
+        try (InputStream inputStream = storageInterface.get(TenantService.MAIN_TENANT, null, uri)) {
+            return inputStream.readAllBytes().length;
+        }
+    }
+
+    @Test
+    void zstdHigherCompressionLevelProducesSmallerReadableFile() throws Exception {
+        List<Map<String, Object>> rows = compressibleTextRows();
+        URI uri = uploadIonRows(rows);
+
+        IonToParquet.Output fast = writeWithCompression(uri, IonToParquet.CompressionCodec.ZSTD, 1);
+        IonToParquet.Output strong = writeWithCompression(uri, IonToParquet.CompressionCodec.ZSTD, 22);
+
+        assertThat(fileSize(strong.getUri()), lessThan(fileSize(fast.getUri())));
+
+        List<Map<String, Object>> result = readBackAsRows(strong.getUri());
+        assertThat(result.size(), is(rows.size()));
+        assertThat(result.get(0).get("text"), is(rows.get(0).get("text")));
+    }
+
+    @Test
+    void zstdWithoutCompressionLevelUsesDefaultLevel() throws Exception {
+        URI uri = uploadIonRows(compressibleTextRows());
+
+        IonToParquet.Output unset = writeWithCompression(uri, IonToParquet.CompressionCodec.ZSTD, null);
+        IonToParquet.Output explicitDefault = writeWithCompression(uri, IonToParquet.CompressionCodec.ZSTD, 3);
+        IonToParquet.Output strong = writeWithCompression(uri, IonToParquet.CompressionCodec.ZSTD, 22);
+
+        assertThat(fileSize(unset.getUri()), is(fileSize(explicitDefault.getUri())));
+        assertThat(fileSize(strong.getUri()), lessThan(fileSize(unset.getUri())));
+    }
+
+    @Test
+    void compressionLevelWithNonZstdCodecFails() throws Exception {
+        URI uri = uploadIonRows(List.of(Map.of("id", 1, "text", "a")));
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> writeWithCompression(uri, IonToParquet.CompressionCodec.GZIP, 5)
+        );
+
+        assertThat(ex.getMessage(), containsString("only supported with the ZSTD compression codec"));
+    }
+
+    @Test
+    void zstdCompressionLevelOutOfRangeFails() throws Exception {
+        URI uri = uploadIonRows(List.of(Map.of("id", 1, "text", "a")));
+
+        IllegalArgumentException ex = assertThrows(
+            IllegalArgumentException.class,
+            () -> writeWithCompression(uri, IonToParquet.CompressionCodec.ZSTD, 23)
+        );
+
+        assertThat(ex.getMessage(), containsString("Invalid ZSTD compressionLevel 23"));
+    }
 }
