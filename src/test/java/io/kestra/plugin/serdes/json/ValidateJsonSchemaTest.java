@@ -34,6 +34,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -225,7 +226,8 @@ class ValidateJsonSchemaTest {
     void malformedPayloadFailsClearly() {
         var exception = assertThrows(IllegalArgumentException.class, () -> runInline("{\"id\": ", ORDER_SCHEMA, true));
 
-        assertThat(exception.getMessage(), containsString("`from` must contain a single valid JSON document"));
+        assertThat(exception.getMessage(), containsString("`from` is not valid JSON"));
+        assertThat(exception.getMessage(), containsString("line 1, column"));
     }
 
     @Test
@@ -462,13 +464,15 @@ class ValidateJsonSchemaTest {
         var exception = assertThrows(IllegalArgumentException.class, () -> runStoredFile("{\"a\": 1}\n{\"a\": 2}\n"));
 
         assertThat(exception.getMessage(), containsString("JSONL is not supported"));
+        assertThat(exception.getMessage(), not(containsString("DeserializationFeature")));
     }
 
     @Test
     void trailingContentFailsClearly() {
         var exception = assertThrows(IllegalArgumentException.class, () -> runInline("{} garbage", "{}", true));
 
-        assertThat(exception.getMessage(), containsString("single valid JSON document"));
+        assertThat(exception.getMessage(), containsString("`from` is not valid JSON"));
+        assertThat(exception.getMessage(), containsString("garbage"));
     }
 
     @Test

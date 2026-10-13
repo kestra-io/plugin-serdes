@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.networknt.schema.InputFormat;
 
 import io.kestra.core.models.annotations.Example;
@@ -280,10 +281,15 @@ public class ValidateJsonSchema extends Task implements RunnableTask<ValidateJso
             if (document == null || document.isMissingNode()) {
                 throw new IllegalArgumentException("`from` is required and cannot be empty");
             }
-        } catch (JacksonException e) {
+        } catch (MismatchedInputException e) {
             throw new IllegalArgumentException(
-                "`from` must contain a single valid JSON document (invalid JSON or trailing content; JSONL is not supported): "
-                    + e.getOriginalMessage(),
+                "`from` must contain a single JSON document, but more content was found after the first value (JSONL is not supported)", e
+            );
+        } catch (JacksonException e) {
+            var location = e.getLocation();
+            throw new IllegalArgumentException(
+                "`from` is not valid JSON: " + e.getOriginalMessage()
+                    + (location == null ? "" : " (line " + location.getLineNr() + ", column " + location.getColumnNr() + ")"),
                 e
             );
         }

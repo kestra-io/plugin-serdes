@@ -1,5 +1,6 @@
 package io.kestra.plugin.serdes.json;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -9,6 +10,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import io.kestra.core.http.HttpRequest;
 import io.kestra.core.http.client.HttpClient;
+import io.kestra.core.http.client.HttpClientException;
 import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.http.client.configurations.HttpConfiguration;
 import io.kestra.core.runners.RunContext;
@@ -68,6 +70,8 @@ final class SchemaRegistryClient {
             body = client.request(request, String.class).getBody();
         } catch (HttpClientResponseException e) {
             throw translate(e, description);
+        } catch (HttpClientException | IOException e) {
+            throw new IllegalStateException("Could not reach the schema registry at " + baseUrl(rUrl) + ": " + e.getMessage(), e);
         }
 
         if (body == null || body.isBlank()) {
@@ -127,6 +131,16 @@ final class SchemaRegistryClient {
             names.append(reference.path("subject").asText(reference.path("name").asText("?")));
         }
         return names.toString();
+    }
+
+    // Drops any userinfo so credentials embedded in the URL never reach an error message.
+    private static String baseUrl(String url) {
+        try {
+            var uri = URI.create(url);
+            return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), uri.getPath(), null, null).toString();
+        } catch (Exception e) {
+            return "the configured `registry.url`";
+        }
     }
 
     private static String encode(String value) {
