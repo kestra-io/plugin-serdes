@@ -1,0 +1,23 @@
+[
+    {
+        "schema": { "pattern": "^[Aa]" },
+        "data": "Ah, so that's how it is",
+        "valid": true
+    },
+    {
+        "schema": { "pattern": "a" },
+        "data": "foobar",
+        "valid": true
+    },
+    {
+        "schema": { "pattern": "^[Aa]" },
+        "data": "foobar",
+        "valid": false,
+        "message": "err.common.pattern.noMatch",
+        "msgData": {
+            "regex": "^[Aa]",
+            "string": "foobar"
+        },
+        "msgParams": [ "regex", "string" ]
+    }
+]

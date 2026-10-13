@@ -1,0 +1,23 @@
+[
+    {
+        "data": "http://slashdot.org",
+        "valid": true
+    },
+    {
+        "data": "http://my.schema.org/schema.json#",
+        "valid": true
+    },
+    {
+        "data": "foo://a.b.c/d/e?f=g#h",
+        "valid": true
+    },
+    {
+        "data": "+23:aa",
+        "valid": false,
+        "message": "err.format.invalidURI",
+        "msgData": {
+            "value": "+23:aa"
+        },
+        "msgParams": [ "value" ]
+    }
+]

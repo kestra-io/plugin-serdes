@@ -33,6 +33,7 @@ Single-module plugin. Source packages under `io.kestra.plugin`:
 - `io.kestra.plugin.serdes.json.JsonToJsonl`
 - `io.kestra.plugin.serdes.json.JsonToToon`
 - `io.kestra.plugin.serdes.json.ToonToJson`
+- `io.kestra.plugin.serdes.json.ValidateJsonSchema`
 - `io.kestra.plugin.serdes.markdown.HtmlToMarkdown`
 - `io.kestra.plugin.serdes.markdown.MarkdownToHtml`
 - `io.kestra.plugin.serdes.markdown.MarkdownToText`
