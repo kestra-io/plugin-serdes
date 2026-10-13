@@ -71,7 +71,7 @@ final class SchemaRegistryClient {
         } catch (HttpClientResponseException e) {
             throw translate(e, description);
         } catch (HttpClientException | IOException e) {
-            throw new IllegalStateException("Could not reach the schema registry at " + baseUrl(rUrl) + ": " + e.getMessage(), e);
+            throw new IllegalStateException("Could not reach the schema registry at " + baseUrl(rUrl) + ": " + e.getClass().getSimpleName(), e);
         }
 
         if (body == null || body.isBlank()) {

@@ -519,6 +519,46 @@ class ValidateJsonSchemaTest {
     }
 
     @Test
+    void registryConnectionFailureReportsOnlyExceptionType() {
+        var url = registryUrl();
+        server.stop(0);
+
+        var exception = assertThrows(
+            IllegalStateException.class, () -> run(
+                task().from(Property.ofValue("{}"))
+                    .registry(SchemaRegistrySource.builder().url(Property.ofValue(url)).subject(Property.ofValue("orders-value")).build())
+                    .build()
+            )
+        );
+
+        // The raw cause message can embed the full request URI (and any userinfo), so only its type is surfaced.
+        var cause = exception.getCause();
+        assertThat(cause, notNullValue());
+        assertThat(
+            exception.getMessage(),
+            is("Could not reach the schema registry at " + url + ": " + cause.getClass().getSimpleName())
+        );
+    }
+
+    @Test
+    void registryUrlCredentialsDoNotLeakOnFailure() {
+        var url = registryUrl().replace("http://", "http://svc-user:s3cr3t-pass@");
+        server.stop(0);
+
+        var exception = assertThrows(
+            Exception.class, () -> run(
+                task().from(Property.ofValue("{}"))
+                    .registry(SchemaRegistrySource.builder().url(Property.ofValue(url)).subject(Property.ofValue("orders-value")).build())
+                    .build()
+            )
+        );
+
+        for (Throwable t = exception; t != null; t = t.getCause()) {
+            assertThat(String.valueOf(t.getMessage()), not(containsString("s3cr3t-pass")));
+        }
+    }
+
+    @Test
     void registryRejectsInvalidSubjectVersion() {
         for (var version : List.of("abc", "0", "-1", "../x", "1.5")) {
             var exception = assertThrows(
