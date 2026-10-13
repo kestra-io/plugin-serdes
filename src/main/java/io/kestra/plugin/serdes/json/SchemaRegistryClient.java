@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.json;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -14,6 +15,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
 
 final class SchemaRegistryClient {
+    private static final Pattern POSITIVE_INTEGER = Pattern.compile("[1-9][0-9]{0,9}");
     private static final String ACCEPT = "application/vnd.schemaregistry.v1+json, application/json";
 
     record RegisteredSchema(String schema, Integer id, Integer version) {
@@ -39,9 +41,15 @@ final class SchemaRegistryClient {
             path = "/schemas/ids/" + rId;
             description = "schema id " + rId;
         } else {
+            if (rSubject.equals(".") || rSubject.equals("..")) {
+                throw new IllegalArgumentException("`registry.subject` cannot be `.` or `..`");
+            }
             var rVersion = runContext.render(registry.getSubjectVersion()).as(String.class)
                 .filter(value -> !value.isBlank())
                 .orElse("latest");
+            if (!rVersion.equals("latest") && !POSITIVE_INTEGER.matcher(rVersion).matches()) {
+                throw new IllegalArgumentException("`registry.subjectVersion` must be a positive integer or `latest`, got '" + rVersion + "'");
+            }
             path = "/subjects/" + encode(rSubject) + "/versions/" + encode(rVersion);
             description = "subject '" + rSubject + "' version '" + rVersion + "'";
         }

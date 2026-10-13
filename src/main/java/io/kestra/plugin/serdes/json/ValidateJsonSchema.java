@@ -6,6 +6,8 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.networknt.schema.InputFormat;
 
 import io.kestra.core.models.annotations.Example;
@@ -134,6 +136,9 @@ import lombok.experimental.SuperBuilder;
 )
 public class ValidateJsonSchema extends Task implements RunnableTask<ValidateJsonSchema.Output> {
     private static final String STORAGE_SCHEME = "kestra://";
+    private static final ObjectReader STRICT_READER = JacksonMapper.ofJson().copy()
+        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+        .reader();
     private static final int MAX_REPORTED_ERRORS = 100;
     private static final int MAX_ERRORS_IN_FAILURE_MESSAGE = 10;
 
@@ -216,7 +221,10 @@ public class ValidateJsonSchema extends Task implements RunnableTask<ValidateJso
             throw new IllegalArgumentException("Invalid JSON Schema: " + e.getMessage(), e);
         }
 
-        var errors = jsonSchema.validate(payload, InputFormat.JSON).stream()
+        var found = jsonSchema.validate(payload, InputFormat.JSON);
+        var total = found.size();
+        var reported = found.stream()
+            .limit(MAX_REPORTED_ERRORS)
             .map(
                 error -> ValidationError.builder()
                     .instanceLocation(error.getInstanceLocation().toString())
@@ -227,21 +235,20 @@ public class ValidateJsonSchema extends Task implements RunnableTask<ValidateJso
             )
             .toList();
 
-        runContext.metric(Counter.of("errors", errors.size()));
+        runContext.metric(Counter.of("errors", total));
 
-        var reported = errors.size() > MAX_REPORTED_ERRORS ? errors.subList(0, MAX_REPORTED_ERRORS) : errors;
-        if (!errors.isEmpty()) {
+        if (total > 0) {
             reported.forEach(error -> runContext.logger().warn("{}: {}", error.getInstanceLocation(), error.getMessage()));
-            if (reported.size() < errors.size()) {
-                runContext.logger().warn("{} more validation errors not shown", errors.size() - reported.size());
+            if (reported.size() < total) {
+                runContext.logger().warn("{} more validation errors not shown", total - reported.size());
             }
             if (rFailOnInvalid) {
-                throw new IllegalStateException(failureMessage(errors));
+                throw new IllegalStateException(failureMessage(total, reported));
             }
         }
 
         return Output.builder()
-            .valid(errors.isEmpty())
+            .valid(total == 0)
             .errors(reported)
             .schemaId(schemaId)
             .schemaVersion(schemaVersion)
@@ -269,21 +276,28 @@ public class ValidateJsonSchema extends Task implements RunnableTask<ValidateJso
         }
 
         try {
-            JacksonMapper.ofJson().readTree(text);
+            var document = STRICT_READER.readTree(text);
+            if (document == null || document.isMissingNode()) {
+                throw new IllegalArgumentException("`from` is required and cannot be empty");
+            }
         } catch (JacksonException e) {
-            throw new IllegalArgumentException("`from` is not valid JSON: " + e.getOriginalMessage(), e);
+            throw new IllegalArgumentException(
+                "`from` must contain a single valid JSON document (invalid JSON or trailing content; JSONL is not supported): "
+                    + e.getOriginalMessage(),
+                e
+            );
         }
         return text;
     }
 
-    private static String failureMessage(List<ValidationError> errors) {
+    private static String failureMessage(int total, List<ValidationError> reported) {
         var message = new StringBuilder("JSON data does not match the schema (")
-            .append(errors.size()).append(errors.size() == 1 ? " error" : " errors").append("):");
-        errors.stream().limit(MAX_ERRORS_IN_FAILURE_MESSAGE).forEach(
+            .append(total).append(total == 1 ? " error" : " errors").append("):");
+        reported.stream().limit(MAX_ERRORS_IN_FAILURE_MESSAGE).forEach(
             error -> message.append("\n- ").append(error.getInstanceLocation()).append(": ").append(error.getMessage())
         );
-        if (errors.size() > MAX_ERRORS_IN_FAILURE_MESSAGE) {
-            message.append("\n- ... and ").append(errors.size() - MAX_ERRORS_IN_FAILURE_MESSAGE).append(" more");
+        if (total > MAX_ERRORS_IN_FAILURE_MESSAGE) {
+            message.append("\n- ... and ").append(total - MAX_ERRORS_IN_FAILURE_MESSAGE).append(" more");
         }
         return message.toString();
     }

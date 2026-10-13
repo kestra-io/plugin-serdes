@@ -225,7 +225,7 @@ class ValidateJsonSchemaTest {
     void malformedPayloadFailsClearly() {
         var exception = assertThrows(IllegalArgumentException.class, () -> runInline("{\"id\": ", ORDER_SCHEMA, true));
 
-        assertThat(exception.getMessage(), containsString("`from` is not valid JSON"));
+        assertThat(exception.getMessage(), containsString("`from` must contain a single valid JSON document"));
     }
 
     @Test
@@ -447,6 +447,105 @@ class ValidateJsonSchemaTest {
         );
 
         assertThat(exception.getMessage(), containsString("exactly one of `registry.subject` or `registry.id`"));
+    }
+
+    private ValidateJsonSchema.Output runStoredFile(String content) throws Exception {
+        var file = File.createTempFile("payload_", ".json");
+        Files.writeString(file.toPath(), content);
+        var runContext = runContextFactory.of();
+        var uri = runContext.storage().putFile(file);
+        return task().from(Property.ofValue(uri.toString())).schema(Property.ofValue("{}")).build().run(runContext);
+    }
+
+    @Test
+    void jsonlStorageFileFailsClearly() {
+        var exception = assertThrows(IllegalArgumentException.class, () -> runStoredFile("{\"a\": 1}\n{\"a\": 2}\n"));
+
+        assertThat(exception.getMessage(), containsString("JSONL is not supported"));
+    }
+
+    @Test
+    void trailingContentFailsClearly() {
+        var exception = assertThrows(IllegalArgumentException.class, () -> runInline("{} garbage", "{}", true));
+
+        assertThat(exception.getMessage(), containsString("single valid JSON document"));
+    }
+
+    @Test
+    void emptyStorageFileFailsClearly() {
+        var exception = assertThrows(IllegalArgumentException.class, () -> runStoredFile(""));
+        assertThat(exception.getMessage(), containsString("cannot be empty"));
+
+        var whitespace = assertThrows(IllegalArgumentException.class, () -> runStoredFile("  \n "));
+        assertThat(whitespace.getMessage(), containsString("cannot be empty"));
+    }
+
+    @Test
+    void localRefToDefinitionsInDraft4() throws Exception {
+        var schema = "{\"$schema\": \"" + DRAFT_4 + "\", \"definitions\": {\"id\": {\"type\": \"integer\"}}, "
+            + "\"properties\": {\"a\": {\"$ref\": \"#/definitions/id\"}}}";
+
+        assertThat(runInline("{\"a\": 1}", schema, false).isValid(), is(true));
+        assertThat(runInline("{\"a\": \"x\"}", schema, false).isValid(), is(false));
+    }
+
+    @Test
+    void localRefToDefsIn2020_12() throws Exception {
+        var schema = "{\"$schema\": \"https://json-schema.org/draft/2020-12/schema\", \"$defs\": {\"id\": {\"type\": \"integer\"}}, "
+            + "\"properties\": {\"a\": {\"$ref\": \"#/$defs/id\"}}}";
+
+        assertThat(runInline("{\"a\": 1}", schema, false).isValid(), is(true));
+        var invalid = runInline("{\"a\": \"x\"}", schema, false);
+        assertThat(invalid.isValid(), is(false));
+        assertThat(invalid.getErrors().getFirst().getInstanceLocation(), is("/a"));
+    }
+
+    @Test
+    void registryConnectionFailureFailsClearly() {
+        var url = registryUrl();
+        server.stop(0);
+
+        assertThrows(
+            Exception.class, () -> run(
+                task().from(Property.ofValue("{}"))
+                    .registry(SchemaRegistrySource.builder().url(Property.ofValue(url)).subject(Property.ofValue("orders-value")).build())
+                    .build()
+            )
+        );
+    }
+
+    @Test
+    void registryRejectsInvalidSubjectVersion() {
+        for (var version : List.of("abc", "0", "-1", "../x", "1.5")) {
+            var exception = assertThrows(
+                IllegalArgumentException.class, () -> run(
+                    task().from(Property.ofValue("{}"))
+                        .registry(
+                            SchemaRegistrySource.builder().url(Property.ofValue(registryUrl())).subject(Property.ofValue("orders-value")).subjectVersion(Property.ofValue(version)).build()
+                        )
+                        .build()
+                ), version
+            );
+
+            assertThat(exception.getMessage(), containsString("positive integer or `latest`"));
+        }
+        assertThat(requests, is(empty()));
+    }
+
+    @Test
+    void registryRejectsDotSegmentSubjects() {
+        for (var subject : List.of(".", "..")) {
+            var exception = assertThrows(
+                IllegalArgumentException.class, () -> run(
+                    task().from(Property.ofValue("{}"))
+                        .registry(SchemaRegistrySource.builder().url(Property.ofValue(registryUrl())).subject(Property.ofValue(subject)).build())
+                        .build()
+                ), subject
+            );
+
+            assertThat(exception.getMessage(), containsString("cannot be `.` or `..`"));
+        }
+        assertThat(requests, is(empty()));
     }
 
     @Test
