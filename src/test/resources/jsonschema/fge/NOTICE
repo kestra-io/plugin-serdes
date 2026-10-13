@@ -4,11 +4,11 @@ Copyright (c) 2014, Francis Galiegue and contributors.
 
 That project is dual-licensed under the LGPL 3.0 and the Apache Software License 2.0.
 These files are used and redistributed here under the Apache Software License 2.0
-(see LICENSE-ASL-2.0.txt).
+(see LICENSE at the repository root).
 
 Files:
   format/{common,draftv4,extra}/*.json  <- src/test/resources/format/{common,draftv4,extra}
   keyword/pattern.json                  <- src/test/resources/keyword/special/pattern.json
-  testsuite-draftv4.json                <- src/test/resources/testsuite/draftv4.json
+  testsuite-draftv4.json                <- src/test/resources/testsuite/draftv4.json (subset, see FgeParityTest)
 
 Only the "data"/"schema"/"valid" fields are used; fge-specific message fields are ignored.

@@ -78,6 +78,9 @@ class FgeParityTest {
         return tests.stream();
     }
 
+    // Subset of fge's draft-04 suite that depends on our setup rather than on stock networknt keywords:
+    // draft-04 fallback (boolean exclusiveMaximum/Minimum, 1.0 is not an integer) and the draft-04 meta-schema
+    // $ref resolving with remote fetching off. Formats and pattern have their own vectors above.
     @TestFactory
     Stream<DynamicTest> draft4TestSuite() throws Exception {
         var tests = new ArrayList<DynamicTest>();
