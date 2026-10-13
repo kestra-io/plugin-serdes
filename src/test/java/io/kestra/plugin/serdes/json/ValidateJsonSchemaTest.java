@@ -337,7 +337,7 @@ class ValidateJsonSchemaTest {
     void registryBySubjectVersionWithEncodedSubject() throws Exception {
         var byVersion = run(
             task().from(Property.ofValue("{\"id\": 1, \"email\": \"ada@example.com\"}"))
-                .registry(SchemaRegistrySource.builder().url(Property.ofValue(registryUrl())).subject(Property.ofValue("orders-value")).version(Property.ofValue("2")).build())
+                .registry(SchemaRegistrySource.builder().url(Property.ofValue(registryUrl())).subject(Property.ofValue("orders-value")).subjectVersion(Property.ofValue("2")).build())
                 .build()
         );
         assertThat(byVersion.getSchemaVersion(), is(2));

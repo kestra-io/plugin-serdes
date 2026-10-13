@@ -14,7 +14,7 @@ import lombok.Getter;
     title = "Confluent-compatible Schema Registry",
     description = """
         Fetches a JSON Schema from a Confluent-compatible Schema Registry such as Karapace. \
-        Set either `subject` (with an optional `version`) or `id`. Only registered schemas of type \
+        Set either `subject` (with an optional `subjectVersion`) or `id`. Only registered schemas of type \
         `JSON` without `references` are supported."""
 )
 public class SchemaRegistrySource {
@@ -34,10 +34,10 @@ public class SchemaRegistrySource {
 
     @Schema(
         title = "Subject version",
-        description = "Version of the subject: an integer or `latest`. Defaults to `latest`. Ignored when `id` is set."
+        description = "Version of the subject: an integer or `latest`, which is the default. Ignored when `id` is set."
     )
     @PluginProperty(group = "main")
-    private Property<String> version;
+    private Property<String> subjectVersion;
 
     @Schema(
         title = "Global schema ID",

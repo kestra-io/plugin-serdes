@@ -39,7 +39,7 @@ final class SchemaRegistryClient {
             path = "/schemas/ids/" + rId;
             description = "schema id " + rId;
         } else {
-            var rVersion = runContext.render(registry.getVersion()).as(String.class)
+            var rVersion = runContext.render(registry.getSubjectVersion()).as(String.class)
                 .filter(value -> !value.isBlank())
                 .orElse("latest");
             path = "/subjects/" + encode(rSubject) + "/versions/" + encode(rVersion);

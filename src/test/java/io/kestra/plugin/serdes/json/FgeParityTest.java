@@ -3,7 +3,6 @@ package io.kestra.plugin.serdes.json;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DynamicTest;
@@ -24,9 +23,6 @@ class FgeParityTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String DRAFT_4 = "http://json-schema.org/draft-04/schema#";
     private static final String ROOT = "/jsonschema/fge/";
-
-    // Test suite cases fge passes but we deliberately or inherently do not reproduce.
-    private static final Map<String, String> KNOWN_DIFFERENCES = Map.of();
 
     private static boolean isValid(String schema, JsonNode data) throws Exception {
         var registry = JsonSchemaValidatorFactory.create(ValidateJsonSchema.Dialect.DRAFT_4);
@@ -87,9 +83,6 @@ class FgeParityTest {
         var tests = new ArrayList<DynamicTest>();
         for (var vector : load("testsuite-draftv4.json")) {
             var description = vector.get("description").asText();
-            if (KNOWN_DIFFERENCES.containsKey(description)) {
-                continue;
-            }
             // fge falls back to draft-04 when $schema is absent, as does our default dialect here.
             var schema = MAPPER.writeValueAsString(vector.get("schema"));
             var data = vector.get("data");

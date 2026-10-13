@@ -111,7 +111,7 @@ import lombok.experimental.SuperBuilder;
                     registry:
                       url: https://my-karapace.aivencloud.com:12345
                       subject: orders-value
-                      version: latest
+                      subjectVersion: latest
                       options:
                         auth:
                           type: BASIC
