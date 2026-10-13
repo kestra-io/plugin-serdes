@@ -505,20 +505,6 @@ class ValidateJsonSchemaTest {
     }
 
     @Test
-    void registryConnectionFailureFailsClearly() {
-        var url = registryUrl();
-        server.stop(0);
-
-        assertThrows(
-            Exception.class, () -> run(
-                task().from(Property.ofValue("{}"))
-                    .registry(SchemaRegistrySource.builder().url(Property.ofValue(url)).subject(Property.ofValue("orders-value")).build())
-                    .build()
-            )
-        );
-    }
-
-    @Test
     void registryConnectionFailureReportsOnlyExceptionType() {
         var url = registryUrl();
         server.stop(0);
