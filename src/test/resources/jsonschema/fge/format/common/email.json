@@ -1,0 +1,28 @@
+[
+    {
+        "data": "foo@bar.com",
+        "valid": true
+    },
+    {
+        "data": "foo",
+        "valid": false,
+        "message": "err.format.invalidEmail",
+        "msgData": {
+            "value": "foo"
+        },
+        "msgParams": [ "value" ]
+    },
+    {
+        "data": "éioaj@my.name",
+        "valid": true
+    },
+    {
+        "data": "a@",
+        "valid": false,
+        "message": "err.format.invalidEmail",
+        "msgData": {
+            "value": "a@"
+        },
+        "msgParams": [ "value" ]
+    }
+]

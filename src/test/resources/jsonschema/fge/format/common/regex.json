@@ -1,0 +1,32 @@
+[
+    {
+        "data": "ab+",
+        "valid": true
+    },
+    {
+        "data": "a++",
+        "valid": false,
+        "message": "err.format.invalidRegex",
+        "msgData": {
+            "value": "a++"
+        },
+        "msgParams": [ "value" ]
+    },
+    {
+        "data": "^[^.]+(?=ab)",
+        "valid": true
+    },
+    {
+        "data": "[^]",
+        "valid": true
+    },
+    {
+        "data": "a{4,5}(?<=b)",
+        "valid": false,
+        "message": "err.format.invalidRegex",
+        "msgData": {
+            "value": "a{4,5}(?<=b)"
+        },
+        "msgParams": [ "value" ]
+    }
+]
