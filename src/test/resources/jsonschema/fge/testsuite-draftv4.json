@@ -1,0 +1,103 @@
+[
+    {
+        "data": {
+            "definitions": {
+                "foo": {
+                    "type": "integer"
+                }
+            }
+        }, 
+        "description": "valid definition schema", 
+        "schema": {
+            "$ref": "http://json-schema.org/draft-04/schema#"
+        }, 
+        "valid": true
+    }, 
+    {
+        "data": {
+            "definitions": {
+                "foo": {
+                    "type": 1
+                }
+            }
+        }, 
+        "description": "invalid definition schema", 
+        "schema": {
+            "$ref": "http://json-schema.org/draft-04/schema#"
+        }, 
+        "valid": false
+    }, 
+    {
+        "data": 2.2, 
+        "description": "below the maximum is still valid", 
+        "schema": {
+            "exclusiveMaximum": true, 
+            "maximum": 3.0
+        }, 
+        "valid": true
+    }, 
+    {
+        "data": 3.0, 
+        "description": "boundary point is invalid", 
+        "schema": {
+            "exclusiveMaximum": true, 
+            "maximum": 3.0
+        }, 
+        "valid": false
+    }, 
+    {
+        "data": 1.2, 
+        "description": "above the minimum is still valid", 
+        "schema": {
+            "exclusiveMinimum": true, 
+            "minimum": 1.1
+        }, 
+        "valid": true
+    }, 
+    {
+        "data": 1.1, 
+        "description": "boundary point is invalid", 
+        "schema": {
+            "exclusiveMinimum": true, 
+            "minimum": 1.1
+        }, 
+        "valid": false
+    }, 
+    {
+        "data": {
+            "minLength": 1
+        }, 
+        "description": "remote ref valid", 
+        "schema": {
+            "$ref": "http://json-schema.org/draft-04/schema#"
+        }, 
+        "valid": true
+    }, 
+    {
+        "data": {
+            "minLength": -1
+        }, 
+        "description": "remote ref invalid", 
+        "schema": {
+            "$ref": "http://json-schema.org/draft-04/schema#"
+        }, 
+        "valid": false
+    }, 
+    {
+        "data": 1.0, 
+        "description": "a float is not an integer even without fractional part", 
+        "schema": {
+            "type": "integer"
+        }, 
+        "valid": false
+    }, 
+    {
+        "data": 9.727837981879871e+26, 
+        "description": "comparison works for high numbers", 
+        "schema": {
+            "exclusiveMaximum": true, 
+            "maximum": 9.727837981879871e+26
+        }, 
+        "valid": false
+    }
+]
