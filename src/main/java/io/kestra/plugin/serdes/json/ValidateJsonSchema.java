@@ -39,6 +39,10 @@ import lombok.experimental.SuperBuilder;
         Schema Registry such as Karapace.
 
         The `$schema` keyword of the schema selects the draft; when it is absent, `defaultDialect` is used. \
+        Draft-04, draft-06 and draft-07 check `format` values. Draft 2019-09 and draft 2020-12, the default, treat `format` \
+        as an annotation and do not check it, as the specification requires; set `$schema` or `defaultDialect` to an earlier \
+        draft to enforce formats.
+
         With draft-04 the validator mirrors [java-json-tools/json-schema-validator](https://github.com/java-json-tools/json-schema-validator): \
         the same set of checked `format` values (`date-time`, `email`, `hostname`, `ipv4`, `ipv6`, `regex`, `uri`, \
         `uuid`, `json-pointer`, `uri-template`, `base64`, `md5`, `sha1`, `sha256`, `sha512`, `mac`), ECMA-262 regular expressions, \
@@ -67,6 +71,7 @@ import lombok.experimental.SuperBuilder;
                     from: "{{ inputs.payload }}"
                     schema: |
                       {
+                        "$schema": "http://json-schema.org/draft-07/schema#",
                         "type": "object",
                         "required": ["id", "email"],
                         "properties": {
