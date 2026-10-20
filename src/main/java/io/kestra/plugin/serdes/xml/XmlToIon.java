@@ -241,12 +241,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
      * root does not match this pattern.
      */
     private String detectRootCollectionChild(RunContext runContext, URI from, String charset) throws Exception {
-        var factory = XMLInputFactory.newInstance();
-        // Disable external entities for security
-        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-        // Merge adjacent text/CDATA events: StAX otherwise splits long CDATA into several events
-        factory.setProperty(XMLInputFactory.IS_COALESCING, true);
+        var factory = newSecureXmlInputFactory();
 
         try (
             InputStream is = runContext.storage().getFile(from);
@@ -336,12 +331,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         System.arraycopy(segments, 0, parentSegments, 0, segments.length - 1);
         var elementName = segments[segments.length - 1];
 
-        var factory = XMLInputFactory.newInstance();
-        // Disable external entities for security
-        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-        // Merge adjacent text/CDATA events: StAX otherwise splits long CDATA into several events
-        factory.setProperty(XMLInputFactory.IS_COALESCING, true);
+        var factory = newSecureXmlInputFactory();
 
         var recordCount = 0;
 
@@ -449,6 +439,14 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         return true;
     }
 
+    private static XMLInputFactory newSecureXmlInputFactory() {
+        var factory = XMLInputFactory.newInstance();
+        // Disable external entities for security
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        return factory;
+    }
+
     /**
      * Read the current element (the reader is positioned on its START_ELEMENT)
      * and return its complete XML subtree as a string, including the element tag itself.
@@ -466,9 +464,16 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         }
         sb.append('>');
 
+        // StAX may split one long CDATA section into several consecutive CDATA events. They are
+        // buffered and flushed as a single section so org.json sees one CDATA (kept verbatim,
+        // unlike text content which it trims) rather than an array of chunks.
+        var pendingCdata = new StringBuilder();
         int depth = 1;
         while (reader.hasNext() && depth > 0) {
             int event = reader.next();
+            if (event != XMLStreamConstants.CDATA) {
+                flushCdata(sb, pendingCdata);
+            }
             switch (event) {
                 case XMLStreamConstants.START_ELEMENT:
                     depth++;
@@ -490,7 +495,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                     sb.append(escapeXmlContent(reader.getText()));
                     break;
                 case XMLStreamConstants.CDATA:
-                    sb.append("<![CDATA[").append(reader.getText()).append("]]>");
+                    pendingCdata.append(reader.getText());
                     break;
                 default:
                     break;
@@ -500,6 +505,13 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         sb.append("</").append(localName).append('>');
 
         return sb.toString();
+    }
+
+    private static void flushCdata(StringBuilder sb, StringBuilder pendingCdata) {
+        if (pendingCdata.length() > 0) {
+            sb.append("<![CDATA[").append(pendingCdata).append("]]>");
+            pendingCdata.setLength(0);
+        }
     }
 
     /**
