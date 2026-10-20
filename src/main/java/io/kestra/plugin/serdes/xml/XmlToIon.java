@@ -183,7 +183,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             .build();
     }
 
-    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, boolean unwrapRootCollection, File tempFile, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
+    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, boolean unwrapRootCollection, File tempFile, Set<String> forceString,
+        boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
         var collectionChildName = unwrapRootCollection ? detectRootCollectionChild(runContext, from, charset) : null;
 
         var effectiveParserConfiguration = xmlParserConfiguration;
@@ -244,6 +245,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         // Disable external entities for security
         factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
         factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        // Merge adjacent text/CDATA events: StAX otherwise splits long CDATA into several events
+        factory.setProperty(XMLInputFactory.IS_COALESCING, true);
 
         try (
             InputStream is = runContext.storage().getFile(from);
@@ -325,7 +328,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         return hasNestedElement;
     }
 
-    private long runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
+    private long runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile, Set<String> forceString,
+        boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
         // Parse query: "/catalog/book" → parentSegments=["catalog"], elementName="book"
         var segments = query.replaceFirst("^/", "").split("/");
         var parentSegments = new String[segments.length - 1];
@@ -336,6 +340,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         // Disable external entities for security
         factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
         factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        // Merge adjacent text/CDATA events: StAX otherwise splits long CDATA into several events
+        factory.setProperty(XMLInputFactory.IS_COALESCING, true);
 
         var recordCount = 0;
 

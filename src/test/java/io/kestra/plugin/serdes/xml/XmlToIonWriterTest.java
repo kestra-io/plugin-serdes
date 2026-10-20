@@ -618,6 +618,37 @@ class XmlToIonWriterTest {
         assertThat(record.get("LotNumber"), is("25E2568"));
     }
 
+    private Map<String, Object> readQueryItem(String xml) throws Exception {
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), xml);
+        return readSingleRecord(this.reader(sourceFile, "/items/item").getUri());
+    }
+
+    @Test
+    void longCdataWithQueryIsSingleString() throws Exception {
+        // CDATA larger than the StAX buffer used to be split into chunks and end up as a nested array.
+        String text = "Lorem ipsum dolor sit amet. ".repeat(399);
+        Map<String, Object> record = readQueryItem("<items><item><description><![CDATA[" + text + "]]></description></item></items>");
+
+        assertThat(record.get("description"), instanceOf(String.class));
+        assertThat(record.get("description"), is(text.trim()));
+    }
+
+    @Test
+    void mixedTextAndCdataWithQueryIsSingleString() throws Exception {
+        Map<String, Object> record = readQueryItem("<items><item><d>a &amp; b <![CDATA[<c> & d]]></d></item></items>");
+
+        assertThat(record.get("d"), instanceOf(String.class));
+        assertThat(record.get("d"), is("a & b <c> & d"));
+    }
+
+    @Test
+    void cdataWithMarkupLookingTextIsKeptLiterallyWithQuery() throws Exception {
+        Map<String, Object> record = readQueryItem("<items><item><d><![CDATA[<tag>x</tag> & y]]></d></item></items>");
+
+        assertThat(record.get("d"), is("<tag>x</tag> & y"));
+    }
+
     @Test
     void largeXmlStreaming() throws Exception {
         int recordCount = 10_000;
