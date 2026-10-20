@@ -157,7 +157,6 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         Long lineCount;
 
         if (this.from instanceof String fromStr) {
-            this.init(runContext);
             try (SXSSFWorkbook workbook = new SXSSFWorkbook(1)) {
                 File tempFile = runContext.workingDir().createTempFile(".xlsx").toFile();
 
