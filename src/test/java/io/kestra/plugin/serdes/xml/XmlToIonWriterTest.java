@@ -667,6 +667,12 @@ class XmlToIonWriterTest {
     }
 
     @Test
+    void cdataSplitEndMarkerQueryParity() throws Exception {
+        // "]]>" is encoded by splitting it across two CDATA sections; query mode must not merge it into one.
+        assertQueryParity("<![CDATA[foo]]]]><![CDATA[>bar]]>");
+    }
+
+    @Test
     void cdataWithMarkupLookingTextIsKeptLiterallyWithQuery() throws Exception {
         var record = readItem("<items><item><d><![CDATA[<tag>x</tag> & y]]></d></item></items>", "/items/item");
 

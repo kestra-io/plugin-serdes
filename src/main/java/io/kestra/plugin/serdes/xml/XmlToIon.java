@@ -464,9 +464,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         }
         sb.append('>');
 
-        // StAX may split one long CDATA section into several consecutive CDATA events. They are
-        // buffered and flushed as a single section so org.json sees one CDATA (kept verbatim,
-        // unlike text content which it trims) rather than an array of chunks.
+        // StAX may split one CDATA section into several events; re-emit them as one
         var pendingCdata = new StringBuilder();
         int depth = 1;
         while (reader.hasNext() && depth > 0) {
@@ -509,7 +507,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
 
     private static void flushCdata(StringBuilder sb, StringBuilder pendingCdata) {
         if (pendingCdata.length() > 0) {
-            sb.append("<![CDATA[").append(pendingCdata).append("]]>");
+            // "]]>" can only come from a split section (e.g. "]]" + ">"), so re-split it
+            sb.append("<![CDATA[").append(pendingCdata.toString().replace("]]>", "]]]]><![CDATA[>")).append("]]>");
             pendingCdata.setLength(0);
         }
     }
