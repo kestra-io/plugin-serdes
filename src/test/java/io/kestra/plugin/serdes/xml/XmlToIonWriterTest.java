@@ -2,6 +2,7 @@ package io.kestra.plugin.serdes.xml;
 
 import java.io.*;
 import java.net.URI;
+import java.nio.file.Files;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -452,6 +453,68 @@ class XmlToIonWriterTest {
 
         assertThat(record.get("LotNumber"), instanceOf(String.class));
         assertThat(record.get("LotNumber"), is("25E2568"));
+    }
+
+    private Map<String, Object> readItem(String xml, String query) throws Exception {
+        var sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        Files.writeString(sourceFile.toPath(), xml);
+        return readSingleRecord(this.reader(sourceFile, query).getUri());
+    }
+
+    /**
+     * Runs the same document through query mode and no-query mode (single child kept under its
+     * root, so it is navigated manually) and asserts the element values are identical; returns the value for further checks.
+     */
+    @SuppressWarnings("unchecked")
+    private Object assertQueryParity(String itemContent) throws Exception {
+        var xml = "<items><item><d>" + itemContent + "</d><k>1</k></item></items>";
+        var withQuery = readItem(xml, "/items/item");
+        var withoutQuery = readItem(xml, null);
+        var withoutQueryItem = (Map<String, Object>) ((Map<String, Object>) withoutQuery.get("items")).get("item");
+
+        assertThat(withQuery.get("d"), is(withoutQueryItem.get("d")));
+        return withQuery.get("d");
+    }
+
+    @Test
+    void longCdataWithQueryIsSingleString() throws Exception {
+        // CDATA larger than the StAX buffer used to be split into chunks and end up as a nested array.
+        var text = "Lorem ipsum dolor sit amet. ".repeat(399);
+        var record = readItem("<items><item><description><![CDATA[" + text + "]]></description></item></items>", "/items/item");
+
+        assertThat(record.get("description"), instanceOf(String.class));
+        assertThat(record.get("description"), is(text));
+    }
+
+    @Test
+    void longCdataQueryParity() throws Exception {
+        var text = "Lorem ipsum dolor sit amet. ".repeat(399);
+
+        assertThat(assertQueryParity("<![CDATA[" + text + "]]>"), is(text));
+    }
+
+    @Test
+    void cdataWhitespaceQueryParity() throws Exception {
+        assertThat(assertQueryParity("<![CDATA[  \n leading and trailing \n  ]]>"), is("  \n leading and trailing \n  "));
+    }
+
+    @Test
+    void mixedTextAndCdataQueryParity() throws Exception {
+        // Whatever the no-query path returns for mixed content, query mode must return the same.
+        assertQueryParity("a &amp; b <![CDATA[<c> & d]]>");
+    }
+
+    @Test
+    void cdataSplitEndMarkerQueryParity() throws Exception {
+        // "]]>" is encoded by splitting it across two CDATA sections; query mode must not merge it into one.
+        assertQueryParity("<![CDATA[foo]]]]><![CDATA[>bar]]>");
+    }
+
+    @Test
+    void cdataWithMarkupLookingTextIsKeptLiterallyWithQuery() throws Exception {
+        var record = readItem("<items><item><d><![CDATA[<tag>x</tag> & y]]></d></item></items>", "/items/item");
+
+        assertThat(record.get("d"), is("<tag>x</tag> & y"));
     }
 
     @Test

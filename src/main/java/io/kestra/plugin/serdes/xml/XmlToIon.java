@@ -157,7 +157,8 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
             .build();
     }
 
-    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, File tempFile, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
+    private long runBatch(RunContext runContext, URI from, String charset, XMLParserConfiguration xmlParserConfiguration, File tempFile, Set<String> forceString, boolean keepNumberAsString,
+        boolean keepBooleanAsString) throws Exception {
         try (
             Reader input = new BufferedReader(
                 new InputStreamReader(runContext.storage().getFile(from), charset),
@@ -223,17 +224,15 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         return jsonObject;
     }
 
-    private long runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile, Set<String> forceString, boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
+    private long runStreaming(RunContext runContext, URI from, String charset, String query, XMLParserConfiguration xmlParserConfiguration, File tempFile, Set<String> forceString,
+        boolean keepNumberAsString, boolean keepBooleanAsString) throws Exception {
         // Parse query: "/catalog/book" → parentSegments=["catalog"], elementName="book"
         var segments = query.replaceFirst("^/", "").split("/");
         var parentSegments = new String[segments.length - 1];
         System.arraycopy(segments, 0, parentSegments, 0, segments.length - 1);
         var elementName = segments[segments.length - 1];
 
-        var factory = XMLInputFactory.newInstance();
-        // Disable external entities for security
-        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        var factory = newSecureXmlInputFactory();
 
         var recordCount = 0;
 
@@ -341,6 +340,14 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         return true;
     }
 
+    private static XMLInputFactory newSecureXmlInputFactory() {
+        var factory = XMLInputFactory.newInstance();
+        // Disable external entities for security
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        return factory;
+    }
+
     /**
      * Read the current element (the reader is positioned on its START_ELEMENT)
      * and return its complete XML subtree as a string, including the element tag itself.
@@ -358,9 +365,14 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         }
         sb.append('>');
 
+        // StAX may split one CDATA section into several events; re-emit them as one
+        var pendingCdata = new StringBuilder();
         int depth = 1;
         while (reader.hasNext() && depth > 0) {
             int event = reader.next();
+            if (event != XMLStreamConstants.CDATA) {
+                flushCdata(sb, pendingCdata);
+            }
             switch (event) {
                 case XMLStreamConstants.START_ELEMENT:
                     depth++;
@@ -382,7 +394,7 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
                     sb.append(escapeXmlContent(reader.getText()));
                     break;
                 case XMLStreamConstants.CDATA:
-                    sb.append("<![CDATA[").append(reader.getText()).append("]]>");
+                    pendingCdata.append(reader.getText());
                     break;
                 default:
                     break;
@@ -392,6 +404,14 @@ public class XmlToIon extends Task implements RunnableTask<XmlToIon.Output> {
         sb.append("</").append(localName).append('>');
 
         return sb.toString();
+    }
+
+    private static void flushCdata(StringBuilder sb, StringBuilder pendingCdata) {
+        if (pendingCdata.length() > 0) {
+            // "]]>" can only come from a split section (e.g. "]]" + ">"), so re-split it
+            sb.append("<![CDATA[").append(pendingCdata.toString().replace("]]>", "]]]]><![CDATA[>")).append("]]>");
+            pendingCdata.setLength(0);
+        }
     }
 
     /**
