@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.net.URI;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +37,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 class IonToExcelTest {
@@ -73,6 +75,20 @@ class IonToExcelTest {
     @Test
     void noHeader() throws Exception {
         this.test("excel/insurance_sample.ion", "excel/insurance_sample_no_header.xlsx", false);
+    }
+
+    @Test
+    void shouldFailBeforeWritingWhenTimeZoneIdIsInvalid() throws Exception {
+        URI inputUri = this.serdesUtils.resourceToStorageObject(SerdesUtils.resourceToFile("excel/insurance_sample.ion"));
+
+        IonToExcel writer = IonToExcel.builder()
+            .id(IonToExcelTest.class.getSimpleName())
+            .type(IonToExcel.class.getName())
+            .from(inputUri.toString())
+            .timeZoneId(Property.ofValue("Not/AZone"))
+            .build();
+
+        assertThrows(DateTimeException.class, () -> writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of())));
     }
 
     @Test

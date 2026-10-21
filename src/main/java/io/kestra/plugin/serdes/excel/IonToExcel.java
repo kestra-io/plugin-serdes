@@ -194,7 +194,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)) {
             var renderedHeaderValue = runContext.render(this.header).as(Boolean.class).orElseThrow();
             var renderedStyles = runContext.render(this.styles).as(Boolean.class).orElseThrow();
-            var renderedTimeZoneId = runContext.render(this.getTimeZoneId()).as(String.class).orElse(null);
+            var zoneId = runContext.render(this.getTimeZoneId()).as(String.class).map(ZoneId::of).orElse(null);
 
             SXSSFSheet sheet = workbook.createSheet(title);
 
@@ -215,7 +215,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
                             int cellAt = 0;
                             for (final Object value : casted) {
-                                createCell(workbook, sheet, value, xssfRow, cellAt, renderedStyles, renderedTimeZoneId);
+                                createCell(workbook, sheet, value, xssfRow, cellAt, renderedStyles, zoneId);
                                 ++cellAt;
                             }
 
@@ -227,7 +227,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                                 if (renderedHeaderValue) {
                                     int cellAt = 0;
                                     for (final Object value : casted.keySet()) {
-                                        createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles, renderedTimeZoneId);
+                                        createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles, zoneId);
                                     }
                                     xssfRow = sheet.createRow(rowAt++);
                                 }
@@ -235,7 +235,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
 
                             int cellAt = 0;
                             for (final Object value : casted.values()) {
-                                createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles, renderedTimeZoneId);
+                                createCell(workbook, sheet, value, xssfRow, cellAt++, renderedStyles, zoneId);
                             }
                         }
                     }
@@ -250,7 +250,7 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
         return lineCount;
     }
 
-    private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber, boolean styles, String renderedTimeZoneId) {
+    private void createCell(Workbook workbook, Sheet sheet, Object value, SXSSFRow xssfRow, int rowNumber, boolean styles, ZoneId zoneId) {
         SXSSFCell cell = xssfRow.createCell(rowNumber);
 
         switch (value) {
@@ -299,8 +299,8 @@ public class IonToExcel extends AbstractTextWriter implements RunnableTask<IonTo
                     sheet.setDefaultColumnStyle(cell.getColumnIndex(), getCellStyle(workbook));
                 }
 
-                if (renderedTimeZoneId != null) {
-                    LocalDate date = LocalDate.ofInstant(instant, ZoneId.of(renderedTimeZoneId));
+                if (zoneId != null) {
+                    LocalDate date = LocalDate.ofInstant(instant, zoneId);
                     cell.setCellValue(DateUtil.getExcelDate(date));
                 } else {
                     Date date = Date.from(instant);

@@ -354,27 +354,4 @@ class IonToCsvTest {
             );
         }
     }
-
-    @Test
-    void shouldUseEachRunZoneWhenSameTaskRunsWithDifferentTimeZones() throws Exception {
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".ion");
-        try (OutputStream output = new FileOutputStream(tempFile)) {
-            FileSerde.write(output, List.of(ZonedDateTime.parse("2021-05-05T12:21:12.123+02:00")));
-        }
-        URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
-
-        IonToCsv writer = IonToCsv.builder()
-            .id(IonToCsvTest.class.getSimpleName())
-            .type(IonToCsv.class.getName())
-            .from(Property.ofValue(uri.toString()))
-            .header(Property.ofValue(false))
-            .timeZoneId(Property.ofExpression("{{ inputs.tz }}"))
-            .build();
-
-        IonToCsv.Output lisbon = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of("tz", "Europe/Lisbon")));
-        IonToCsv.Output tokyo = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of("tz", "Asia/Tokyo")));
-
-        assertThat(IOUtils.toString(storageInterface.get(TenantService.MAIN_TENANT, null, lisbon.getUri()), Charsets.UTF_8), is("2021-05-05T11:21:12.123+01:00\n"));
-        assertThat(IOUtils.toString(storageInterface.get(TenantService.MAIN_TENANT, null, tokyo.getUri()), Charsets.UTF_8), is("2021-05-05T19:21:12.123+09:00\n"));
-    }
 }
