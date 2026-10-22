@@ -54,40 +54,33 @@ public abstract class AbstractTextWriter extends Task {
     @PluginProperty(group = "advanced")
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
-    @Getter(AccessLevel.NONE)
-    private transient DateTimeFormatter dateFormatter;
-
-    @Getter(AccessLevel.NONE)
-    private transient DateTimeFormatter timeFormatter;
-
-    @Getter(AccessLevel.NONE)
-    private transient DateTimeFormatter dateTimeFormatter;
-
-    @Getter(AccessLevel.NONE)
-    private transient ZoneId zoneId;
-
-    protected void init(RunContext runContext) throws IllegalVariableEvaluationException {
-        dateFormatter = DateTimeFormatter.ofPattern(runContext.render(this.dateFormat));
-        timeFormatter = DateTimeFormatter.ofPattern(runContext.render(this.timeFormat));
-        dateTimeFormatter = DateTimeFormatter.ofPattern(runContext.render(this.dateTimeFormat));
-        zoneId = ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow());
+    protected Formatters formatters(RunContext runContext) throws IllegalVariableEvaluationException {
+        return new Formatters(
+            DateTimeFormatter.ofPattern(runContext.render(this.dateFormat)),
+            DateTimeFormatter.ofPattern(runContext.render(this.timeFormat)),
+            DateTimeFormatter.ofPattern(runContext.render(this.dateTimeFormat)),
+            ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow())
+        );
     }
 
-    protected String convert(Object value) {
+    protected static String convert(Object value, Formatters formatters) {
         if (value == null) {
             return null;
         } else if (value instanceof Instant || value instanceof Date || value instanceof LocalDateTime) {
-            return this.dateTimeFormatter.withZone(zoneId).withZone(ZoneOffset.UTC).format((TemporalAccessor) value);
+            return formatters.dateTime().withZone(formatters.zoneId()).withZone(ZoneOffset.UTC).format((TemporalAccessor) value);
         } else if (value instanceof OffsetDateTime || value instanceof ZonedDateTime) {
-            return this.dateTimeFormatter.withZone(zoneId).format((TemporalAccessor) value);
+            return formatters.dateTime().withZone(formatters.zoneId()).format((TemporalAccessor) value);
         } else if (value instanceof LocalDate) {
-            return this.dateFormatter.format((TemporalAccessor) value);
+            return formatters.date().format((TemporalAccessor) value);
         } else if (value instanceof LocalTime) {
-            return this.timeFormatter.withZone(zoneId).format((TemporalAccessor) value);
+            return formatters.time().withZone(formatters.zoneId()).format((TemporalAccessor) value);
         } else if (value instanceof OffsetTime) {
-            return this.timeFormatter.format((TemporalAccessor) value);
+            return formatters.time().format((TemporalAccessor) value);
         } else {
             return value.toString();
         }
+    }
+
+    protected record Formatters(DateTimeFormatter date, DateTimeFormatter time, DateTimeFormatter dateTime, ZoneId zoneId) {
     }
 }

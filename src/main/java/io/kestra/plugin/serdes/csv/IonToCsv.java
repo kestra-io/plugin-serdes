@@ -183,7 +183,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
         URI rFrom = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         // formatter
-        this.init(runContext);
+        var formatters = this.formatters(runContext);
 
         try (
             InputStream is = new BufferedInputStream(runContext.storage().getFile(rFrom), FileSerde.BUFFER_SIZE);
@@ -206,7 +206,7 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
                                 throw new IllegalArgumentException("Invalid data of type List with header");
                             }
 
-                            var record = casted.stream().map(field -> convert(field)).toList();
+                            var record = casted.stream().map(field -> convert(field, formatters)).toList();
                             csvWriter.writeRecord(record);
                         } else if (row instanceof Map) {
                             Map<String, Object> casted = (Map<String, Object>) row;
@@ -214,12 +214,12 @@ public class IonToCsv extends AbstractTextWriter implements RunnableTask<IonToCs
                             if (!first) {
                                 this.first = true;
                                 if (rHeaderValue) {
-                                    var record = casted.keySet().stream().map(field -> convert(field)).toList();
+                                    var record = casted.keySet().stream().map(field -> convert(field, formatters)).toList();
                                     csvWriter.writeRecord(record);
                                 }
                             }
 
-                            var record = casted.values().stream().map(field -> convert(field)).toList();
+                            var record = casted.values().stream().map(field -> convert(field, formatters)).toList();
                             csvWriter.writeRecord(record);
                         }
                     }
