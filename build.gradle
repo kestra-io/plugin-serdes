@@ -109,7 +109,7 @@ dependencies {
     implementation "org.jsoup:jsoup:1.23.2" // for HTML parsing (required by flexmark-html2md-converter)
 
     implementation 'com.networknt:json-schema-validator' // version managed by the Kestra platform BOM
-    implementation 'org.jruby.joni:joni:2.2.6' // ECMA-262 regex for JSON Schema "pattern"
+    implementation 'org.jruby.joni:joni:2.2.7' // ECMA-262 regex for JSON Schema "pattern"
 }
 
 configurations.configureEach {
