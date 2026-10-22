@@ -55,11 +55,17 @@ public abstract class AbstractTextWriter extends Task {
     private final Property<String> timeZoneId = Property.ofValue(ZoneId.systemDefault().toString());
 
     protected Formatters formatters(RunContext runContext) throws IllegalVariableEvaluationException {
+        var zoneId = ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow());
+        var time = DateTimeFormatter.ofPattern(runContext.render(this.timeFormat));
+        var dateTime = DateTimeFormatter.ofPattern(runContext.render(this.dateTimeFormat));
+
+        // zones are bound once here, since withZone() allocates a new formatter on every call
         return new Formatters(
             DateTimeFormatter.ofPattern(runContext.render(this.dateFormat)),
-            DateTimeFormatter.ofPattern(runContext.render(this.timeFormat)),
-            DateTimeFormatter.ofPattern(runContext.render(this.dateTimeFormat)),
-            ZoneId.of(runContext.render(this.timeZoneId).as(String.class).orElseThrow())
+            time,
+            time.withZone(zoneId),
+            dateTime.withZone(zoneId),
+            dateTime.withZone(ZoneOffset.UTC)
         );
     }
 
@@ -67,13 +73,13 @@ public abstract class AbstractTextWriter extends Task {
         if (value == null) {
             return null;
         } else if (value instanceof Instant || value instanceof Date || value instanceof LocalDateTime) {
-            return formatters.dateTime().withZone(formatters.zoneId()).withZone(ZoneOffset.UTC).format((TemporalAccessor) value);
+            return formatters.utcDateTime().format((TemporalAccessor) value);
         } else if (value instanceof OffsetDateTime || value instanceof ZonedDateTime) {
-            return formatters.dateTime().withZone(formatters.zoneId()).format((TemporalAccessor) value);
+            return formatters.zonedDateTime().format((TemporalAccessor) value);
         } else if (value instanceof LocalDate) {
             return formatters.date().format((TemporalAccessor) value);
         } else if (value instanceof LocalTime) {
-            return formatters.time().withZone(formatters.zoneId()).format((TemporalAccessor) value);
+            return formatters.zonedTime().format((TemporalAccessor) value);
         } else if (value instanceof OffsetTime) {
             return formatters.time().format((TemporalAccessor) value);
         } else {
@@ -81,6 +87,11 @@ public abstract class AbstractTextWriter extends Task {
         }
     }
 
-    protected record Formatters(DateTimeFormatter date, DateTimeFormatter time, DateTimeFormatter dateTime, ZoneId zoneId) {
+    protected record Formatters(
+        DateTimeFormatter date,
+        DateTimeFormatter time,
+        DateTimeFormatter zonedTime,
+        DateTimeFormatter zonedDateTime,
+        DateTimeFormatter utcDateTime) {
     }
 }
