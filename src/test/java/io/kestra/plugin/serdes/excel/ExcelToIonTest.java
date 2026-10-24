@@ -431,6 +431,41 @@ public class ExcelToIonTest {
     }
 
     @Test
+    void skipRowsWithoutHeaderSkipsLeadingRows() throws Exception {
+        var sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("Sheet1");
+            sheet.createRow(0).createCell(0).setCellValue("Sales report");
+
+            var firstRow = sheet.createRow(1);
+            firstRow.createCell(0).setCellValue(1);
+            firstRow.createCell(1).setCellValue(2);
+
+            var secondRow = sheet.createRow(2);
+            secondRow.createCell(0).setCellValue(3);
+            secondRow.createCell(1).setCellValue(4);
+
+            try (var out = new FileOutputStream(sourceFile)) {
+                workbook.write(out);
+            }
+        }
+
+        var source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        var reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(false))
+            .skipRows(1)
+            .build();
+        var ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        var out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
+        assertThat(out, is("$ion_1_0 [1e0,2e0] [3e0,4e0]"));
+    }
+
+    @Test
     void formulaRenderDoesNotThrowOnNonFormulaHeaderCells() throws Exception {
         // valueRender=FORMULA routes every cell through getFormula(), including the header row,
         // which never holds formula cells; it must not crash on those.
