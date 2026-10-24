@@ -1,9 +1,9 @@
 plugins {
-    id 'io.kestra.gradle.repository-conventions' version '1.2.11'
-    id "io.kestra.gradle.plugin-doc-lint" version '1.2.11'
-    id 'io.kestra.gradle.spotless-conventions' version '1.2.11'
+    id 'io.kestra.gradle.repository-conventions' version '1.2.12'
+    id "io.kestra.gradle.plugin-doc-lint" version '1.2.12'
+    id 'io.kestra.gradle.spotless-conventions' version '1.2.12'
     id "com.vanniktech.maven.publish" version "0.37.0"
-    id "io.kestra.gradle.inject-bom-versions" version '1.2.11'
+    id "io.kestra.gradle.inject-bom-versions" version '1.2.12'
     id 'java-library'
     id "idea"
     id 'jacoco'
@@ -103,13 +103,13 @@ dependencies {
     }
     implementation group: 'org.json', name: 'json', version: '20260814'
 
-    implementation "org.commonmark:commonmark:0.30.0" // for Markdown
+    implementation "org.commonmark:commonmark:0.30.1" // for Markdown
     implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
     implementation "com.vladsch.flexmark:flexmark-html2md-converter:0.64.8" // for HTML to Markdown conversion
     implementation "org.jsoup:jsoup:1.23.2" // for HTML parsing (required by flexmark-html2md-converter)
 
     implementation 'com.networknt:json-schema-validator' // version managed by the Kestra platform BOM
-    implementation 'org.jruby.joni:joni:2.2.6' // ECMA-262 regex for JSON Schema "pattern"
+    implementation 'org.jruby.joni:joni:2.2.7' // ECMA-262 regex for JSON Schema "pattern"
 }
 
 configurations.configureEach {
