@@ -230,8 +230,10 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
                     );
                 }
 
-                // If we hit EOF or no fields, stop
-                if (message == null || message.getAllFields().isEmpty()) {
+                // Non-delimited: an empty input has no message to emit.
+                // Delimited: an all-defaults proto3 message is encoded with a zero length prefix and is
+                // still a valid record; EOF is detected by mergeDelimitedFrom above.
+                if (!isDelimited && message.getAllFields().isEmpty()) {
                     break;
                 }
 

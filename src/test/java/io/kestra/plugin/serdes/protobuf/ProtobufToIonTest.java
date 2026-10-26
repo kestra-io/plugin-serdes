@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.protobuf;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
@@ -20,6 +21,7 @@ import io.kestra.core.exceptions.KilledException;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.TestsUtils;
@@ -167,6 +169,34 @@ class ProtobufToIonTest {
     }
 
     @Test
+    void testDelimitedAllDefaultsMessageInMiddleIsNotTreatedAsEof() throws Exception {
+        File data = File.createTempFile("product-delimited-defaults-middle", ".pb");
+        data.deleteOnExit();
+        createDelimitedFile(data, loadDescriptor(), Map.of("product_id", "1"), Map.of(),
+            Map.of("product_id", "3"), Map.of("product_id", "4"));
+
+        var output = runDelimited(data);
+
+        // ProtoJSON prints an all-defaults message as {}, so it is written as an empty record
+        assertThat(output.getSize(), is(4L));
+        assertThat(readRecords(output), is(List.of(
+            Map.of("productId", "1"), Map.of(), Map.of("productId", "3"), Map.of("productId", "4")
+        )));
+    }
+
+    @Test
+    void testDelimitedTrailingAllDefaultsMessageIsKept() throws Exception {
+        File data = File.createTempFile("product-delimited-defaults-last", ".pb");
+        data.deleteOnExit();
+        createDelimitedFile(data, loadDescriptor(), Map.of("product_id", "1"), Map.of());
+
+        var output = runDelimited(data);
+
+        assertThat(output.getSize(), is(2L));
+        assertThat(readRecords(output), is(List.of(Map.of("productId", "1"), Map.of())));
+    }
+
+    @Test
     void testKillBeforeRunFailsWithKilledException() throws Exception {
         URI source = serdesUtils.resourceToStorageObject(delimitedV10File);
         URI descriptorUri = serdesUtils.resourceToStorageObject(descriptorV10File);
@@ -290,6 +320,29 @@ class ProtobufToIonTest {
     }
 
     // ---------- Helpers ----------
+
+    private static Descriptor loadDescriptor() throws Exception {
+        return ProtobufTools.findMessageDescriptor(
+            FileDescriptorSet.parseFrom(new FileInputStream(descriptorV10File)), TYPE_NAME
+        );
+    }
+
+    private ProtobufToIon.Output runDelimited(File data) throws Exception {
+        var task = ProtobufToIon.builder().id("protobuf-to-ion-delimited-defaults")
+            .type(ProtobufToIon.class.getName())
+            .from(Property.ofValue(serdesUtils.resourceToStorageObject(data).toString()))
+            .descriptorFile(Property.ofValue(serdesUtils.resourceToStorageObject(descriptorV10File).toString()))
+            .typeName(Property.ofValue(TYPE_NAME)).delimited(Property.ofValue(true))
+            .build();
+
+        return task.run(TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of()));
+    }
+
+    private List<Object> readRecords(ProtobufToIon.Output output) throws IOException {
+        try (InputStream inputStream = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
+            return FileSerde.readAll(inputStream).collectList().block();
+        }
+    }
 
     private static void createSingleFile(File output, Descriptors.Descriptor descriptor,
         Map<String, Object> fields) throws IOException {
