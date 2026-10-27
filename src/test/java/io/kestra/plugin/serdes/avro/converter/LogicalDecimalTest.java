@@ -21,6 +21,9 @@ public class LogicalDecimalTest {
             Arguments.of("12.828282", new BigDecimal("12.828282"), 8, 6),
             Arguments.of(12L, new BigDecimal("12.00"), 4, 2),
             Arguments.of(12, new BigDecimal("12.00"), 4, 2),
+            Arguments.of(7, new BigDecimal("7.00"), 12, 2),
+            Arguments.of(250L, new BigDecimal("250.00"), 12, 2),
+            Arguments.of(5, new BigDecimal("5.00"), 10, 2),
             Arguments.of(12.8444D, new BigDecimal("12.84"), 4, 2),
             Arguments.of(12.8444F, new BigDecimal("12.84"), 4, 2),
             Arguments.of("2019", new BigDecimal("2019"), 4, 0)
