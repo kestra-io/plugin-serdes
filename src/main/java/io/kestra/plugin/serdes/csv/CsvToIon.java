@@ -226,18 +226,29 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
             OnEmptyHeader rOnEmptyHeaderValue = runContext.render(this.onEmptyHeader).as(OnEmptyHeader.class).orElse(OnEmptyHeader.DROP);
 
-            Flux<Object> flowable = Flux
-                .fromIterable(csvReader)
-                .onErrorResume(CsvParseException.class, e ->
-                {
-                    if (rOnBadLinesValue == OnBadLines.ERROR) {
-                        return Flux.error(e);
-                    } else if (rOnBadLinesValue == OnBadLines.WARN) {
-                        runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
-                    } else if (rOnBadLinesValue == OnBadLines.SKIP) {
-                        // silently skip
+            var iterator = csvReader.iterator();
+            Flux<CsvRecord> flowable = Flux
+                .<CsvRecord>generate(sink -> {
+                    while (true) {
+                        try {
+                            if (!iterator.hasNext()) {
+                                sink.complete();
+                                return;
+                            }
+                            CsvRecord record = iterator.next();
+                            sink.next(record);
+                            return;
+                        } catch (CsvParseException e) {
+                            if (rOnBadLinesValue == OnBadLines.ERROR) {
+                                sink.error(e);
+                                return;
+                            } else if (rOnBadLinesValue == OnBadLines.WARN) {
+                                runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
+                            } else if (rOnBadLinesValue == OnBadLines.SKIP) {
+                                // silently skip
+                            }
+                        }
                     }
-                    return Flux.empty();
                 })
                 .filter(csvRecord ->
                 {

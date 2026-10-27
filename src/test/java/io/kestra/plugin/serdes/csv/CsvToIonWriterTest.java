@@ -917,4 +917,34 @@ class CsvToIonWriterTest {
         Throwable thrown = assertThrows(RuntimeException.class, () -> readerError.run(runContextError));
         assertThat(thrown.getMessage(), containsString("Bad line encountered"));
     }
+
+    @Test
+    void badQuotesPreservesSubsequentRows() throws Exception {
+        String csv = "k,v\n10,alpha\n20,\"be\"ta\n30,gamma\n40,delta\n50,eps\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/badQuotesPreservesSubsequentRows.csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon readerSkip = CsvToIon.builder()
+            .id("badQuotesSkip")
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        RunContext runContextSkip = TestsUtils.mockRunContext(runContextFactory, readerSkip, ImmutableMap.of());
+        CsvToIon.Output output = readerSkip.run(runContextSkip);
+
+        Counter recordsSkip = (Counter) runContextSkip.metrics()
+            .stream()
+            .filter(metric -> metric.getName().equals("records"))
+            .findFirst()
+            .orElseThrow();
+
+        // Total 5 rows minus 1 bad row (row 2) = 4 records processed
+        assertThat(recordsSkip.getValue(), is(4D));
+        assertThat(output.getSize(), is(greaterThan(0L)));
+    }
 }
