@@ -22,7 +22,9 @@ public class LogicalDecimalTest {
             Arguments.of(12L, new BigDecimal("12.00"), 4, 2),
             Arguments.of(12, new BigDecimal("12.00"), 4, 2),
             Arguments.of(7, new BigDecimal("7.00"), 12, 2),
+            Arguments.of(-7, new BigDecimal("-7.00"), 12, 2),
             Arguments.of(250L, new BigDecimal("250.00"), 12, 2),
+            Arguments.of(30_000_000_000L, new BigDecimal("30000000000.00"), 14, 2),
             Arguments.of(5, new BigDecimal("5.00"), 10, 2),
             Arguments.of(12.8444D, new BigDecimal("12.84"), 4, 2),
             Arguments.of(12.8444F, new BigDecimal("12.84"), 4, 2),
@@ -35,6 +37,15 @@ public class LogicalDecimalTest {
     void convert(Object v, BigDecimal expected, Integer precision, Integer scale) throws Exception {
         Schema schema = LogicalTypes.decimal(precision, scale).addToSchema(Schema.create(Schema.Type.BYTES));
         AvroConverterTest.Utils.oneField(v, expected, schema, false);
+    }
+
+    @org.junit.jupiter.api.Test
+    void shouldThrowWhenIntegerExceedsPrecision() {
+        Schema schema = LogicalTypes.decimal(3, 2).addToSchema(Schema.create(Schema.Type.BYTES));
+        org.junit.jupiter.api.Assertions.assertThrows(
+            AvroConverter.IllegalRowConvertion.class,
+            () -> AvroConverterTest.Utils.oneField(12, new BigDecimal("12.00"), schema, false)
+        );
     }
 
     static Stream<Arguments> separator() {
