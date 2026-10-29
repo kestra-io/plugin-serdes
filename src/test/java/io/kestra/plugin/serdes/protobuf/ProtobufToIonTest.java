@@ -24,6 +24,7 @@ import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 
@@ -170,23 +171,29 @@ class ProtobufToIonTest {
 
     @Test
     void testDelimitedAllDefaultsMessageInMiddleIsNotTreatedAsEof() throws Exception {
-        File data = File.createTempFile("product-delimited-defaults-middle", ".pb");
+        var data = File.createTempFile("product-delimited-defaults-middle", ".pb");
         data.deleteOnExit();
-        createDelimitedFile(data, loadDescriptor(), Map.of("product_id", "1"), Map.of(),
-            Map.of("product_id", "3"), Map.of("product_id", "4"));
+        createDelimitedFile(
+            data, loadDescriptor(), Map.of("product_id", "1"), Map.of(),
+            Map.of("product_id", "3"), Map.of("product_id", "4")
+        );
 
         var output = runDelimited(data);
 
         // ProtoJSON prints an all-defaults message as {}, so it is written as an empty record
         assertThat(output.getSize(), is(4L));
-        assertThat(readRecords(output), is(List.of(
-            Map.of("productId", "1"), Map.of(), Map.of("productId", "3"), Map.of("productId", "4")
-        )));
+        assertThat(
+            readRecords(output), is(
+                List.of(
+                    Map.of("productId", "1"), Map.of(), Map.of("productId", "3"), Map.of("productId", "4")
+                )
+            )
+        );
     }
 
     @Test
     void testDelimitedTrailingAllDefaultsMessageIsKept() throws Exception {
-        File data = File.createTempFile("product-delimited-defaults-last", ".pb");
+        var data = File.createTempFile("product-delimited-defaults-last", ".pb");
         data.deleteOnExit();
         createDelimitedFile(data, loadDescriptor(), Map.of("product_id", "1"), Map.of());
 
@@ -322,13 +329,13 @@ class ProtobufToIonTest {
     // ---------- Helpers ----------
 
     private static Descriptor loadDescriptor() throws Exception {
-        return ProtobufTools.findMessageDescriptor(
-            FileDescriptorSet.parseFrom(new FileInputStream(descriptorV10File)), TYPE_NAME
-        );
+        try (InputStream inputStream = new FileInputStream(descriptorV10File)) {
+            return ProtobufTools.findMessageDescriptor(FileDescriptorSet.parseFrom(inputStream), TYPE_NAME);
+        }
     }
 
     private ProtobufToIon.Output runDelimited(File data) throws Exception {
-        var task = ProtobufToIon.builder().id("protobuf-to-ion-delimited-defaults")
+        var task = ProtobufToIon.builder().id(IdUtils.create())
             .type(ProtobufToIon.class.getName())
             .from(Property.ofValue(serdesUtils.resourceToStorageObject(data).toString()))
             .descriptorFile(Property.ofValue(serdesUtils.resourceToStorageObject(descriptorV10File).toString()))

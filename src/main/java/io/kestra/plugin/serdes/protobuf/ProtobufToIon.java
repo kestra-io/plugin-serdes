@@ -230,9 +230,7 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
                     );
                 }
 
-                // Non-delimited: an empty input has no message to emit.
-                // Delimited: an all-defaults proto3 message is encoded with a zero length prefix and is
-                // still a valid record; EOF is detected by mergeDelimitedFrom above.
+                // a zero-length delimited record is a valid all-defaults message, only mergeDelimitedFrom signals EOF
                 if (!isDelimited && message.getAllFields().isEmpty()) {
                     break;
                 }
