@@ -295,16 +295,15 @@ public class AvroConverter {
     protected BigDecimal logicalDecimal(Schema schema, Object data) {
         int scale = ((LogicalTypes.Decimal) schema.getLogicalType()).getScale();
         int precision = ((LogicalTypes.Decimal) schema.getLogicalType()).getPrecision();
-        double multiply = Math.pow(10D, precision - scale * 1D);
 
         BigDecimal value;
 
         if (data instanceof String) {
             value = new BigDecimal(convertDecimalSeparator(((String) data)));
         } else if (data instanceof Long) {
-            value = BigDecimal.valueOf((long) ((long) data * multiply), scale);
+            value = BigDecimal.valueOf((Long) data);
         } else if (data instanceof Integer) {
-            value = BigDecimal.valueOf((int) ((int) data * multiply), scale);
+            value = BigDecimal.valueOf((Integer) data);
         } else if (data instanceof Double) {
             value = new BigDecimal((double) data, new MathContext(precision));
         } else if (data instanceof Float) {
