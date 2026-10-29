@@ -436,6 +436,49 @@ class XmlToIonWriterTest {
         assertThat(records, contains(""));
     }
 
+    private List<Object> readAllWithQuery(String xml, String query) throws Exception {
+        File sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xml");
+        java.nio.file.Files.writeString(sourceFile.toPath(), xml);
+        XmlToIon.Output output = this.reader(sourceFile, query);
+        try (var inputStream = runContextFactory.of().storage().getFile(output.getUri())) {
+            List<Object> records = FileSerde.readAll(inputStream).collectList().block();
+            assertThat(output.getSize(), is((long) records.size()));
+            return records;
+        }
+    }
+
+    @Test
+    void queryReadsChildrenOfEveryMatchingParent() throws Exception {
+        // #449: the query path used to stop at the end of the first matching parent
+        var records = readAllWithQuery(
+            "<shop><dept><p><n>1</n></p><p><n>2</n></p></dept><dept><p><n>3</n></p></dept><dept><p><n>4</n></p></dept></shop>",
+            "/shop/dept/p"
+        );
+
+        assertThat(records, contains(Map.of("n", 1), Map.of("n", 2), Map.of("n", 3), Map.of("n", 4)));
+    }
+
+    @Test
+    void queryOnlyMatchesTheExactPath() throws Exception {
+        // Same element names outside the query path, at another depth or under another parent, are ignored
+        var records = readAllWithQuery(
+            "<shop><p><n>0</n></p><dept><p><n>1</n></p><box><p><n>9</n></p></box></dept><other><p><n>8</n></p></other><dept><p><n>2</n></p></dept></shop>",
+            "/shop/dept/p"
+        );
+
+        assertThat(records, contains(Map.of("n", 1), Map.of("n", 2)));
+    }
+
+    @Test
+    void queryReadsRepeatedParentsAtDeeperLevels() throws Exception {
+        var records = readAllWithQuery(
+            "<a><b><c><d>1</d></c></b><b><c><d>2</d></c><c><d>3</d></c></b></a>",
+            "/a/b/c"
+        );
+
+        assertThat(records, contains(Map.of("d", 1), Map.of("d", 2), Map.of("d", 3)));
+    }
+
     @Test
     void numericLikeStringPreservedAsString() throws Exception {
         // #412: org.json parses "25E2568" as scientific notation into a BigDecimal that
