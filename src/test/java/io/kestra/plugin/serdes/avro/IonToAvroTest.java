@@ -223,6 +223,62 @@ class IonToAvroTest {
     }
 
     @Test
+    void inferAllFieldsKeepsBooleanLikeStringsInStringColumns() throws Exception {
+        // Issue #445: the issue's CSV example after CsvToIon, where every value
+        // is a string. The inferred schema types every column as string, so the
+        // trueValues/falseValues words must survive verbatim, and no row may
+        // be dropped under onBadLines SKIP.
+        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_infer_all_bool_strings_", ".ion");
+        try (OutputStream output = new FileOutputStream(tempFile)) {
+            FileSerde.write(output, issue445Row("0", "alice", "yes", null));
+            FileSerde.write(output, issue445Row("1", "bob", "no", "vip"));
+            FileSerde.write(output, issue445Row("2", "carol", "on", "x"));
+            FileSerde.write(output, issue445Row("3", "dave", "maybe", "y"));
+        }
+
+        URI uri = storageInterface.put(TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".ion"), new FileInputStream(tempFile));
+
+        IonToAvro writer = IonToAvro.builder()
+            .id(IdUtils.create())
+            .type(IonToAvro.class.getName())
+            .from(Property.ofValue(uri.toString()))
+            .schema(null)
+            .inferAllFields(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        IonToAvro.Output output = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+
+        assertThat(output.getSize(), is(4L));
+        try (var inputStream = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
+            DatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
+            DataFileStream<GenericRecord> dataFileReader = new DataFileStream<>(inputStream, datumReader);
+
+            List<GenericRecord> records = new ArrayList<>();
+            dataFileReader.forEach(records::add);
+
+            assertThat(records.size(), is(4));
+            assertThat(records.get(0).get("id").toString(), is("0"));
+            assertThat(records.get(0).get("active").toString(), is("yes"));
+            assertThat(records.get(1).get("id").toString(), is("1"));
+            assertThat(records.get(1).get("active").toString(), is("no"));
+            assertThat(records.get(2).get("id").toString(), is("2"));
+            assertThat(records.get(2).get("active").toString(), is("on"));
+            assertThat(records.get(3).get("id").toString(), is("3"));
+            assertThat(records.get(3).get("active").toString(), is("maybe"));
+        }
+    }
+
+    private static Map<String, Object> issue445Row(String id, String name, String active, String note) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", id);
+        row.put("name", name);
+        row.put("active", active);
+        row.put("note", note);
+        return row;
+    }
+
+    @Test
     void nullIntoNonNullableStringFieldFailsWithOnBadLinesError() throws Exception {
         File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_null_string_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
