@@ -3,14 +3,18 @@ package io.kestra.plugin.serdes.avro.converter;
 import java.math.BigDecimal;
 import java.util.stream.Stream;
 
+import org.apache.avro.AvroTypeException;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import io.kestra.plugin.serdes.avro.AvroConverter;
 import io.kestra.plugin.serdes.avro.AvroConverterTest;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class LogicalDecimalTest {
     static Stream<Arguments> source() {
@@ -39,11 +43,12 @@ public class LogicalDecimalTest {
         AvroConverterTest.Utils.oneField(v, expected, schema, false);
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     void shouldThrowWhenIntegerExceedsPrecision() {
         Schema schema = LogicalTypes.decimal(3, 2).addToSchema(Schema.create(Schema.Type.BYTES));
-        org.junit.jupiter.api.Assertions.assertThrows(
-            AvroConverter.IllegalRowConvertion.class,
+        // 12 -> 12.00 needs precision 4: the Avro encoder rejects it, not the converter
+        assertThrows(
+            AvroTypeException.class,
             () -> AvroConverterTest.Utils.oneField(12, new BigDecimal("12.00"), schema, false)
         );
     }
