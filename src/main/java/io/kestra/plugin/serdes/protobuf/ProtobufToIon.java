@@ -230,8 +230,8 @@ public class ProtobufToIon extends Task implements RunnableTask<ProtobufToIon.Ou
                     );
                 }
 
-                // If we hit EOF or no fields, stop
-                if (message == null || message.getAllFields().isEmpty()) {
+                // a zero-length delimited record is a valid all-defaults message, only mergeDelimitedFrom signals EOF
+                if (!isDelimited && message.getAllFields().isEmpty()) {
                     break;
                 }
 
