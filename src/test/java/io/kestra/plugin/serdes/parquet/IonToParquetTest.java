@@ -339,11 +339,8 @@ class IonToParquetTest {
     @SuppressWarnings("unchecked")
     @Test
     void inferAllFieldsKeepsBooleanLikeStringsInStringColumns() throws Exception {
-        // Issue #445: the issue's CSV example after CsvToIon, where every value
-        // is a string. The inferred schema types every column as string, so the
-        // trueValues/falseValues words must survive verbatim instead of being
-        // rewritten to "true" or "false".
-        File tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_infer_all_bool_strings_", ".ion");
+        // #445
+        var tempFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_infer_all_bool_strings_", ".ion");
         try (OutputStream output = new FileOutputStream(tempFile)) {
             FileSerde.write(output, issue445Row("0", "alice", "yes", null));
             FileSerde.write(output, issue445Row("1", "bob", "no", "vip"));
@@ -351,13 +348,13 @@ class IonToParquetTest {
             FileSerde.write(output, issue445Row("3", "dave", "maybe", "y"));
         }
 
-        URI uri = storageInterface.put(
+        var uri = storageInterface.put(
             TenantService.MAIN_TENANT, null,
             URI.create("/" + IdUtils.create() + ".ion"),
             new FileInputStream(tempFile)
         );
 
-        IonToParquet writer = IonToParquet.builder()
+        var writer = IonToParquet.builder()
             .id(IdUtils.create())
             .type(IonToParquet.class.getName())
             .from(Property.ofValue(uri.toString()))
@@ -365,22 +362,22 @@ class IonToParquetTest {
             .inferAllFields(Property.ofValue(true))
             .build();
 
-        IonToParquet.Output writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
+        var writerOutput = writer.run(TestsUtils.mockRunContext(runContextFactory, writer, ImmutableMap.of()));
 
-        ParquetToIon reader = ParquetToIon.builder()
+        var reader = ParquetToIon.builder()
             .id(IdUtils.create())
             .type(ParquetToIon.class.getName())
             .from(Property.ofValue(writerOutput.getUri().toString()))
             .build();
 
-        ParquetToIon.Output readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+        var readerOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
 
-        List<Map<String, Object>> result = new ArrayList<>();
+        var result = new ArrayList<Map<String, Object>>();
         FileSerde.read(storageInterface.get(TenantService.MAIN_TENANT, null, readerOutput.getUri()), r -> result.add((Map<String, Object>) r));
 
         assertThat(result.size(), is(4));
-        assertThat(String.valueOf(result.get(0).get("id")), is("0"));
-        assertThat(String.valueOf(result.get(0).get("active")), is("yes"));
+        assertThat(String.valueOf(result.getFirst().get("id")), is("0"));
+        assertThat(String.valueOf(result.getFirst().get("active")), is("yes"));
         assertThat(String.valueOf(result.get(1).get("id")), is("1"));
         assertThat(String.valueOf(result.get(1).get("active")), is("no"));
         assertThat(String.valueOf(result.get(2).get("id")), is("2"));
@@ -390,7 +387,7 @@ class IonToParquetTest {
     }
 
     private static Map<String, Object> issue445Row(String id, String name, String active, String note) {
-        Map<String, Object> row = new HashMap<>();
+        var row = new HashMap<String, Object>();
         row.put("id", id);
         row.put("name", name);
         row.put("active", active);

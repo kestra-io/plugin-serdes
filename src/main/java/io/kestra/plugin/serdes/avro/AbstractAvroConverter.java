@@ -137,8 +137,9 @@ public abstract class AbstractAvroConverter extends Task {
             If `true`, schema inference scans **all rows** (ignoring `numberOfRowsToScan`) and attempts to infer \
             all field types using `trueValues`, `falseValues`, and `nullValues`. \
             This prevents fields that are null in the first scanned rows from being typed as NULL. \
-            If `false`, only the first `numberOfRowsToScan` rows are scanned, and booleans/nulls are inferred \
-            only on fields declared in the schema as `null` or `bool`."""
+            If `false`, only the first `numberOfRowsToScan` rows are scanned. \
+            `trueValues` and `falseValues` only apply to fields whose schema has a boolean branch; \
+            string columns keep their values verbatim."""
     )
     @PluginProperty(group = "advanced")
     protected Property<Boolean> inferAllFields = Property.ofValue(false);

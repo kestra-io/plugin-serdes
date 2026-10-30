@@ -3,18 +3,15 @@ package io.kestra.plugin.serdes.avro.converter;
 import java.util.stream.Stream;
 
 import org.apache.avro.Schema;
+import org.apache.avro.util.Utf8;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import io.kestra.plugin.serdes.avro.AvroConverterTest;
 
-/**
- * Regression tests for issue #445: with inferAllFields enabled, a string
- * value that appears in trueValues/falseValues must not be rewritten to a
- * boolean when the field's schema type is string. Only fields whose schema
- * actually allows a boolean may convert.
- */
+// #445
 public class InferBooleanStringTest {
     static Stream<Arguments> stringValues() {
         return Stream.of(
@@ -32,7 +29,7 @@ public class InferBooleanStringTest {
     @ParameterizedTest
     @MethodSource("stringValues")
     void stringFieldKeepsOriginalValue(String value) throws Exception {
-        AvroConverterTest.Utils.oneField(value, value, Schema.create(Schema.Type.STRING), true);
+        AvroConverterTest.Utils.oneField(value, new Utf8(value), Schema.create(Schema.Type.STRING), true);
     }
 
     @ParameterizedTest
@@ -40,10 +37,21 @@ public class InferBooleanStringTest {
     void nullableStringFieldKeepsOriginalValue(String value) throws Exception {
         AvroConverterTest.Utils.oneField(
             value,
-            value,
+            new Utf8(value),
             Schema.createUnion(Schema.create(Schema.Type.NULL), Schema.create(Schema.Type.STRING)),
             true
         );
+    }
+
+    @Test
+    void mixedUnionFieldConvertsBooleanWordsButKeepsOtherStrings() throws Exception {
+        Schema mixed = Schema.createUnion(
+            Schema.create(Schema.Type.NULL),
+            Schema.create(Schema.Type.BOOLEAN),
+            Schema.create(Schema.Type.STRING)
+        );
+        AvroConverterTest.Utils.oneField("yes", true, mixed, true);
+        AvroConverterTest.Utils.oneField("maybe", new Utf8("maybe"), mixed, true);
     }
 
     static Stream<Arguments> booleanValues() {

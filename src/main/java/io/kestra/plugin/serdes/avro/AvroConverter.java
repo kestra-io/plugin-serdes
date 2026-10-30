@@ -613,18 +613,7 @@ public class AvroConverter {
         return list.stream().anyMatch(s -> s.equalsIgnoreCase(data));
     }
 
-    /**
-     * Whether a schema can hold a boolean value: a BOOLEAN type itself, or a
-     * UNION with a BOOLEAN branch. Any other type (including a UNION of NULL
-     * and STRING, which is what schema inference produces for a column of
-     * plain strings) must keep the original string, even when that string
-     * appears in trueValues or falseValues. Without this check, a
-     * string-typed column was converted to a Boolean that its schema rejects:
-     * IonToAvro then failed or dropped the row under onBadLines SKIP, while
-     * IonToParquet silently wrote "true" or "false" in place of the original
-     * value. A genuinely boolean field still converts through primitiveBool
-     * (or through this early return), so boolean columns are unaffected.
-     */
+    // String columns must keep trueValues/falseValues words verbatim.
     private static boolean schemaAllowsBoolean(Schema schema) {
         if (schema == null) {
             return false;
@@ -635,11 +624,7 @@ public class AvroConverter {
         }
 
         if (schema.getType() == Schema.Type.UNION) {
-            for (Schema branch : schema.getTypes()) {
-                if (schemaAllowsBoolean(branch)) {
-                    return true;
-                }
-            }
+            return schema.getTypes().stream().anyMatch(AvroConverter::schemaAllowsBoolean);
         }
 
         return false;
