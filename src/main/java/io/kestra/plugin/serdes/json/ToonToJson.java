@@ -186,8 +186,9 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
         private static final String QUOTED_STRING = "\"[^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+\"";
 
+        // A bare or quoted key, then [N], then an optional {fields} list whose quoted names may contain } or "
         private static final Pattern KEY_ARRAY_PATTERN = Pattern.compile(
-            "^(" + QUOTED_STRING + "|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:" + QUOTED_STRING + "[^}\"]*+)*+)})?$"
+            "^(%1$s|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:%1$s[^}\"]*+)*+)})?$".formatted(QUOTED_STRING)
         );
 
         private final List<Line> lines = new ArrayList<>();
@@ -516,7 +517,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
         }
 
         /**
-         * Split a comma-separated line into tokens, honoring double quotes.
+         * Split a comma-separated line into tokens, honoring double quotes and backslash escapes inside them.
          */
         private List<String> splitByCommaRespectingQuotes(String line) {
             List<String> result = new ArrayList<>();

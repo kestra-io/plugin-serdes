@@ -360,14 +360,14 @@ class ToonToJsonTest {
         var name = "x".repeat(10_000);
         var temp = File.createTempFile("long_fields_", ".toon");
         try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
-            w.write("rows[1]{" + name + ",\"" + name + " y\"}:\n  1,2\n");
+            w.write("rows[1]{%1$s,\"%1$s y\"}:\n  1,2\n".formatted(name));
         }
 
         var output = convert(temp);
         var result = readResult(output.getUri());
 
         var expected = MAPPER.createObjectNode();
-        expected.putArray("rows").addObject().put(name, 1).put(name + " y", 2);
+        expected.putArray("rows").addObject().put(name, 1).put("%s y".formatted(name), 2);
         assertThat(readJson(result), is(expected));
     }
 
@@ -395,5 +395,76 @@ class ToonToJsonTest {
             """;
 
         assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void escapedQuotesInValues() throws Exception {
+        var toon = """
+            rows[2]{name,note}:
+              Ada,"a\\",b"
+              Alan,plain
+            tags[2]: "x\\",y",z
+            """;
+
+        var temp = File.createTempFile("escaped_values_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = """
+            {
+              "rows": [
+                {"name": "Ada", "note": "a\\",b"},
+                {"name": "Alan", "note": "plain"}
+              ],
+              "tags": ["x\\",y", "z"]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void roundTripQuotedKeysAndValues() throws Exception {
+        var json = """
+            {
+              "full name": "Ada Lovelace",
+              "order:id": 7,
+              "say \\"hi\\"": "a\\",b",
+              "": "empty",
+              "user info": {"e-mail": "ada@example.com"},
+              "tags[1]": ["x", "y,z", "q\\",r"],
+              "rows": [
+                {"first name": "Ada", "a,b": "x\\",y", "a}b": 1},
+                {"first name": "Alan", "a,b": "z", "a}b": 2}
+              ],
+              "list:items": [{"item id": 1, "member list": ["Ada", "Alan"]}],
+              "a[0]{\\"": [{"b": 1}]
+            }
+            """;
+
+        var jsonFile = File.createTempFile("round_trip_", ".json");
+        try (var w = new FileWriter(jsonFile, StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+
+        var jsonToToon = JsonToToon.builder()
+            .id(JsonToToon.class.getSimpleName())
+            .type(JsonToToon.class.getName())
+            .from(Property.ofValue(this.serdesUtils.resourceToStorageObject(jsonFile).toString()))
+            .build();
+        var toonOutput = jsonToToon.run(TestsUtils.mockRunContext(this.runContextFactory, jsonToToon, ImmutableMap.of()));
+
+        var toonToJson = ToonToJson.builder()
+            .id(ToonToJson.class.getSimpleName())
+            .type(ToonToJson.class.getName())
+            .from(Property.ofValue(toonOutput.getUri().toString()))
+            .build();
+        var jsonOutput = toonToJson.run(TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of()));
+
+        assertThat(readJson(readResult(jsonOutput.getUri())), is(readJson(json)));
     }
 }
