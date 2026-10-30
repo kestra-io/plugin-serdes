@@ -45,7 +45,7 @@ public class InferBooleanStringTest {
 
     @Test
     void mixedUnionFieldConvertsBooleanWordsButKeepsOtherStrings() throws Exception {
-        Schema mixed = Schema.createUnion(
+        var mixed = Schema.createUnion(
             Schema.create(Schema.Type.NULL),
             Schema.create(Schema.Type.BOOLEAN),
             Schema.create(Schema.Type.STRING)
