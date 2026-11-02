@@ -75,8 +75,8 @@ dependencies {
         exclude group: 'com.fasterxml.jackson.core'
     }
     implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.18.1'
-    implementation group: 'org.apache.poi', name: 'poi', version: '5.5.1'
-    implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
+    implementation group: 'org.apache.poi', name: 'poi', version: '6.0.0'
+    implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '6.0.0'
     implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.3.0'
     // ION, provided at runtime by io.kestra:core, whose FileSerde is ION-based. Bundling a second copy
     // would let the child-first PluginClassLoader define its own com.amazon.ion.* classes, so values
