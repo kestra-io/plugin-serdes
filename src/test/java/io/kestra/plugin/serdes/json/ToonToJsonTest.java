@@ -290,4 +290,181 @@ class ToonToJsonTest {
 
         assertThat(readJson(result), is(readJson(expected)));
     }
+
+    @Test
+    void quotedKeys() throws Exception {
+        var toon = """
+            "full name": Ada Lovelace
+            "order:id": 7
+            "say \\"hi\\"": hello
+            "": empty
+            "user info":
+              "e-mail": ada@example.com
+            "tags[1]"[2]: x,y
+            rows[2]{"first name",age,"a,b"}:
+              Ada,36,1
+              Alan,41,2
+            "list:items"[1]:
+              - "item id": 1
+                "item name": pen
+            groups[1]:
+              - "member list"[1]: Ada
+            "a[0]{\\""[1]{b}:
+              1
+            """;
+
+        var temp = File.createTempFile("quoted_keys_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = """
+            {
+              "full name": "Ada Lovelace",
+              "order:id": 7,
+              "say \\"hi\\"": "hello",
+              "": "empty",
+              "user info": {"e-mail": "ada@example.com"},
+              "tags[1]": ["x", "y"],
+              "rows": [
+                {"first name": "Ada", "age": 36, "a,b": 1},
+                {"first name": "Alan", "age": 41, "a,b": 2}
+              ],
+              "list:items": [{"item id": 1, "item name": "pen"}],
+              "groups": [{"member list": ["Ada"]}],
+              "a[0]{\\"": [{"b": 1}]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void quotedRootStringWithColon() throws Exception {
+        var temp = File.createTempFile("quoted_root_string_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write("\"a:b\"");
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        assertThat(readJson(result), is(readJson("\"a:b\"")));
+    }
+
+    @Test
+    void longTabularFieldNames() throws Exception {
+        var name = "x".repeat(10_000);
+        var temp = File.createTempFile("long_fields_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write("rows[1]{%1$s,\"%1$s y\"}:\n  1,2\n".formatted(name));
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = MAPPER.createObjectNode();
+        expected.putArray("rows").addObject().put(name, 1).put("%s y".formatted(name), 2);
+        assertThat(readJson(result), is(expected));
+    }
+
+    @Test
+    void quotedKeysInRootTabularArray() throws Exception {
+        var toon = """
+            [2]{"first name","last:name","a}b","a\\",b"}:
+              Ada,Lovelace,1,x
+              Alan,Turing,2,y
+            """;
+
+        var temp = File.createTempFile("quoted_root_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = """
+            [
+              {"first name": "Ada", "last:name": "Lovelace", "a}b": 1, "a\\",b": "x"},
+              {"first name": "Alan", "last:name": "Turing", "a}b": 2, "a\\",b": "y"}
+            ]
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void escapedQuotesInValues() throws Exception {
+        var toon = """
+            rows[2]{name,note}:
+              Ada,"a\\",b"
+              Alan,plain
+            tags[2]: "x\\",y",z
+            """;
+
+        var temp = File.createTempFile("escaped_values_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = """
+            {
+              "rows": [
+                {"name": "Ada", "note": "a\\",b"},
+                {"name": "Alan", "note": "plain"}
+              ],
+              "tags": ["x\\",y", "z"]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void roundTripQuotedKeysAndValues() throws Exception {
+        var json = """
+            {
+              "full name": "Ada Lovelace",
+              "order:id": 7,
+              "say \\"hi\\"": "a\\",b",
+              "": "empty",
+              "user info": {"e-mail": "ada@example.com"},
+              "tags[1]": ["x", "y,z", "q\\",r"],
+              "rows": [
+                {"first name": "Ada", "a,b": "x\\",y", "a}b": 1},
+                {"first name": "Alan", "a,b": "z", "a}b": 2}
+              ],
+              "list:items": [{"item id": 1, "member list": ["Ada", "Alan"]}],
+              "a[0]{\\"": [{"b": 1}]
+            }
+            """;
+
+        var jsonFile = File.createTempFile("round_trip_", ".json");
+        try (var w = new FileWriter(jsonFile, StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+
+        var jsonToToon = JsonToToon.builder()
+            .id(JsonToToon.class.getSimpleName())
+            .type(JsonToToon.class.getName())
+            .from(Property.ofValue(this.serdesUtils.resourceToStorageObject(jsonFile).toString()))
+            .build();
+        var toonOutput = jsonToToon.run(TestsUtils.mockRunContext(this.runContextFactory, jsonToToon, ImmutableMap.of()));
+
+        var toonToJson = ToonToJson.builder()
+            .id(ToonToJson.class.getSimpleName())
+            .type(ToonToJson.class.getName())
+            .from(Property.ofValue(toonOutput.getUri().toString()))
+            .build();
+        var jsonOutput = toonToJson.run(TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of()));
+
+        assertThat(readJson(readResult(jsonOutput.getUri())), is(readJson(json)));
+    }
 }

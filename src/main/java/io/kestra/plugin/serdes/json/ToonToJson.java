@@ -184,7 +184,12 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
     private static class ToonParser {
         private static final int INDENT_SIZE = 2;
 
-        private static final Pattern KEY_ARRAY_PATTERN = Pattern.compile("^(.*?)\\[(\\d+)](?:\\{([^}]*)})?$");
+        private static final String QUOTED_STRING = "\"[^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+\"";
+
+        // A bare or quoted key, then [N], then an optional {fields} list whose quoted names may contain } or "
+        private static final Pattern KEY_ARRAY_PATTERN = Pattern.compile(
+            "^(%1$s|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:%1$s[^}\"]*+)*+)})?$".formatted(QUOTED_STRING)
+        );
 
         private final List<Line> lines = new ArrayList<>();
         private int index = 0;
@@ -234,7 +239,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             }
 
             // Root primitive form: single primitive line without colon or header
-            if (!first.text.contains(":") && !first.text.startsWith("[") && lines.size() == 1) {
+            if (findKeyColon(first.text) < 0 && !first.text.startsWith("[") && lines.size() == 1) {
                 index = 1;
                 return parseScalar(first.text.trim());
             }
@@ -245,7 +250,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
         }
 
         private boolean isRootArrayHeader(String text) {
-            int colonIdx = text.indexOf(':');
+            var colonIdx = findKeyColon(text);
             if (colonIdx < 0) {
                 return false;
             }
@@ -260,7 +265,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
         private Object parseRootArray() {
             Line first = lines.getFirst();
-            int colonIdx = first.text.indexOf(':');
+            var colonIdx = findKeyColon(first.text);
             String header = first.text.substring(0, colonIdx).trim();
             String rest = first.text.substring(colonIdx + 1).trim();
 
@@ -303,7 +308,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 }
 
                 index++;
-                int colonIdx = text.indexOf(':');
+                var colonIdx = findKeyColon(text);
                 if (colonIdx < 0) {
                     continue;
                 }
@@ -314,7 +319,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 Matcher m = KEY_ARRAY_PATTERN.matcher(keyPart);
                 if (m.matches()) {
                     // Array field: key[N]: ..., key[N]{fields}:
-                    String key = m.group(1).trim();
+                    var key = parseKey(m.group(1));
                     int size = Integer.parseInt(m.group(2));
                     String fields = m.group(3);
 
@@ -326,10 +331,10 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 // Nested object: "key:"
                 if (rest.isEmpty()) {
                     Object nested = parseObject(indentLevel + 1);
-                    obj.put(keyPart, nested);
+                    obj.put(parseKey(keyPart), nested);
                 } else {
                     // Primitive: "key: value"
-                    obj.put(keyPart, parseScalar(rest));
+                    obj.put(parseKey(keyPart), parseScalar(rest));
                 }
             }
 
@@ -357,7 +362,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
             // Tabular array: key[N]{fields}:
             if (fields != null) {
-                String[] cols = splitFields(fields);
+                var cols = splitFields(fields);
                 List<Map<String, Object>> table = new ArrayList<>();
 
                 int rowsRead = 0;
@@ -376,8 +381,8 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
                     List<String> cellTokens = splitByCommaRespectingQuotes(rowText);
                     Map<String, Object> row = new LinkedHashMap<>();
-                    for (int j = 0; j < cols.length && j < cellTokens.size(); j++) {
-                        String colName = cols[j].trim();
+                    for (var j = 0; j < cols.size() && j < cellTokens.size(); j++) {
+                        var colName = cols.get(j);
                         String raw = cellTokens.get(j).trim();
                         row.put(colName, parseScalar(raw));
                     }
@@ -430,7 +435,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 return new LinkedHashMap<String, Object>();
             }
 
-            int colonIdx = text.indexOf(':');
+            var colonIdx = findKeyColon(text);
 
             // No colon: either "- value" (primitive) or "- [N]{...}: ..." (but header always has colon)
             if (colonIdx < 0) {
@@ -460,7 +465,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 // v3 §10: tabular rows at depth +2 relative to hyphen line
                 int arrayHeaderIndent = (fields != null) ? indentLevel + 1 : indentLevel;
                 Object arrayValue = parseArrayFromHeader(size, fields, rest, arrayHeaderIndent);
-                obj.put(key, arrayValue);
+                obj.put(parseKey(key), arrayValue);
 
                 // Additional fields of the same object item at depth +1
                 Map<String, Object> extra = parseObject(indentLevel + 1);
@@ -473,10 +478,10 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             Map<String, Object> obj = new LinkedHashMap<>();
             if (rest.isEmpty()) {
                 Object nested = parseObject(indentLevel + 1);
-                obj.put(beforeColon, nested);
+                obj.put(parseKey(beforeColon), nested);
             } else {
                 // "- key: value" primitive + optional extra fields
-                obj.put(beforeColon, parseScalar(rest));
+                obj.put(parseKey(beforeColon), parseScalar(rest));
 
                 Map<String, Object> extra = parseObject(indentLevel + 1);
                 obj.putAll(extra);
@@ -484,13 +489,35 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             return obj;
         }
 
-        private String[] splitFields(String fields) {
-            // Fields are keys, possibly quoted; our encoder never quotes field names
-            return fields.split(",", -1);
+        private List<String> splitFields(String fields) {
+            return splitByCommaRespectingQuotes(fields).stream().map(this::parseKey).toList();
+        }
+
+        private int findKeyColon(String text) {
+            var inQuotes = false;
+            for (var i = 0; i < text.length(); i++) {
+                var c = text.charAt(i);
+                if (inQuotes && c == '\\') {
+                    i++;
+                } else if (c == '"') {
+                    inQuotes = !inQuotes;
+                } else if (c == ':' && !inQuotes) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private String parseKey(String raw) {
+            var trimmed = raw.trim();
+            if (trimmed.length() >= 2 && trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+                return unescape(trimmed.substring(1, trimmed.length() - 1));
+            }
+            return trimmed;
         }
 
         /**
-         * Split a comma-separated line into tokens, honoring double quotes.
+         * Split a comma-separated line into tokens, honoring double quotes and backslash escapes inside them.
          */
         private List<String> splitByCommaRespectingQuotes(String line) {
             List<String> result = new ArrayList<>();
@@ -500,7 +527,9 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             for (int i = 0; i < line.length(); i++) {
                 char c = line.charAt(i);
 
-                if (c == '"') {
+                if (inQuotes && c == '\\' && i + 1 < line.length()) {
+                    current.append(c).append(line.charAt(++i));
+                } else if (c == '"') {
                     inQuotes = !inQuotes;
                     current.append(c);
                 } else if (c == ',' && !inQuotes) {
