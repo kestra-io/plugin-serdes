@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.json;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.Writer;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
@@ -10,6 +11,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
@@ -25,7 +27,9 @@ import io.kestra.plugin.serdes.SerdesUtils;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 class ToonToJsonTest {
@@ -466,5 +470,185 @@ class ToonToJsonTest {
         var jsonOutput = toonToJson.run(TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of()));
 
         assertThat(readJson(readResult(jsonOutput.getUri())), is(readJson(json)));
+    }
+
+    private String convertToon(String toon) throws Exception {
+        var temp = File.createTempFile("toon_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+        return readResult(convert(temp).getUri());
+    }
+
+    @Test
+    void leadingZerosStayStrings() throws Exception {
+        var result = convertToon("""
+            zip: 05
+            order_id: 007
+            negative: -05
+            codes[2]: 0123,-007
+            rows[1]{code}:
+              042
+            """);
+
+        var expected = """
+            {
+              "zip": "05",
+              "order_id": "007",
+              "negative": "-05",
+              "codes": ["0123", "-007"],
+              "rows": [{"code": "042"}]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void exponentsBecomeNumbers() throws Exception {
+        var result = convertToon("""
+            population: 1e6
+            negative: -1E+03
+            mantissa: 2.5e2
+            ratio: 2.5e-1
+            one: 5E+00
+            zero: 0e1
+            nums[2]: 1e3,3E-02
+            """);
+
+        var expected = """
+            {
+              "population": 1000000,
+              "negative": -1000,
+              "mantissa": 250,
+              "ratio": 0.25,
+              "one": 5,
+              "zero": 0,
+              "nums": [1000, 0.03]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void exponentsOutsideLongRangeStayNumbers() throws Exception {
+        var result = convertToon("""
+            big: 1e30
+            small: 1e-10
+            huge: 1e999999999
+            tooBig: 1e99999999999
+            """);
+
+        var json = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result);
+
+        assertThat(json.get("big").decimalValue().compareTo(new BigDecimal("1e30")), is(0));
+        assertThat(json.get("small").decimalValue().compareTo(new BigDecimal("1e-10")), is(0));
+        assertThat(json.get("huge").decimalValue().compareTo(new BigDecimal("1e999999999")), is(0));
+        assertThat(json.get("tooBig").textValue(), is("1e99999999999"));
+    }
+
+    @Test
+    void notJsonNumbersStayStrings() throws Exception {
+        var result = convertToon("""
+            a: .5
+            b: 1.
+            c: +5
+            d: 1e
+            e: 0x10
+            f: 1_000
+            """);
+
+        var expected = """
+            {"a": ".5", "b": "1.", "c": "+5", "d": "1e", "e": "0x10", "f": "1_000"}
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void plainNumbersKeepTheirValue() throws Exception {
+        var result = convertToon("""
+            zero: 0
+            negativeZero: -0
+            integer: 42
+            decimal: 3.14
+            beyondLong: 123456789012345678901234
+            """);
+
+        var expected = """
+            {
+              "zero": 0,
+              "negativeZero": 0,
+              "integer": 42,
+              "decimal": 3.14,
+              "beyondLong": 123456789012345678901234
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void roundTripNumberLikeStrings() throws Exception {
+        var json = """
+            {"zip": "05", "exponent": "1e6", "negative": "-05", "number": 1000000, "small": 0.25}
+            """;
+
+        var jsonFile = File.createTempFile("round_trip_numbers_", ".json");
+        try (var w = new FileWriter(jsonFile, StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+
+        var jsonToToon = JsonToToon.builder()
+            .id(JsonToToon.class.getSimpleName())
+            .type(JsonToToon.class.getName())
+            .from(Property.ofValue(this.serdesUtils.resourceToStorageObject(jsonFile).toString()))
+            .build();
+        var toonOutput = jsonToToon.run(TestsUtils.mockRunContext(this.runContextFactory, jsonToToon, ImmutableMap.of()));
+
+        var toonToJson = ToonToJson.builder()
+            .id(ToonToJson.class.getSimpleName())
+            .type(ToonToJson.class.getName())
+            .from(Property.ofValue(toonOutput.getUri().toString()))
+            .build();
+        var jsonOutput = toonToJson.run(TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of()));
+
+        assertThat(readJson(readResult(jsonOutput.getUri())), is(readJson(json)));
+    }
+
+    @Test
+    void unicodeEscapes() throws Exception {
+        var result = convertToon("""
+            note: "a\\u00e9b"
+            upper: "a\\u00ABb"
+            control: "a\\u0004b"
+            "k\\u00e9y": 1
+            """);
+
+        var expected = """
+            {"note": "aéb", "upper": "a«b", "control": "a\\u0004b", "kéy": 1}
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void invalidEscapesFail() {
+        for (var toon : new String[] {
+            "val: \"a\\qb\"",
+            "val: \"a\\bb\"",
+            "\"a\\x\": 1",
+            "val: \"a\\u00b\"",
+            "val: \"\\u+0ab\"",
+            "val: \"\\u٠٠٤١\"",
+            "val: \"a\\uD800b\"",
+            "val: \"\\udc00\"",
+            "val: \"\\ud83d\\ude00\"",
+            "val: \"a\\\\\\\""
+        }) {
+            var exception = assertThrows(IllegalArgumentException.class, () -> convertToon(toon), toon);
+            assertThat(exception.getMessage(), containsString("escape"));
+        }
     }
 }

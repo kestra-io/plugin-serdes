@@ -6,6 +6,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -190,6 +191,8 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
         private static final Pattern KEY_ARRAY_PATTERN = Pattern.compile(
             "^(%1$s|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:%1$s[^}\"]*+)*+)})?$".formatted(QUOTED_STRING)
         );
+
+        private static final Pattern JSON_NUMBER = Pattern.compile("-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?");
 
         private final List<Line> lines = new ArrayList<>();
         private int index = 0;
@@ -586,34 +589,62 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 return unescape(trimmed.substring(1, trimmed.length() - 1));
             }
 
-            // number canonical form (integer or decimal, no exponent)
-            if (trimmed.matches("^-?\\d+(?:\\.\\d+)?$")) {
-                if (trimmed.contains(".")) {
-                    // decimal => BigDecimal
-                    try {
-                        return new BigDecimal(trimmed);
-                    } catch (NumberFormatException ignored) {
-                        return trimmed;
-                    }
-                } else {
-                    // integer => Long
-                    try {
-                        return Long.parseLong(trimmed);
-                    } catch (NumberFormatException ignored) {
-                        return new BigDecimal(trimmed); // fallback big integer
-                    }
-                }
+            if (JSON_NUMBER.matcher(trimmed).matches()) {
+                return parseNumber(trimmed);
             }
 
             // fallback: string
             return trimmed;
         }
 
+        private Object parseNumber(String token) {
+            BigDecimal number;
+            try {
+                number = new BigDecimal(token);
+            } catch (NumberFormatException ignored) {
+                return token;
+            }
+
+            if (number.scale() > 0) {
+                return number;
+            }
+
+            // Whole numbers go out as a long, because a BigDecimal would write 1e6 as 1E+6
+            try {
+                return number.longValueExact();
+            } catch (ArithmeticException ignored) {
+                return number;
+            }
+        }
+
+        private char parseUnicodeEscape(String s, int start) {
+            var end = Math.min(start + 4, s.length());
+            var digits = s.substring(start, end);
+            if (digits.length() < 4 || !digits.chars().allMatch(HexFormat::isHexDigit)) {
+                throw invalidEscape("\\u" + digits);
+            }
+            var codeUnit = (char) HexFormat.fromHexDigits(digits);
+            if (Character.isSurrogate(codeUnit)) {
+                throw invalidEscape("\\u" + digits);
+            }
+            return codeUnit;
+        }
+
+        private IllegalArgumentException invalidEscape(String escape) {
+            return new IllegalArgumentException(
+                "Invalid escape sequence '" + escape + "' in a TOON quoted string. The TOON file may be malformed or written by a non-conforming encoder. " +
+                    "Use only \\\\, \\\", \\n, \\r, \\t or \\uXXXX (not a surrogate), and write characters above U+FFFF as literal UTF-8."
+            );
+        }
+
         private String unescape(String s) {
             StringBuilder out = new StringBuilder(s.length());
             for (int i = 0; i < s.length(); i++) {
                 char c = s.charAt(i);
-                if (c == '\\' && i + 1 < s.length()) {
+                if (c == '\\') {
+                    if (i + 1 == s.length()) {
+                        throw invalidEscape("\\");
+                    }
                     char n = s.charAt(i + 1);
                     switch (n) {
                         case '\\' -> {
@@ -636,7 +667,11 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                             out.append('\t');
                             i++;
                         }
-                        default -> out.append(n);
+                        case 'u' -> {
+                            out.append(parseUnicodeEscape(s, i + 2));
+                            i += 5;
+                        }
+                        default -> throw invalidEscape("\\" + n);
                     }
                 } else {
                     out.append(c);
