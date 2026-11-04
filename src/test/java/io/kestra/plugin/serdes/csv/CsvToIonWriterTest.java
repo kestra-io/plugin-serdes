@@ -830,7 +830,7 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsWarn.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsWarn.getValue(), is(3D)); // header + 3 good lines processed, 2 bad lines skipped
 
         // Test SKIP
         CsvToIon readerSkip = CsvToIon.builder()
@@ -850,7 +850,7 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsSkip.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsSkip.getValue(), is(3D)); // header + 3 good lines processed, 2 bad lines skipped
     }
 
     @Test
