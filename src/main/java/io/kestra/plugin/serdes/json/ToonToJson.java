@@ -192,7 +192,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             "^(%1$s|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:%1$s[^}\"]*+)*+)})?$".formatted(QUOTED_STRING)
         );
 
-        // The decimal128 exponent range. A number with a larger written exponent stays a string,
+        // Decimal128's largest adjusted exponent, used as the limit in both directions. A number with a larger written exponent stays a string,
         // because a few bytes like 1e999999999 expand to a 1 GB string in toPlainString()
         private static final long MAX_NUMBER_EXPONENT = 6144;
 
