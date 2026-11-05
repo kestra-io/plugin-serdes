@@ -192,11 +192,12 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             "^(%1$s|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:%1$s[^}\"]*+)*+)})?$".formatted(QUOTED_STRING)
         );
 
-        // Decimal128's largest adjusted exponent, used as the limit in both directions. A number with a larger written exponent stays a string,
-        // because a few bytes like 1e999999999 expand to a 1 GB string in toPlainString()
+        // Decimal128's largest adjusted exponent, used as the limit in both directions. A number written with an
+        // exponent whose adjusted exponent is past it stays a string, because consumers that call toPlainString(),
+        // like JsonToToon, expand a few bytes like 1e999999999 into a 1 GB string. Zero only expands to the right
         private static final long MAX_NUMBER_EXPONENT = 6144;
 
-        private static final Pattern JSON_NUMBER = Pattern.compile("-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?");
+        private static final Pattern JSON_NUMBER = Pattern.compile("-?(?:0|[1-9]\\d*)(?:\\.\\d+)?([eE][+-]?\\d+)?");
 
         private final List<Line> lines = new ArrayList<>();
         private int index = 0;
@@ -593,15 +594,16 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 return unescape(trimmed.substring(1, trimmed.length() - 1));
             }
 
-            if (JSON_NUMBER.matcher(trimmed).matches()) {
-                return parseNumber(trimmed);
+            var numberMatch = JSON_NUMBER.matcher(trimmed);
+            if (numberMatch.matches()) {
+                return parseNumber(trimmed, numberMatch.group(1) != null);
             }
 
             // fallback: string
             return trimmed;
         }
 
-        private Object parseNumber(String token) {
+        private Object parseNumber(String token, boolean hasExponent) {
             BigDecimal number;
             try {
                 number = new BigDecimal(token);
@@ -609,7 +611,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 return token;
             }
 
-            if (hasHugeExponent(token)) {
+            if (hasExponent && expandsPastLimit(number)) {
                 return token;
             }
 
@@ -625,9 +627,11 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             }
         }
 
-        private boolean hasHugeExponent(String token) {
-            var exponentMarker = Math.max(token.indexOf('e'), token.indexOf('E'));
-            return exponentMarker >= 0 && Math.abs(Long.parseLong(token.substring(exponentMarker + 1))) > MAX_NUMBER_EXPONENT;
+        private boolean expandsPastLimit(BigDecimal number) {
+            if (number.signum() == 0) {
+                return number.scale() > MAX_NUMBER_EXPONENT;
+            }
+            return Math.abs((long) number.precision() - number.scale() - 1) > MAX_NUMBER_EXPONENT;
         }
 
         private char parseUnicodeEscape(String s, int start) {
