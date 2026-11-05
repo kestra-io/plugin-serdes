@@ -559,6 +559,9 @@ class ToonToJsonTest {
             huge: 1e999999999
             hugeNegative: -1.5e-999999999
             outsideBigDecimal: 1e99999999999
+            longMantissa: 10000000000e6144
+            zeroSmall: 0e-6145
+            smallMantissa: 0.01e-6143
             """);
 
         var json = MAPPER.readTree(result);
@@ -570,14 +573,47 @@ class ToonToJsonTest {
         assertThat(json.get("huge").textValue(), is("1e999999999"));
         assertThat(json.get("hugeNegative").textValue(), is("-1.5e-999999999"));
         assertThat(json.get("outsideBigDecimal").textValue(), is("1e99999999999"));
+        assertThat(json.get("longMantissa").textValue(), is("10000000000e6144"));
+        assertThat(json.get("zeroSmall").textValue(), is("0e-6145"));
+        assertThat(json.get("smallMantissa").textValue(), is("0.01e-6143"));
+    }
+
+    @Test
+    void exponentsInsideTheLimitStayNumbers() throws Exception {
+        var result = convertToon("""
+            zero: 0E+7000
+            scaled: 1000e6141
+            smallMantissa: 0.01e6146
+            zeroAtLimit: 0e-6144
+            """);
+
+        var json = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result);
+
+        assertThat(json.get("zero").isNumber(), is(true));
+        assertThat(json.get("zero").longValue(), is(0L));
+        assertThat(json.get("scaled").decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(json.get("smallMantissa").decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(json.get("zeroAtLimit").isNumber(), is(true));
+    }
+
+    @Test
+    void oneColumnCanMixNumbersAndStringsAroundTheExponentLimit() throws Exception {
+        var result = convertToon("""
+            vals[3]: 1e6144,1e6145,2
+            """);
+
+        var vals = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result).get("vals");
+
+        assertThat(vals.get(0).decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(vals.get(1).textValue(), is("1e6145"));
+        assertThat(vals.get(2).longValue(), is(2L));
     }
 
     @Test
     void longNumbersWithoutHugeExponentsStayNumbers() throws Exception {
         var integer = "1" + "0".repeat(7000);
         var fraction = "1." + "0".repeat(7000);
-        var shifted = integer + "e-1";
-        var result = convertToon("integer: " + integer + "\nfraction: " + fraction + "\nshifted: " + shifted + "\n");
+        var result = convertToon("integer: " + integer + "\nfraction: " + fraction + "\n");
 
         assertThat(result, not(containsString("\"1000")));
         assertThat(result, not(containsString("\"1.000")));
