@@ -192,6 +192,10 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             "^(%1$s|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:%1$s[^}\"]*+)*+)})?$".formatted(QUOTED_STRING)
         );
 
+        // The decimal128 exponent range. A number with a larger written exponent stays a string,
+        // because a few bytes like 1e999999999 expand to a 1 GB string in toPlainString()
+        private static final long MAX_NUMBER_EXPONENT = 6144;
+
         private static final Pattern JSON_NUMBER = Pattern.compile("-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?");
 
         private final List<Line> lines = new ArrayList<>();
@@ -605,6 +609,10 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 return token;
             }
 
+            if (hasHugeExponent(token)) {
+                return token;
+            }
+
             if (number.scale() > 0) {
                 return number;
             }
@@ -615,6 +623,11 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             } catch (ArithmeticException ignored) {
                 return number;
             }
+        }
+
+        private boolean hasHugeExponent(String token) {
+            var exponentMarker = Math.max(token.indexOf('e'), token.indexOf('E'));
+            return exponentMarker >= 0 && Math.abs(Long.parseLong(token.substring(exponentMarker + 1))) > MAX_NUMBER_EXPONENT;
         }
 
         private char parseUnicodeEscape(String s, int start) {
