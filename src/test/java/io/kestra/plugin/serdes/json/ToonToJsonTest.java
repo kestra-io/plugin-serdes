@@ -29,6 +29,7 @@ import jakarta.inject.Inject;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
@@ -536,16 +537,86 @@ class ToonToJsonTest {
         var result = convertToon("""
             big: 1e30
             small: 1e-10
-            huge: 1e999999999
-            tooBig: 1e99999999999
+            largest: 1e6144
+            smallest: 1e-6144
             """);
 
         var json = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result);
 
         assertThat(json.get("big").decimalValue().compareTo(new BigDecimal("1e30")), is(0));
         assertThat(json.get("small").decimalValue().compareTo(new BigDecimal("1e-10")), is(0));
-        assertThat(json.get("huge").decimalValue().compareTo(new BigDecimal("1e999999999")), is(0));
-        assertThat(json.get("tooBig").textValue(), is("1e99999999999"));
+        assertThat(json.get("largest").decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(json.get("smallest").decimalValue().compareTo(new BigDecimal("1e-6144")), is(0));
+    }
+
+    @Test
+    void hugeExponentsStayStrings() throws Exception {
+        var result = convertToon("""
+            tooLarge: 1e6145
+            tooSmall: 1e-6145
+            padded: 1.000e6145
+            upperCase: 1E+6145
+            huge: 1e999999999
+            hugeNegative: -1.5e-999999999
+            outsideBigDecimal: 1e99999999999
+            longMantissa: 10000000000e6144
+            zeroSmall: 0e-6145
+            smallMantissa: 0.01e-6143
+            """);
+
+        var json = MAPPER.readTree(result);
+
+        assertThat(json.get("tooLarge").textValue(), is("1e6145"));
+        assertThat(json.get("tooSmall").textValue(), is("1e-6145"));
+        assertThat(json.get("padded").textValue(), is("1.000e6145"));
+        assertThat(json.get("upperCase").textValue(), is("1E+6145"));
+        assertThat(json.get("huge").textValue(), is("1e999999999"));
+        assertThat(json.get("hugeNegative").textValue(), is("-1.5e-999999999"));
+        assertThat(json.get("outsideBigDecimal").textValue(), is("1e99999999999"));
+        assertThat(json.get("longMantissa").textValue(), is("10000000000e6144"));
+        assertThat(json.get("zeroSmall").textValue(), is("0e-6145"));
+        assertThat(json.get("smallMantissa").textValue(), is("0.01e-6143"));
+    }
+
+    @Test
+    void exponentsInsideTheLimitStayNumbers() throws Exception {
+        var result = convertToon("""
+            zero: 0E+7000
+            scaled: 1000e6141
+            smallMantissa: 0.01e6146
+            zeroAtLimit: 0e-6144
+            """);
+
+        var json = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result);
+
+        assertThat(json.get("zero").isNumber(), is(true));
+        assertThat(json.get("zero").longValue(), is(0L));
+        assertThat(json.get("scaled").decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(json.get("smallMantissa").decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(json.get("zeroAtLimit").isNumber(), is(true));
+    }
+
+    @Test
+    void oneColumnCanMixNumbersAndStringsAroundTheExponentLimit() throws Exception {
+        var result = convertToon("""
+            vals[3]: 1e6144,1e6145,2
+            """);
+
+        var vals = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result).get("vals");
+
+        assertThat(vals.get(0).decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(vals.get(1).textValue(), is("1e6145"));
+        assertThat(vals.get(2).longValue(), is(2L));
+    }
+
+    @Test
+    void longNumbersWithoutHugeExponentsStayNumbers() throws Exception {
+        var integer = "1" + "0".repeat(7000);
+        var fraction = "1." + "0".repeat(7000);
+        var result = convertToon("integer: " + integer + "\nfraction: " + fraction + "\n");
+
+        assertThat(result, not(containsString("\"1000")));
+        assertThat(result, not(containsString("\"1.000")));
     }
 
     @Test
