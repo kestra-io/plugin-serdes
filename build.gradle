@@ -123,8 +123,8 @@ dependencies {
 configurations.configureEach {
     exclude group: "org.apache.hadoop", module: "hadoop-client"
     // Jackson 2 is pinned by enforcedPlatform (a strict constraint conflicts), so it must be forced.
-    resolutionStrategy.force 'com.fasterxml.jackson.core:jackson-databind:2.22.3',
-        'com.fasterxml.jackson.core:jackson-core:2.22.3'
+    resolutionStrategy.force 'com.fasterxml.jackson.core:jackson-databind:2.22.4',
+        'com.fasterxml.jackson.core:jackson-core:2.22.4'
 }
 
 /**********************************************************************************************************************\
