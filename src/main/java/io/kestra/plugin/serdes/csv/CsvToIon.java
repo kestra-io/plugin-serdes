@@ -215,7 +215,6 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 ),
                 FileSerde.BUFFER_SIZE
             );
-            CsvReader<CsvRecord> csvReader = this.csvReader(reader, runContext);
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
@@ -226,68 +225,155 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
             OnEmptyHeader rOnEmptyHeaderValue = runContext.render(this.onEmptyHeader).as(OnEmptyHeader.class).orElse(OnEmptyHeader.DROP);
 
-            Flux<Object> flowable = Flux
-                .fromIterable(csvReader)
-                .onErrorResume(CsvParseException.class, e ->
-                {
-                    if (rOnBadLinesValue == OnBadLines.ERROR) {
-                        return Flux.error(e);
-                    } else if (rOnBadLinesValue == OnBadLines.WARN) {
-                        runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
-                    } else if (rOnBadLinesValue == OnBadLines.SKIP) {
-                        // silently skip
-                    }
-                    return Flux.empty();
-                })
-                .filter(csvRecord ->
-                {
-                    if (skipped.get() < rSkipRowsBound) {
-                        skipped.incrementAndGet();
-                        return false;
-                    }
-                    if (rHeaderValue && headerResolved.compareAndSet(false, true)) {
-                        effectiveHeaderCount.set(this.resolveHeaders(csvRecord, headers, rOnEmptyHeaderValue, runContext));
-                        return false;
-                    }
-                    return true;
-                })
+            Flux<CsvRecord> flowable;
+            if (rOnBadLinesValue == OnBadLines.ERROR) {
+                CsvReader<CsvRecord> csvReader = this.csvReader(reader, runContext);
+                flowable = Flux.fromIterable(csvReader);
+            } else {
+                BufferedReader br = reader instanceof BufferedReader b ? b : new BufferedReader(reader);
+                var builder = this.csvReaderBuilder(runContext);
+                var handler = this.createCsvRecordHandler(runContext);
+                char quote = runContext.render(textDelimiter).as(Character.class).orElse('"');
+                int rMaxFieldSize = runContext.render(maxFieldSize).as(Integer.class).orElse(DEFAULT_MAX_FIELD_SIZE);
+                int rMaxRecordSize = maxRecordSize == null
+                    ? Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize)
+                    : runContext.render(maxRecordSize).as(Integer.class)
+                        .orElse(Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize));
 
-                .flatMap(r ->
-                {
-                    if (rHeaderValue) {
-                        Map<String, Object> fields = new LinkedHashMap<>();
-                        if (r.getFieldCount() != headers.size()) {
-                            String message = "Bad line encountered (field count mismatch): Expected "
-                                + headers.size() + ", got " + r.getFieldCount() + " fields.";
-                            if (rOnBadLinesValue == OnBadLines.ERROR) {
-                                return Mono.error(new RuntimeException(message));
-                            } else if (rOnBadLinesValue == OnBadLines.WARN) {
-                                runContext.logger().warn(message);
-                            }
-                            return Mono.empty();
-                        }
-                        for (int i = 0; i < effectiveHeaderCount.get(); i++) {
-                            String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
-                            if ("\\N".equals(fieldValue)) {
-                                fieldValue = null;
-                            }
-                            fields.put(headers.get(i), fieldValue);
-                        }
-                        return Mono.just(fields);
-                    } else {
-                        List<Object> fields = new ArrayList<>(r.getFieldCount());
-                        for (int i = 0; i < r.getFieldCount(); i++) {
-                            String fieldValue = r.getField(i);
-                            if ("\\N".equals(fieldValue)) {
-                                fieldValue = null;
-                            }
-                            fields.add(fieldValue);
-                        }
-                        return Mono.just(fields);
-                    }
-                });
+                flowable = Flux.<CsvRecord, StringBuilder>generate(
+                    () -> new StringBuilder(),
+                    (pending, sink) -> {
+                        try {
+                            String line;
+                            while ((line = br.readLine()) != null) {
+                                if (pending.length() > 0) {
+                                    String candidate = pending + "\n" + line;
+                                    try {
+                                        var it = builder.build(handler, new StringReader(candidate)).iterator();
+                                        if (it.hasNext()) {
+                                            pending.setLength(0);
+                                            sink.next(it.next());
+                                            return pending;
+                                        }
+                                    } catch (CsvParseException ignored) {
+                                        try {
+                                            var it = builder.build(handler, new StringReader(line)).iterator();
+                                            if (it.hasNext()) {
+                                                var rec = it.next();
+                                                int expected = effectiveHeaderCount.get();
+                                                if (expected <= 0 || rec.getFieldCount() == expected) {
+                                                    if (rOnBadLinesValue == OnBadLines.WARN) {
+                                                        runContext.logger().warn("Bad line encountered (skipped): unclosed quote");
+                                                    }
+                                                    pending.setLength(0);
+                                                    sink.next(rec);
+                                                    return pending;
+                                                }
+                                            }
+                                        } catch (CsvParseException ignoredAgain) {
+                                            // Neither candidate nor single line parses
+                                        }
 
-            Mono<Long> count = FileSerde.writeAll(output, flowable);
+                                        if (candidate.length() < rMaxRecordSize) {
+                                            pending.setLength(0);
+                                            pending.append(candidate);
+                                            continue;
+                                        } else {
+                                            if (rOnBadLinesValue == OnBadLines.WARN) {
+                                                runContext.logger().warn("Bad line encountered (skipped): record exceeded maxRecordSize");
+                                            }
+                                            pending.setLength(0);
+                                            continue;
+                                        }
+                                    }
+                                } else {
+                                    try {
+                                        var it = builder.build(handler, new StringReader(line)).iterator();
+                                        if (it.hasNext()) {
+                                            sink.next(it.next());
+                                            return pending;
+                                        }
+                                    } catch (CsvParseException e) {
+                                        int q = 0;
+                                        for (int i = 0; i < line.length(); i++) {
+                                            if (line.charAt(i) == quote) q++;
+                                        }
+                                        if (q % 2 != 0 && line.length() < rMaxRecordSize) {
+                                            pending.append(line);
+                                            continue;
+                                        }
+                                        if (rOnBadLinesValue == OnBadLines.WARN) {
+                                            runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
+                                        }
+                                    }
+                                }
+                            }
+                            if (pending.length() > 0) {
+                                if (rOnBadLinesValue == OnBadLines.WARN) {
+                                    runContext.logger().warn("Bad line encountered (skipped): Unclosed quoted field at end of input");
+                                }
+                                pending.setLength(0);
+                            }
+                            sink.complete();
+                        } catch (Exception e) {
+                            sink.error(e);
+                        }
+                        return pending;
+                    },
+                    pending -> pending.setLength(0)
+                );
+            }
+
+            Mono<Long> count = FileSerde.writeAll(
+                output,
+                flowable
+                    .filter(csvRecord ->
+                    {
+                        if (skipped.get() < rSkipRowsBound) {
+                            skipped.incrementAndGet();
+                            return false;
+                        }
+                        if (rHeaderValue && headerResolved.compareAndSet(false, true)) {
+                            effectiveHeaderCount.set(this.resolveHeaders(csvRecord, headers, rOnEmptyHeaderValue, runContext));
+                            return false;
+                        }
+                        return true;
+                    })
+                    .flatMap(r ->
+                    {
+                        if (rHeaderValue) {
+                            Map<String, Object> fields = new LinkedHashMap<>();
+                            if (r.getFieldCount() != headers.size()) {
+                                String message = "Bad line encountered (field count mismatch): Expected "
+                                    + headers.size() + ", got " + r.getFieldCount() + " fields.";
+                                if (rOnBadLinesValue == OnBadLines.ERROR) {
+                                    return Mono.error(new RuntimeException(message));
+                                } else if (rOnBadLinesValue == OnBadLines.WARN) {
+                                    runContext.logger().warn(message);
+                                }
+                                return Mono.empty();
+                            }
+                            for (int i = 0; i < effectiveHeaderCount.get(); i++) {
+                                String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
+                                if ("\\N".equals(fieldValue)) {
+                                    fieldValue = null;
+                                }
+                                fields.put(headers.get(i), fieldValue);
+                            }
+                            return Mono.just(fields);
+                        } else {
+                            List<Object> fields = new ArrayList<>(r.getFieldCount());
+                            for (int i = 0; i < r.getFieldCount(); i++) {
+                                String fieldValue = r.getField(i);
+                                if ("\\N".equals(fieldValue)) {
+                                    fieldValue = null;
+                                }
+                                fields.add(fieldValue);
+                            }
+                            return Mono.just(fields);
+                        }
+                    })
+            );
 
             lineCount = count.block();
             runContext.metric(Counter.of("records", lineCount));
@@ -382,7 +468,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         return kept;
     }
 
-    private CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {
+    private CsvReader.CsvReaderBuilder csvReaderBuilder(RunContext runContext) throws IllegalVariableEvaluationException {
         var builder = CsvReader.builder();
 
         runContext.render(textDelimiter).as(Character.class)
@@ -396,6 +482,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         builder.allowMissingFields(true);
         builder.allowExtraFields(true);
+        builder.allowUnclosedQuote(false);
 
         runContext.render(allowExtraCharsAfterClosingQuote).as(Boolean.class)
             .ifPresent(builder::allowExtraCharsAfterClosingQuote);
@@ -403,6 +490,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         runContext.render(maxBufferSize).as(Integer.class)
             .ifPresent(builder::maxBufferSize);
 
+        return builder;
+    }
+
+    private de.siegmar.fastcsv.reader.CsvRecordHandler createCsvRecordHandler(RunContext runContext) throws IllegalVariableEvaluationException {
         var handlerBuilder = de.siegmar.fastcsv.reader.CsvRecordHandler.builder();
         int rMaxFieldSize = runContext.render(maxFieldSize).as(Integer.class).orElse(DEFAULT_MAX_FIELD_SIZE);
         int rMaxRecordSize = maxRecordSize == null
@@ -419,7 +510,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         handlerBuilder.maxFieldSize(rMaxFieldSize);
         handlerBuilder.maxRecordSize(rMaxRecordSize);
 
-        var handler = handlerBuilder.build();
-        return builder.build(handler, reader);
+        return handlerBuilder.build();
+    }
+
+    private CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {
+        return this.csvReaderBuilder(runContext).build(this.createCsvRecordHandler(runContext), reader);
     }
 }
