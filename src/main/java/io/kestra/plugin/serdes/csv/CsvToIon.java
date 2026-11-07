@@ -232,28 +232,96 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             } else {
                 BufferedReader br = reader instanceof BufferedReader b ? b : new BufferedReader(reader);
                 var builder = this.csvReaderBuilder(runContext);
-                flowable = Flux.<CsvRecord>generate(sink -> {
-                    try {
-                        String line;
-                        while ((line = br.readLine()) != null) {
-                            try {
-                                var handler = this.createCsvRecordHandler(runContext);
-                                var it = builder.build(handler, new StringReader(line)).iterator();
-                                if (it.hasNext()) {
-                                    sink.next(it.next());
-                                    return;
-                                }
-                            } catch (CsvParseException e) {
-                                if (rOnBadLinesValue == OnBadLines.WARN) {
-                                    runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
+                var handler = this.createCsvRecordHandler(runContext);
+                char quote = runContext.render(textDelimiter).as(Character.class).orElse('"');
+                int rMaxFieldSize = runContext.render(maxFieldSize).as(Integer.class).orElse(DEFAULT_MAX_FIELD_SIZE);
+                int rMaxRecordSize = maxRecordSize == null
+                    ? Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize)
+                    : runContext.render(maxRecordSize).as(Integer.class)
+                        .orElse(Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize));
+
+                flowable = Flux.<CsvRecord, StringBuilder>generate(
+                    () -> new StringBuilder(),
+                    (pending, sink) -> {
+                        try {
+                            String line;
+                            while ((line = br.readLine()) != null) {
+                                if (pending.length() > 0) {
+                                    String candidate = pending + "\n" + line;
+                                    try {
+                                        var it = builder.build(handler, new StringReader(candidate)).iterator();
+                                        if (it.hasNext()) {
+                                            pending.setLength(0);
+                                            sink.next(it.next());
+                                            return pending;
+                                        }
+                                    } catch (CsvParseException ignored) {
+                                        try {
+                                            var it = builder.build(handler, new StringReader(line)).iterator();
+                                            if (it.hasNext()) {
+                                                var rec = it.next();
+                                                int expected = effectiveHeaderCount.get();
+                                                if (expected <= 0 || rec.getFieldCount() == expected) {
+                                                    if (rOnBadLinesValue == OnBadLines.WARN) {
+                                                        runContext.logger().warn("Bad line encountered (skipped): unclosed quote");
+                                                    }
+                                                    pending.setLength(0);
+                                                    sink.next(rec);
+                                                    return pending;
+                                                }
+                                            }
+                                        } catch (CsvParseException ignoredAgain) {
+                                            // Neither candidate nor single line parses
+                                        }
+
+                                        if (candidate.length() < rMaxRecordSize) {
+                                            pending.setLength(0);
+                                            pending.append(candidate);
+                                            continue;
+                                        } else {
+                                            if (rOnBadLinesValue == OnBadLines.WARN) {
+                                                runContext.logger().warn("Bad line encountered (skipped): record exceeded maxRecordSize");
+                                            }
+                                            pending.setLength(0);
+                                            continue;
+                                        }
+                                    }
+                                } else {
+                                    try {
+                                        var it = builder.build(handler, new StringReader(line)).iterator();
+                                        if (it.hasNext()) {
+                                            sink.next(it.next());
+                                            return pending;
+                                        }
+                                    } catch (CsvParseException e) {
+                                        int q = 0;
+                                        for (int i = 0; i < line.length(); i++) {
+                                            if (line.charAt(i) == quote) q++;
+                                        }
+                                        if (q % 2 != 0 && line.length() < rMaxRecordSize) {
+                                            pending.append(line);
+                                            continue;
+                                        }
+                                        if (rOnBadLinesValue == OnBadLines.WARN) {
+                                            runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
+                                        }
+                                    }
                                 }
                             }
+                            if (pending.length() > 0) {
+                                if (rOnBadLinesValue == OnBadLines.WARN) {
+                                    runContext.logger().warn("Bad line encountered (skipped): Unclosed quoted field at end of input");
+                                }
+                                pending.setLength(0);
+                            }
+                            sink.complete();
+                        } catch (Exception e) {
+                            sink.error(e);
                         }
-                        sink.complete();
-                    } catch (Exception e) {
-                        sink.error(e);
-                    }
-                });
+                        return pending;
+                    },
+                    pending -> pending.setLength(0)
+                );
             }
 
             Mono<Long> count = FileSerde.writeAll(

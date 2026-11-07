@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
@@ -23,6 +25,7 @@ import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.OnBadLines;
 import io.kestra.plugin.serdes.OnEmptyHeader;
@@ -830,7 +833,7 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsWarn.getValue(), is(3D)); // header + 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsWarn.getValue(), is(3D)); // 3 good lines processed, 2 bad lines skipped
 
         // Test SKIP
         CsvToIon readerSkip = CsvToIon.builder()
@@ -919,15 +922,17 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    @Timeout(30)
     void badQuotesPreservesSubsequentRows() throws Exception {
         String csv = "k,v\n10,alpha\n20,\"be\"ta\n30,gamma\n40,delta\n50,eps\n";
         URI src = storageInterface.put(
-            TenantService.MAIN_TENANT, null, URI.create("/badQuotesPreservesSubsequentRows.csv"),
+            TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
         );
 
+        // Test with onBadLines: SKIP
         CsvToIon readerSkip = CsvToIon.builder()
-            .id("badQuotesSkip")
+            .id(IdUtils.create())
             .type(CsvToIon.class.getName())
             .from(Property.ofValue(src.toString()))
             .header(Property.ofValue(true))
@@ -935,7 +940,7 @@ class CsvToIonWriterTest {
             .build();
 
         RunContext runContextSkip = TestsUtils.mockRunContext(runContextFactory, readerSkip, ImmutableMap.of());
-        CsvToIon.Output output = readerSkip.run(runContextSkip);
+        CsvToIon.Output outputSkip = readerSkip.run(runContextSkip);
 
         Counter recordsSkip = (Counter) runContextSkip.metrics()
             .stream()
@@ -943,8 +948,85 @@ class CsvToIonWriterTest {
             .findFirst()
             .orElseThrow();
 
-        // Total 5 rows minus 1 bad row (row 2) = 4 records processed
         assertThat(recordsSkip.getValue(), is(4D));
-        assertThat(output.getSize(), is(greaterThan(0L)));
+        assertThat(outputSkip.getSize(), is(greaterThan(0L)));
+
+        List<Object> rowsSkip;
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, outputSkip.getUri())) {
+            rowsSkip = FileSerde.readAll(in).collectList().block();
+        }
+        assertThat(rowsSkip, hasSize(4));
+        assertThat(rowsSkip.get(0), is((Object) Map.of("k", "10", "v", "alpha")));
+        assertThat(rowsSkip.get(1), is((Object) Map.of("k", "30", "v", "gamma")));
+        assertThat(rowsSkip.get(2), is((Object) Map.of("k", "40", "v", "delta")));
+        assertThat(rowsSkip.get(3), is((Object) Map.of("k", "50", "v", "eps")));
+
+        // Test with onBadLines: WARN
+        CsvToIon readerWarn = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .build();
+
+        RunContext runContextWarn = TestsUtils.mockRunContext(runContextFactory, readerWarn, ImmutableMap.of());
+        CsvToIon.Output outputWarn = readerWarn.run(runContextWarn);
+
+        Counter recordsWarn = (Counter) runContextWarn.metrics()
+            .stream()
+            .filter(metric -> metric.getName().equals("records"))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(recordsWarn.getValue(), is(4D));
+        assertThat(outputWarn.getSize(), is(greaterThan(0L)));
+
+        List<Object> rowsWarn;
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, outputWarn.getUri())) {
+            rowsWarn = FileSerde.readAll(in).collectList().block();
+        }
+        assertThat(rowsWarn, hasSize(4));
+        assertThat(rowsWarn.get(0), is((Object) Map.of("k", "10", "v", "alpha")));
+        assertThat(rowsWarn.get(1), is((Object) Map.of("k", "30", "v", "gamma")));
+        assertThat(rowsWarn.get(2), is((Object) Map.of("k", "40", "v", "delta")));
+        assertThat(rowsWarn.get(3), is((Object) Map.of("k", "50", "v", "eps")));
+    }
+
+    @Test
+    @Timeout(30)
+    void multiLineQuotedRecordsWithBadLine() throws Exception {
+        String csv = "k,v\n10,\"hello\nworld\"\n20,\"be\"ta\n30,\"multi\nline\nrecord\"\n";
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        CsvToIon reader = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        CsvToIon.Output output = reader.run(runContext);
+
+        Counter records = (Counter) runContext.metrics()
+            .stream()
+            .filter(metric -> metric.getName().equals("records"))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(records.getValue(), is(2D));
+
+        List<Object> rows;
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) Map.of("k", "10", "v", "hello\nworld")));
+        assertThat(rows.get(1), is((Object) Map.of("k", "30", "v", "multi\nline\nrecord")));
     }
 }
