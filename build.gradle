@@ -75,8 +75,8 @@ dependencies {
         exclude group: 'com.fasterxml.jackson.core'
     }
     implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.18.1'
-    implementation group: 'org.apache.poi', name: 'poi', version: '5.5.1'
-    implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '5.5.1'
+    implementation group: 'org.apache.poi', name: 'poi', version: '6.0.0'
+    implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '6.0.0'
     implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.3.0'
     // ION, provided at runtime by io.kestra:core, whose FileSerde is ION-based. Bundling a second copy
     // would let the child-first PluginClassLoader define its own com.amazon.ion.* classes, so values
@@ -103,17 +103,28 @@ dependencies {
     }
     implementation group: 'org.json', name: 'json', version: '20260814'
 
-    implementation "org.commonmark:commonmark:0.30.1" // for Markdown
+    implementation "org.commonmark:commonmark:0.32.0" // for Markdown
     implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
     implementation "com.vladsch.flexmark:flexmark-html2md-converter:0.64.8" // for HTML to Markdown conversion
-    implementation "org.jsoup:jsoup:1.23.2" // for HTML parsing (required by flexmark-html2md-converter)
+    implementation "org.jsoup:jsoup:1.24.1" // for HTML parsing (required by flexmark-html2md-converter)
 
     implementation 'com.networknt:json-schema-validator' // version managed by the Kestra platform BOM
-    implementation 'org.jruby.joni:joni:2.2.7' // ECMA-262 regex for JSON Schema "pattern"
+    implementation 'org.jruby.joni:joni:2.2.9' // ECMA-262 regex for JSON Schema "pattern"
+
+    // Security: the platform BOM pins Jackson 2.22.1 and (via json-schema-validator) Jackson 3.1.4, which are
+    // affected by the databind and core async parser advisories. Force the patched releases until the platform ships them.
+    // Jackson 3 is only managed by a regular BOM constraint, so a constraint is enough.
+    constraints {
+        implementation('tools.jackson.core:jackson-databind') { version { strictly '3.1.7' } }
+        implementation('tools.jackson.core:jackson-core') { version { strictly '3.1.7' } }
+    }
 }
 
 configurations.configureEach {
     exclude group: "org.apache.hadoop", module: "hadoop-client"
+    // Jackson 2 is pinned by enforcedPlatform (a strict constraint conflicts), so it must be forced.
+    resolutionStrategy.force 'com.fasterxml.jackson.core:jackson-databind:2.22.4',
+        'com.fasterxml.jackson.core:jackson-core:2.22.4'
 }
 
 /**********************************************************************************************************************\

@@ -3,6 +3,7 @@ package io.kestra.plugin.serdes.json;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.Writer;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
@@ -10,6 +11,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
@@ -25,7 +27,10 @@ import io.kestra.plugin.serdes.SerdesUtils;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 class ToonToJsonTest {
@@ -289,5 +294,432 @@ class ToonToJsonTest {
             """;
 
         assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void quotedKeys() throws Exception {
+        var toon = """
+            "full name": Ada Lovelace
+            "order:id": 7
+            "say \\"hi\\"": hello
+            "": empty
+            "user info":
+              "e-mail": ada@example.com
+            "tags[1]"[2]: x,y
+            rows[2]{"first name",age,"a,b"}:
+              Ada,36,1
+              Alan,41,2
+            "list:items"[1]:
+              - "item id": 1
+                "item name": pen
+            groups[1]:
+              - "member list"[1]: Ada
+            "a[0]{\\""[1]{b}:
+              1
+            """;
+
+        var temp = File.createTempFile("quoted_keys_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = """
+            {
+              "full name": "Ada Lovelace",
+              "order:id": 7,
+              "say \\"hi\\"": "hello",
+              "": "empty",
+              "user info": {"e-mail": "ada@example.com"},
+              "tags[1]": ["x", "y"],
+              "rows": [
+                {"first name": "Ada", "age": 36, "a,b": 1},
+                {"first name": "Alan", "age": 41, "a,b": 2}
+              ],
+              "list:items": [{"item id": 1, "item name": "pen"}],
+              "groups": [{"member list": ["Ada"]}],
+              "a[0]{\\"": [{"b": 1}]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void quotedRootStringWithColon() throws Exception {
+        var temp = File.createTempFile("quoted_root_string_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write("\"a:b\"");
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        assertThat(readJson(result), is(readJson("\"a:b\"")));
+    }
+
+    @Test
+    void longTabularFieldNames() throws Exception {
+        var name = "x".repeat(10_000);
+        var temp = File.createTempFile("long_fields_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write("rows[1]{%1$s,\"%1$s y\"}:\n  1,2\n".formatted(name));
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = MAPPER.createObjectNode();
+        expected.putArray("rows").addObject().put(name, 1).put("%s y".formatted(name), 2);
+        assertThat(readJson(result), is(expected));
+    }
+
+    @Test
+    void quotedKeysInRootTabularArray() throws Exception {
+        var toon = """
+            [2]{"first name","last:name","a}b","a\\",b"}:
+              Ada,Lovelace,1,x
+              Alan,Turing,2,y
+            """;
+
+        var temp = File.createTempFile("quoted_root_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = """
+            [
+              {"first name": "Ada", "last:name": "Lovelace", "a}b": 1, "a\\",b": "x"},
+              {"first name": "Alan", "last:name": "Turing", "a}b": 2, "a\\",b": "y"}
+            ]
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void escapedQuotesInValues() throws Exception {
+        var toon = """
+            rows[2]{name,note}:
+              Ada,"a\\",b"
+              Alan,plain
+            tags[2]: "x\\",y",z
+            """;
+
+        var temp = File.createTempFile("escaped_values_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        var output = convert(temp);
+        var result = readResult(output.getUri());
+
+        var expected = """
+            {
+              "rows": [
+                {"name": "Ada", "note": "a\\",b"},
+                {"name": "Alan", "note": "plain"}
+              ],
+              "tags": ["x\\",y", "z"]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void roundTripQuotedKeysAndValues() throws Exception {
+        var json = """
+            {
+              "full name": "Ada Lovelace",
+              "order:id": 7,
+              "say \\"hi\\"": "a\\",b",
+              "": "empty",
+              "user info": {"e-mail": "ada@example.com"},
+              "tags[1]": ["x", "y,z", "q\\",r"],
+              "rows": [
+                {"first name": "Ada", "a,b": "x\\",y", "a}b": 1},
+                {"first name": "Alan", "a,b": "z", "a}b": 2}
+              ],
+              "list:items": [{"item id": 1, "member list": ["Ada", "Alan"]}],
+              "a[0]{\\"": [{"b": 1}]
+            }
+            """;
+
+        var jsonFile = File.createTempFile("round_trip_", ".json");
+        try (var w = new FileWriter(jsonFile, StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+
+        var jsonToToon = JsonToToon.builder()
+            .id(JsonToToon.class.getSimpleName())
+            .type(JsonToToon.class.getName())
+            .from(Property.ofValue(this.serdesUtils.resourceToStorageObject(jsonFile).toString()))
+            .build();
+        var toonOutput = jsonToToon.run(TestsUtils.mockRunContext(this.runContextFactory, jsonToToon, ImmutableMap.of()));
+
+        var toonToJson = ToonToJson.builder()
+            .id(ToonToJson.class.getSimpleName())
+            .type(ToonToJson.class.getName())
+            .from(Property.ofValue(toonOutput.getUri().toString()))
+            .build();
+        var jsonOutput = toonToJson.run(TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of()));
+
+        assertThat(readJson(readResult(jsonOutput.getUri())), is(readJson(json)));
+    }
+
+    private String convertToon(String toon) throws Exception {
+        var temp = File.createTempFile("toon_", ".toon");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+        return readResult(convert(temp).getUri());
+    }
+
+    @Test
+    void leadingZerosStayStrings() throws Exception {
+        var result = convertToon("""
+            zip: 05
+            order_id: 007
+            negative: -05
+            codes[2]: 0123,-007
+            rows[1]{code}:
+              042
+            """);
+
+        var expected = """
+            {
+              "zip": "05",
+              "order_id": "007",
+              "negative": "-05",
+              "codes": ["0123", "-007"],
+              "rows": [{"code": "042"}]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void exponentsBecomeNumbers() throws Exception {
+        var result = convertToon("""
+            population: 1e6
+            negative: -1E+03
+            mantissa: 2.5e2
+            ratio: 2.5e-1
+            one: 5E+00
+            zero: 0e1
+            nums[2]: 1e3,3E-02
+            """);
+
+        var expected = """
+            {
+              "population": 1000000,
+              "negative": -1000,
+              "mantissa": 250,
+              "ratio": 0.25,
+              "one": 5,
+              "zero": 0,
+              "nums": [1000, 0.03]
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void exponentsOutsideLongRangeStayNumbers() throws Exception {
+        var result = convertToon("""
+            big: 1e30
+            small: 1e-10
+            largest: 1e6144
+            smallest: 1e-6144
+            """);
+
+        var json = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result);
+
+        assertThat(json.get("big").decimalValue().compareTo(new BigDecimal("1e30")), is(0));
+        assertThat(json.get("small").decimalValue().compareTo(new BigDecimal("1e-10")), is(0));
+        assertThat(json.get("largest").decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(json.get("smallest").decimalValue().compareTo(new BigDecimal("1e-6144")), is(0));
+    }
+
+    @Test
+    void hugeExponentsStayStrings() throws Exception {
+        var result = convertToon("""
+            tooLarge: 1e6145
+            tooSmall: 1e-6145
+            padded: 1.000e6145
+            upperCase: 1E+6145
+            huge: 1e999999999
+            hugeNegative: -1.5e-999999999
+            outsideBigDecimal: 1e99999999999
+            longMantissa: 10000000000e6144
+            zeroSmall: 0e-6145
+            smallMantissa: 0.01e-6143
+            """);
+
+        var json = MAPPER.readTree(result);
+
+        assertThat(json.get("tooLarge").textValue(), is("1e6145"));
+        assertThat(json.get("tooSmall").textValue(), is("1e-6145"));
+        assertThat(json.get("padded").textValue(), is("1.000e6145"));
+        assertThat(json.get("upperCase").textValue(), is("1E+6145"));
+        assertThat(json.get("huge").textValue(), is("1e999999999"));
+        assertThat(json.get("hugeNegative").textValue(), is("-1.5e-999999999"));
+        assertThat(json.get("outsideBigDecimal").textValue(), is("1e99999999999"));
+        assertThat(json.get("longMantissa").textValue(), is("10000000000e6144"));
+        assertThat(json.get("zeroSmall").textValue(), is("0e-6145"));
+        assertThat(json.get("smallMantissa").textValue(), is("0.01e-6143"));
+    }
+
+    @Test
+    void exponentsInsideTheLimitStayNumbers() throws Exception {
+        var result = convertToon("""
+            zero: 0E+7000
+            scaled: 1000e6141
+            smallMantissa: 0.01e6146
+            zeroAtLimit: 0e-6144
+            """);
+
+        var json = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result);
+
+        assertThat(json.get("zero").isNumber(), is(true));
+        assertThat(json.get("zero").longValue(), is(0L));
+        assertThat(json.get("scaled").decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(json.get("smallMantissa").decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(json.get("zeroAtLimit").isNumber(), is(true));
+    }
+
+    @Test
+    void oneColumnCanMixNumbersAndStringsAroundTheExponentLimit() throws Exception {
+        var result = convertToon("""
+            vals[3]: 1e6144,1e6145,2
+            """);
+
+        var vals = MAPPER.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(result).get("vals");
+
+        assertThat(vals.get(0).decimalValue().compareTo(new BigDecimal("1e6144")), is(0));
+        assertThat(vals.get(1).textValue(), is("1e6145"));
+        assertThat(vals.get(2).longValue(), is(2L));
+    }
+
+    @Test
+    void longNumbersWithoutHugeExponentsStayNumbers() throws Exception {
+        var integer = "1" + "0".repeat(7000);
+        var fraction = "1." + "0".repeat(7000);
+        var result = convertToon("integer: " + integer + "\nfraction: " + fraction + "\n");
+
+        assertThat(result, not(containsString("\"1000")));
+        assertThat(result, not(containsString("\"1.000")));
+    }
+
+    @Test
+    void notJsonNumbersStayStrings() throws Exception {
+        var result = convertToon("""
+            a: .5
+            b: 1.
+            c: +5
+            d: 1e
+            e: 0x10
+            f: 1_000
+            """);
+
+        var expected = """
+            {"a": ".5", "b": "1.", "c": "+5", "d": "1e", "e": "0x10", "f": "1_000"}
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void plainNumbersKeepTheirValue() throws Exception {
+        var result = convertToon("""
+            zero: 0
+            negativeZero: -0
+            integer: 42
+            decimal: 3.14
+            beyondLong: 123456789012345678901234
+            """);
+
+        var expected = """
+            {
+              "zero": 0,
+              "negativeZero": 0,
+              "integer": 42,
+              "decimal": 3.14,
+              "beyondLong": 123456789012345678901234
+            }
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void roundTripNumberLikeStrings() throws Exception {
+        var json = """
+            {"zip": "05", "exponent": "1e6", "negative": "-05", "number": 1000000, "small": 0.25}
+            """;
+
+        var jsonFile = File.createTempFile("round_trip_numbers_", ".json");
+        try (var w = new FileWriter(jsonFile, StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+
+        var jsonToToon = JsonToToon.builder()
+            .id(JsonToToon.class.getSimpleName())
+            .type(JsonToToon.class.getName())
+            .from(Property.ofValue(this.serdesUtils.resourceToStorageObject(jsonFile).toString()))
+            .build();
+        var toonOutput = jsonToToon.run(TestsUtils.mockRunContext(this.runContextFactory, jsonToToon, ImmutableMap.of()));
+
+        var toonToJson = ToonToJson.builder()
+            .id(ToonToJson.class.getSimpleName())
+            .type(ToonToJson.class.getName())
+            .from(Property.ofValue(toonOutput.getUri().toString()))
+            .build();
+        var jsonOutput = toonToJson.run(TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of()));
+
+        assertThat(readJson(readResult(jsonOutput.getUri())), is(readJson(json)));
+    }
+
+    @Test
+    void unicodeEscapes() throws Exception {
+        var result = convertToon("""
+            note: "a\\u00e9b"
+            upper: "a\\u00ABb"
+            control: "a\\u0004b"
+            "k\\u00e9y": 1
+            """);
+
+        var expected = """
+            {"note": "aéb", "upper": "a«b", "control": "a\\u0004b", "kéy": 1}
+            """;
+
+        assertThat(readJson(result), is(readJson(expected)));
+    }
+
+    @Test
+    void invalidEscapesFail() {
+        for (var toon : new String[] {
+            "val: \"a\\qb\"",
+            "val: \"a\\bb\"",
+            "\"a\\x\": 1",
+            "val: \"a\\u00b\"",
+            "val: \"\\u+0ab\"",
+            "val: \"\\u٠٠٤١\"",
+            "val: \"a\\uD800b\"",
+            "val: \"\\udc00\"",
+            "val: \"\\ud83d\\ude00\"",
+            "val: \"a\\\\\\\""
+        }) {
+            var exception = assertThrows(IllegalArgumentException.class, () -> convertToon(toon), toon);
+            assertThat(exception.getMessage(), containsString("escape"));
+        }
     }
 }

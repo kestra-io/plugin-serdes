@@ -188,6 +188,12 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                     }
                 }
 
+                if (!renderedHeader) {
+                    for (var i = 0; i < this.skipRows && rowIterator.hasNext(); i++) {
+                        rowIterator.next();
+                    }
+                }
+
                 if (lastColNum == -1 && rowIterator.hasNext()) {
                     var firstDataRow = rowIterator.next();
                     lastColNum = firstDataRow.getLastCellNum();
@@ -196,13 +202,8 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                     sheetRawData.add(processRow(firstDataRow, firstColNum, lastColNum, renderedValueRender, renderedSkipEmptyRowsValue, renderedDateTimeRender));
                 }
 
-                var skippedDataRows = new AtomicInteger();
                 while (rowIterator.hasNext()) {
                     var row = rowIterator.next();
-                    if (!renderedHeader && this.skipRows > 0 && skippedDataRows.get() < this.skipRows) {
-                        skippedDataRows.incrementAndGet();
-                        continue;
-                    }
                     sheetRawData.add(processRow(row, firstColNum, lastColNum, renderedValueRender, renderedSkipEmptyRowsValue, renderedDateTimeRender));
                 }
 

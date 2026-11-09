@@ -6,6 +6,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -184,7 +185,19 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
     private static class ToonParser {
         private static final int INDENT_SIZE = 2;
 
-        private static final Pattern KEY_ARRAY_PATTERN = Pattern.compile("^(.*?)\\[(\\d+)](?:\\{([^}]*)})?$");
+        private static final String QUOTED_STRING = "\"[^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+\"";
+
+        // A bare or quoted key, then [N], then an optional {fields} list whose quoted names may contain } or "
+        private static final Pattern KEY_ARRAY_PATTERN = Pattern.compile(
+            "^(%1$s|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:%1$s[^}\"]*+)*+)})?$".formatted(QUOTED_STRING)
+        );
+
+        // Decimal128's largest adjusted exponent, used as the limit in both directions. A number written with an
+        // exponent whose adjusted exponent is past it stays a string, because consumers that call toPlainString(),
+        // like JsonToToon, expand a few bytes like 1e999999999 into a 1 GB string. Zero only expands to the right
+        private static final long MAX_NUMBER_EXPONENT = 6144;
+
+        private static final Pattern JSON_NUMBER = Pattern.compile("-?(?:0|[1-9]\\d*)(?:\\.\\d+)?([eE][+-]?\\d+)?");
 
         private final List<Line> lines = new ArrayList<>();
         private int index = 0;
@@ -234,7 +247,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             }
 
             // Root primitive form: single primitive line without colon or header
-            if (!first.text.contains(":") && !first.text.startsWith("[") && lines.size() == 1) {
+            if (findKeyColon(first.text) < 0 && !first.text.startsWith("[") && lines.size() == 1) {
                 index = 1;
                 return parseScalar(first.text.trim());
             }
@@ -245,7 +258,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
         }
 
         private boolean isRootArrayHeader(String text) {
-            int colonIdx = text.indexOf(':');
+            var colonIdx = findKeyColon(text);
             if (colonIdx < 0) {
                 return false;
             }
@@ -260,7 +273,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
         private Object parseRootArray() {
             Line first = lines.getFirst();
-            int colonIdx = first.text.indexOf(':');
+            var colonIdx = findKeyColon(first.text);
             String header = first.text.substring(0, colonIdx).trim();
             String rest = first.text.substring(colonIdx + 1).trim();
 
@@ -303,7 +316,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 }
 
                 index++;
-                int colonIdx = text.indexOf(':');
+                var colonIdx = findKeyColon(text);
                 if (colonIdx < 0) {
                     continue;
                 }
@@ -314,7 +327,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 Matcher m = KEY_ARRAY_PATTERN.matcher(keyPart);
                 if (m.matches()) {
                     // Array field: key[N]: ..., key[N]{fields}:
-                    String key = m.group(1).trim();
+                    var key = parseKey(m.group(1));
                     int size = Integer.parseInt(m.group(2));
                     String fields = m.group(3);
 
@@ -326,10 +339,10 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 // Nested object: "key:"
                 if (rest.isEmpty()) {
                     Object nested = parseObject(indentLevel + 1);
-                    obj.put(keyPart, nested);
+                    obj.put(parseKey(keyPart), nested);
                 } else {
                     // Primitive: "key: value"
-                    obj.put(keyPart, parseScalar(rest));
+                    obj.put(parseKey(keyPart), parseScalar(rest));
                 }
             }
 
@@ -357,7 +370,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
             // Tabular array: key[N]{fields}:
             if (fields != null) {
-                String[] cols = splitFields(fields);
+                var cols = splitFields(fields);
                 List<Map<String, Object>> table = new ArrayList<>();
 
                 int rowsRead = 0;
@@ -376,8 +389,8 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
 
                     List<String> cellTokens = splitByCommaRespectingQuotes(rowText);
                     Map<String, Object> row = new LinkedHashMap<>();
-                    for (int j = 0; j < cols.length && j < cellTokens.size(); j++) {
-                        String colName = cols[j].trim();
+                    for (var j = 0; j < cols.size() && j < cellTokens.size(); j++) {
+                        var colName = cols.get(j);
                         String raw = cellTokens.get(j).trim();
                         row.put(colName, parseScalar(raw));
                     }
@@ -430,7 +443,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 return new LinkedHashMap<String, Object>();
             }
 
-            int colonIdx = text.indexOf(':');
+            var colonIdx = findKeyColon(text);
 
             // No colon: either "- value" (primitive) or "- [N]{...}: ..." (but header always has colon)
             if (colonIdx < 0) {
@@ -460,7 +473,7 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 // v3 §10: tabular rows at depth +2 relative to hyphen line
                 int arrayHeaderIndent = (fields != null) ? indentLevel + 1 : indentLevel;
                 Object arrayValue = parseArrayFromHeader(size, fields, rest, arrayHeaderIndent);
-                obj.put(key, arrayValue);
+                obj.put(parseKey(key), arrayValue);
 
                 // Additional fields of the same object item at depth +1
                 Map<String, Object> extra = parseObject(indentLevel + 1);
@@ -473,10 +486,10 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             Map<String, Object> obj = new LinkedHashMap<>();
             if (rest.isEmpty()) {
                 Object nested = parseObject(indentLevel + 1);
-                obj.put(beforeColon, nested);
+                obj.put(parseKey(beforeColon), nested);
             } else {
                 // "- key: value" primitive + optional extra fields
-                obj.put(beforeColon, parseScalar(rest));
+                obj.put(parseKey(beforeColon), parseScalar(rest));
 
                 Map<String, Object> extra = parseObject(indentLevel + 1);
                 obj.putAll(extra);
@@ -484,13 +497,35 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             return obj;
         }
 
-        private String[] splitFields(String fields) {
-            // Fields are keys, possibly quoted; our encoder never quotes field names
-            return fields.split(",", -1);
+        private List<String> splitFields(String fields) {
+            return splitByCommaRespectingQuotes(fields).stream().map(this::parseKey).toList();
+        }
+
+        private int findKeyColon(String text) {
+            var inQuotes = false;
+            for (var i = 0; i < text.length(); i++) {
+                var c = text.charAt(i);
+                if (inQuotes && c == '\\') {
+                    i++;
+                } else if (c == '"') {
+                    inQuotes = !inQuotes;
+                } else if (c == ':' && !inQuotes) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private String parseKey(String raw) {
+            var trimmed = raw.trim();
+            if (trimmed.length() >= 2 && trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+                return unescape(trimmed.substring(1, trimmed.length() - 1));
+            }
+            return trimmed;
         }
 
         /**
-         * Split a comma-separated line into tokens, honoring double quotes.
+         * Split a comma-separated line into tokens, honoring double quotes and backslash escapes inside them.
          */
         private List<String> splitByCommaRespectingQuotes(String line) {
             List<String> result = new ArrayList<>();
@@ -500,7 +535,9 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
             for (int i = 0; i < line.length(); i++) {
                 char c = line.charAt(i);
 
-                if (c == '"') {
+                if (inQuotes && c == '\\' && i + 1 < line.length()) {
+                    current.append(c).append(line.charAt(++i));
+                } else if (c == '"') {
                     inQuotes = !inQuotes;
                     current.append(c);
                 } else if (c == ',' && !inQuotes) {
@@ -557,34 +594,74 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                 return unescape(trimmed.substring(1, trimmed.length() - 1));
             }
 
-            // number canonical form (integer or decimal, no exponent)
-            if (trimmed.matches("^-?\\d+(?:\\.\\d+)?$")) {
-                if (trimmed.contains(".")) {
-                    // decimal => BigDecimal
-                    try {
-                        return new BigDecimal(trimmed);
-                    } catch (NumberFormatException ignored) {
-                        return trimmed;
-                    }
-                } else {
-                    // integer => Long
-                    try {
-                        return Long.parseLong(trimmed);
-                    } catch (NumberFormatException ignored) {
-                        return new BigDecimal(trimmed); // fallback big integer
-                    }
-                }
+            var numberMatch = JSON_NUMBER.matcher(trimmed);
+            if (numberMatch.matches()) {
+                return parseNumber(trimmed, numberMatch.group(1) != null);
             }
 
             // fallback: string
             return trimmed;
         }
 
+        private Object parseNumber(String token, boolean hasExponent) {
+            BigDecimal number;
+            try {
+                number = new BigDecimal(token);
+            } catch (NumberFormatException ignored) {
+                return token;
+            }
+
+            if (hasExponent && expandsPastLimit(number)) {
+                return token;
+            }
+
+            if (number.scale() > 0) {
+                return number;
+            }
+
+            // Whole numbers go out as a long, because a BigDecimal would write 1e6 as 1E+6
+            try {
+                return number.longValueExact();
+            } catch (ArithmeticException ignored) {
+                return number;
+            }
+        }
+
+        private boolean expandsPastLimit(BigDecimal number) {
+            if (number.signum() == 0) {
+                return number.scale() > MAX_NUMBER_EXPONENT;
+            }
+            return Math.abs((long) number.precision() - number.scale() - 1) > MAX_NUMBER_EXPONENT;
+        }
+
+        private char parseUnicodeEscape(String s, int start) {
+            var end = Math.min(start + 4, s.length());
+            var digits = s.substring(start, end);
+            if (digits.length() < 4 || !digits.chars().allMatch(HexFormat::isHexDigit)) {
+                throw invalidEscape("\\u" + digits);
+            }
+            var codeUnit = (char) HexFormat.fromHexDigits(digits);
+            if (Character.isSurrogate(codeUnit)) {
+                throw invalidEscape("\\u" + digits);
+            }
+            return codeUnit;
+        }
+
+        private IllegalArgumentException invalidEscape(String escape) {
+            return new IllegalArgumentException(
+                "Invalid escape sequence '" + escape + "' in a TOON quoted string. The TOON file may be malformed or written by a non-conforming encoder. " +
+                    "Use only \\\\, \\\", \\n, \\r, \\t or \\uXXXX (not a surrogate), and write characters above U+FFFF as literal UTF-8."
+            );
+        }
+
         private String unescape(String s) {
             StringBuilder out = new StringBuilder(s.length());
             for (int i = 0; i < s.length(); i++) {
                 char c = s.charAt(i);
-                if (c == '\\' && i + 1 < s.length()) {
+                if (c == '\\') {
+                    if (i + 1 == s.length()) {
+                        throw invalidEscape("\\");
+                    }
                     char n = s.charAt(i + 1);
                     switch (n) {
                         case '\\' -> {
@@ -607,7 +684,11 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
                             out.append('\t');
                             i++;
                         }
-                        default -> out.append(n);
+                        case 'u' -> {
+                            out.append(parseUnicodeEscape(s, i + 2));
+                            i += 5;
+                        }
+                        default -> throw invalidEscape("\\" + n);
                     }
                 } else {
                     out.append(c);
