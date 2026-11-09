@@ -152,9 +152,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             spanning several physical lines counts as a single row. When `header` is `true`, \
             skipped rows are removed first and the header is then read from the next row; when \
             `header` is `false`, the same number of rows is removed from the start of the data. \
-            A negative value is treated as `0`. Rows dropped by `onBadLines` (`WARN` or `SKIP`) \
-            never reach the skip counter, so a malformed row inside the skip window does not \
-            count against `skipRows`."""
+            A negative value is treated as `0`. With `onBadLines` `WARN` or `SKIP`, a malformed row \
+            dropped inside the skip window counts against `skipRows` like any other row, and no \
+            warning is logged for it, since the row would have been skipped anyway."""
     )
     @PluginProperty(group = "advanced")
     private final Property<Integer> skipRows = Property.ofValue(0);
@@ -220,29 +220,34 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             OutputStream output = new BufferedOutputStream(new FileOutputStream(tempFile), FileSerde.BUFFER_SIZE)
         ) {
             var rHeaderValue = runContext.render(header).as(Boolean.class).orElseThrow();
-            Map<Integer, String> headers = new TreeMap<>();
+            var headers = new TreeMap<Integer, String>();
             AtomicInteger effectiveHeaderCount = new AtomicInteger();
             AtomicBoolean headerResolved = new AtomicBoolean();
-            int rSkipRowsBound = Math.max(runContext.render(this.skipRows).as(Integer.class).orElse(0), 0);
-            OnBadLines rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
-            OnEmptyHeader rOnEmptyHeaderValue = runContext.render(this.onEmptyHeader).as(OnEmptyHeader.class).orElse(OnEmptyHeader.DROP);
+            var rSkipRowsBound = Math.max(runContext.render(this.skipRows).as(Integer.class).orElse(0), 0);
+            var rOnBadLinesValue = runContext.render(this.onBadLines).as(OnBadLines.class).orElse(OnBadLines.ERROR);
+            var rOnEmptyHeaderValue = runContext.render(this.onEmptyHeader).as(OnEmptyHeader.class).orElse(OnEmptyHeader.DROP);
 
             // Lenient modes count skipRows themselves, so dropped bad lines are included.
             var csvReaderSkipRows = rOnBadLinesValue == OnBadLines.ERROR ? rSkipRowsBound : 0;
             Flux<CsvRecord> flowable;
             if (rOnBadLinesValue == OnBadLines.ERROR) {
-                CsvReader<CsvRecord> csvReader = this.csvReader(reader, runContext);
+                var csvReader = this.csvReader(reader, runContext);
                 flowable = Flux.fromIterable(csvReader);
             } else {
+                // The single-record parser has no buffer, so apply maxBufferSize as a field limit to match ERROR.
+                var lenientFieldSize = Math.min(
+                    this.renderMaxFieldSize(runContext),
+                    runContext.render(maxBufferSize).as(Integer.class).orElse(DEFAULT_MAX_BUFFER_SIZE)
+                );
                 var lenient = new LenientRecordReader(
                     reader instanceof BufferedReader b ? b : new BufferedReader(reader),
                     this.csvReaderBuilder(runContext, true),
-                    this.createCsvRecordHandler(runContext),
+                    this.createCsvRecordHandler(runContext, lenientFieldSize),
                     this.renderQuote(runContext),
                     this.renderSeparator(runContext),
                     runContext.render(allowExtraCharsAfterClosingQuote).as(Boolean.class).orElse(false),
                     runContext.render(skipEmptyRows).as(Boolean.class).orElse(false),
-                    this.renderMaxFieldSize(runContext),
+                    lenientFieldSize,
                     this.renderMaxRecordSize(runContext),
                     rSkipRowsBound,
                     rOnBadLinesValue == OnBadLines.WARN ? runContext.logger() : null
@@ -281,9 +286,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                     .flatMap(r ->
                     {
                         if (rHeaderValue) {
-                            Map<String, Object> fields = new LinkedHashMap<>();
+                            var fields = new LinkedHashMap<String, Object>();
                             if (r.getFieldCount() != headers.size()) {
-                                String message = "Bad line encountered (field count mismatch): Expected "
+                                var message = "Bad line encountered (field count mismatch): Expected "
                                     + headers.size() + ", got " + r.getFieldCount() + " fields.";
                                 if (rOnBadLinesValue == OnBadLines.ERROR) {
                                     return Mono.error(new RuntimeException(message));
@@ -292,7 +297,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                                 }
                                 return Mono.empty();
                             }
-                            for (int i = 0; i < effectiveHeaderCount.get(); i++) {
+                            for (var i = 0; i < effectiveHeaderCount.get(); i++) {
                                 String fieldValue = i < r.getFieldCount() ? r.getField(i) : null;
                                 if ("\\N".equals(fieldValue)) {
                                     fieldValue = null;
@@ -302,7 +307,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                             return Mono.just(fields);
                         } else {
                             List<Object> fields = new ArrayList<>(r.getFieldCount());
-                            for (int i = 0; i < r.getFieldCount(); i++) {
+                            for (var i = 0; i < r.getFieldCount(); i++) {
                                 String fieldValue = r.getField(i);
                                 if ("\\N".equals(fieldValue)) {
                                     fieldValue = null;
@@ -432,6 +437,10 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     }
 
     private CsvRecordHandler createCsvRecordHandler(RunContext runContext) throws IllegalVariableEvaluationException {
+        return createCsvRecordHandler(runContext, renderMaxFieldSize(runContext));
+    }
+
+    private CsvRecordHandler createCsvRecordHandler(RunContext runContext, int fieldLimit) throws IllegalVariableEvaluationException {
         var handlerBuilder = CsvRecordHandler.builder();
         var rMaxFieldSize = renderMaxFieldSize(runContext);
         var rMaxRecordSize = renderMaxRecordSize(runContext);
@@ -442,7 +451,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
             );
         }
 
-        handlerBuilder.maxFieldSize(rMaxFieldSize);
+        handlerBuilder.maxFieldSize(fieldLimit);
         handlerBuilder.maxRecordSize(rMaxRecordSize);
 
         return handlerBuilder.build();
@@ -580,7 +589,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 }
 
                 dropped(failure);
-                for (int i = starts.size() - 1; i >= 1; i--) {
+                for (var i = starts.size() - 1; i >= 1; i--) {
                     var end = i + 1 < starts.size() ? starts.get(i + 1) : record.length();
                     replay.addFirst(record.substring(starts.get(i), end));
                 }
@@ -596,10 +605,9 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         }
 
         private void dropped(String reason) {
-            if (warnLogger != null) {
+            if (!skipRow() && warnLogger != null) {
                 warnLogger.warn("Bad line encountered (skipped): {}", reason);
             }
-            skipRow();
         }
 
         /** Length of a physical line without its terminator. */
@@ -616,7 +624,7 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
         private State scan(State start, CharSequence text, int from, int to) {
             var state = start;
-            for (int i = from; i < to; i++) {
+            for (var i = from; i < to; i++) {
                 var ch = text.charAt(i);
                 switch (state) {
                     case FIELD_START -> {

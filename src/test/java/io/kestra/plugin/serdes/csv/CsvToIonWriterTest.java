@@ -264,34 +264,51 @@ class CsvToIonWriterTest {
     }
 
     @Test
+    @Timeout(30)
     void badRowInsideSkipWindowCountsAgainstSkipRows() throws Exception {
-        // the first row is unparseable (quoted field larger than the buffer) and sits inside the skip window
-        String csv = "\"" + "x".repeat(50) + "\"\nh1,h2\n1,2\n";
-        URI src = storageInterface.put(
-            TenantService.MAIN_TENANT, null, URI.create("/badRowInsideSkipWindow.csv"),
-            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
-        );
+        // the unclosed quote never closes, so the first line is a real dropped bad row inside the skip window
+        var csv = "\"unclosed\nh1,h2\n1,2\n";
 
-        CsvToIon reader = CsvToIon.builder()
-            .id("badRowInsideSkipWindowCountsAgainstSkipRows")
-            .type(CsvToIon.class.getName())
-            .from(Property.ofValue(src.toString()))
-            .maxBufferSize(Property.ofValue(8))
-            .skipRows(Property.ofValue(1))
-            .header(Property.ofValue(true))
-            .onBadLines(Property.ofValue(OnBadLines.SKIP))
-            .build();
+        for (var mode : List.of(OnBadLines.SKIP, OnBadLines.WARN)) {
+            var rows = readRows(csv, true, mode, 1, null);
 
-        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
-
-        List<Object> rows;
-        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
-            rows = FileSerde.readAll(in).collectList().block();
+            // the dropped bad row consumes the skip budget, so the next line is still read as the header
+            assertThat(rows, hasSize(1));
+            assertThat(rows.getFirst(), is((Object) Map.of("h1", "1", "h2", "2")));
         }
+    }
 
-        // the dropped bad row consumes the skip budget, so the next line is still read as the header
-        assertThat(rows, hasSize(1));
-        assertThat(rows.getFirst(), is((Object) Map.of("h1", "1", "h2", "2")));
+    @Test
+    @Timeout(30)
+    void maxBufferSizeIsEnforcedInSkipAndWarn() throws Exception {
+        var csv = "col1\n\"" + "x".repeat(50) + "\"\nok\n";
+
+        for (var mode : List.of(OnBadLines.SKIP, OnBadLines.WARN)) {
+            var src = storageInterface.put(
+                TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+                new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+            );
+            var reader = CsvToIon.builder()
+                .id(IdUtils.create())
+                .type(CsvToIon.class.getName())
+                .from(Property.ofValue(src.toString()))
+                .maxBufferSize(Property.ofValue(8))
+                .maxFieldSize(Property.ofValue(1024))
+                .header(Property.ofValue(true))
+                .onBadLines(Property.ofValue(mode))
+                .build();
+
+            var out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+            List<Object> rows;
+            try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+                rows = FileSerde.readAll(in).collectList().block();
+            }
+
+            // the 50-char field is rejected like in ERROR mode, the following row is kept
+            assertThat(rows, hasSize(1));
+            assertThat(rows.getFirst(), is((Object) Map.of("col1", "ok")));
+        }
     }
 
     @Test
