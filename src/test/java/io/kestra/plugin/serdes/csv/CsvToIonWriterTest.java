@@ -4,13 +4,16 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.CharStreams;
@@ -23,11 +26,16 @@ import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.OnBadLines;
 import io.kestra.plugin.serdes.OnEmptyHeader;
 import io.kestra.plugin.serdes.SerdesUtils;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import de.siegmar.fastcsv.reader.CsvParseException;
 import jakarta.inject.Inject;
 
@@ -256,34 +264,51 @@ class CsvToIonWriterTest {
     }
 
     @Test
-    void badRowInsideSkipWindowDoesNotCountAgainstSkipRows() throws Exception {
-        // the first row is unparseable (quoted field larger than the buffer) and sits inside the skip window
-        String csv = "\"" + "x".repeat(50) + "\"\nh1,h2\n1,2\n";
-        URI src = storageInterface.put(
-            TenantService.MAIN_TENANT, null, URI.create("/badRowInsideSkipWindow.csv"),
-            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
-        );
+    @Timeout(30)
+    void badRowInsideSkipWindowCountsAgainstSkipRows() throws Exception {
+        // the unclosed quote never closes, so the first line is a real dropped bad row inside the skip window
+        var csv = "\"unclosed\nh1,h2\n1,2\n";
 
-        CsvToIon reader = CsvToIon.builder()
-            .id("badRowInsideSkipWindowDoesNotCountAgainstSkipRows")
-            .type(CsvToIon.class.getName())
-            .from(Property.ofValue(src.toString()))
-            .maxBufferSize(Property.ofValue(8))
-            .skipRows(Property.ofValue(1))
-            .header(Property.ofValue(true))
-            .onBadLines(Property.ofValue(OnBadLines.SKIP))
-            .build();
+        for (var mode : List.of(OnBadLines.SKIP, OnBadLines.WARN)) {
+            var rows = readRows(csv, true, mode, 1, null);
 
-        CsvToIon.Output out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
-
-        List<Object> rows;
-        try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
-            rows = FileSerde.readAll(in).collectList().block();
+            // the dropped bad row consumes the skip budget, so the next line is still read as the header
+            assertThat(rows, hasSize(1));
+            assertThat(rows.getFirst(), is((Object) Map.of("h1", "1", "h2", "2")));
         }
+    }
 
-        // the bad row is dropped by onBadLines before the skip filter, so it never consumes the skip budget;
-        // the parse error also ends the stream, leaving no rows at all
-        assertThat(rows, is(empty()));
+    @Test
+    @Timeout(30)
+    void maxBufferSizeIsEnforcedInSkipAndWarn() throws Exception {
+        var csv = "col1\n\"" + "x".repeat(50) + "\"\nok\n";
+
+        for (var mode : List.of(OnBadLines.SKIP, OnBadLines.WARN)) {
+            var src = storageInterface.put(
+                TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+                new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+            );
+            var reader = CsvToIon.builder()
+                .id(IdUtils.create())
+                .type(CsvToIon.class.getName())
+                .from(Property.ofValue(src.toString()))
+                .maxBufferSize(Property.ofValue(8))
+                .maxFieldSize(Property.ofValue(1024))
+                .header(Property.ofValue(true))
+                .onBadLines(Property.ofValue(mode))
+                .build();
+
+            var out = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+            List<Object> rows;
+            try (var in = storageInterface.get(TenantService.MAIN_TENANT, null, out.getUri())) {
+                rows = FileSerde.readAll(in).collectList().block();
+            }
+
+            // the 50-char field is rejected like in ERROR mode, the following row is kept
+            assertThat(rows, hasSize(1));
+            assertThat(rows.getFirst(), is((Object) Map.of("col1", "ok")));
+        }
     }
 
     @Test
@@ -830,7 +855,7 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsWarn.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsWarn.getValue(), is(3D)); // value1, value6 and value11 remain
 
         // Test SKIP
         CsvToIon readerSkip = CsvToIon.builder()
@@ -850,7 +875,7 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsSkip.getValue(), is(2D)); // header + 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsSkip.getValue(), is(3D)); // value1, value6 and value11 remain
     }
 
     @Test
@@ -916,5 +941,319 @@ class CsvToIonWriterTest {
         RunContext runContextError = TestsUtils.mockRunContext(runContextFactory, readerError, new java.util.HashMap<String, Object>());
         Throwable thrown = assertThrows(RuntimeException.class, () -> readerError.run(runContextError));
         assertThat(thrown.getMessage(), containsString("Bad line encountered"));
+    }
+
+    @Test
+    @Timeout(30)
+    void badQuotesPreservesSubsequentRows() throws Exception {
+        var csv = "k,v\n10,alpha\n20,\"be\"ta\n30,gamma\n40,delta\n50,eps\n";
+        var src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        // Test with onBadLines: SKIP
+        var readerSkip = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        var runContextSkip = TestsUtils.mockRunContext(runContextFactory, readerSkip, ImmutableMap.of());
+        var outputSkip = readerSkip.run(runContextSkip);
+
+        var recordsSkip = (Counter) runContextSkip.metrics()
+            .stream()
+            .filter(metric -> metric.getName().equals("records"))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(recordsSkip.getValue(), is(4D));
+        assertThat(outputSkip.getSize(), is(greaterThan(0L)));
+
+        List<Object> rowsSkip;
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, outputSkip.getUri())) {
+            rowsSkip = FileSerde.readAll(in).collectList().block();
+        }
+        assertThat(rowsSkip, hasSize(4));
+        assertThat(rowsSkip.getFirst(), is((Object) Map.of("k", "10", "v", "alpha")));
+        assertThat(rowsSkip.get(1), is((Object) Map.of("k", "30", "v", "gamma")));
+        assertThat(rowsSkip.get(2), is((Object) Map.of("k", "40", "v", "delta")));
+        assertThat(rowsSkip.get(3), is((Object) Map.of("k", "50", "v", "eps")));
+
+        // Test with onBadLines: WARN
+        var readerWarn = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.WARN))
+            .build();
+
+        var runContextWarn = TestsUtils.mockRunContext(runContextFactory, readerWarn, ImmutableMap.of());
+        var warnings = attachLogCapture(runContextWarn);
+        var outputWarn = readerWarn.run(runContextWarn);
+
+        assertThat(
+            warnings.list.stream()
+                .filter(e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("Bad line encountered"))
+                .count(),
+            is(1L)
+        );
+
+        var recordsWarn = (Counter) runContextWarn.metrics()
+            .stream()
+            .filter(metric -> metric.getName().equals("records"))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(recordsWarn.getValue(), is(4D));
+        assertThat(outputWarn.getSize(), is(greaterThan(0L)));
+
+        List<Object> rowsWarn;
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, outputWarn.getUri())) {
+            rowsWarn = FileSerde.readAll(in).collectList().block();
+        }
+        assertThat(rowsWarn, hasSize(4));
+        assertThat(rowsWarn.getFirst(), is((Object) Map.of("k", "10", "v", "alpha")));
+        assertThat(rowsWarn.get(1), is((Object) Map.of("k", "30", "v", "gamma")));
+        assertThat(rowsWarn.get(2), is((Object) Map.of("k", "40", "v", "delta")));
+        assertThat(rowsWarn.get(3), is((Object) Map.of("k", "50", "v", "eps")));
+    }
+
+    @Test
+    @Timeout(30)
+    void multiLineQuotedRecordsWithBadLine() throws Exception {
+        var csv = "k,v\n10,\"hello\nworld\"\n20,\"be\"ta\n30,\"multi\nline\nrecord\"\n";
+        var src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        var reader = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(true))
+            .onBadLines(Property.ofValue(OnBadLines.SKIP))
+            .build();
+
+        var runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        var output = reader.run(runContext);
+
+        var records = (Counter) runContext.metrics()
+            .stream()
+            .filter(metric -> metric.getName().equals("records"))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(records.getValue(), is(2D));
+
+        List<Object> rows;
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
+            rows = FileSerde.readAll(in).collectList().block();
+        }
+        assertThat(rows, hasSize(2));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "10", "v", "hello\nworld")));
+        assertThat(rows.get(1), is((Object) Map.of("k", "30", "v", "multi\nline\nrecord")));
+    }
+
+    private List<Object> readSkipping(String csv, boolean header, OnBadLines onBadLines, Integer maxRecordSize) throws Exception {
+        var src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        var builder = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(header))
+            .onBadLines(Property.ofValue(onBadLines));
+        if (maxRecordSize != null) {
+            builder.maxFieldSize(Property.ofValue(maxRecordSize)).maxRecordSize(Property.ofValue(maxRecordSize));
+        }
+        var reader = builder.build();
+
+        var runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        var output = reader.run(runContext);
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
+            return FileSerde.readAll(in).collectList().block();
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void multiLineRecordOfThreeLinesWithoutHeaderIsKept() throws Exception {
+        var rows = readSkipping("1,\"multi\nline\nrecord\"\n2,ok\n", false, OnBadLines.SKIP, null);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.getFirst(), is((Object) List.of("1", "multi\nline\nrecord")));
+        assertThat(rows.get(1), is((Object) List.of("2", "ok")));
+    }
+
+    @Test
+    @Timeout(30)
+    void multiLineRecordMiddleLineWithHeaderFieldCountIsKept() throws Exception {
+        var rows = readSkipping("k,v\n1,\"123 Main St\nApt 4, Floor 2\nCity\"\n2,\"be\"ta\n3,z\n", true, OnBadLines.WARN, null);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "123 Main St\nApt 4, Floor 2\nCity")));
+        assertThat(rows.get(1), is((Object) Map.of("k", "3", "v", "z")));
+    }
+
+    @Test
+    @Timeout(30)
+    void singleColumnMultiLineRecordIsKept() throws Exception {
+        var rows = readSkipping("v\n\"a\nb\nc\"\nd\n", true, OnBadLines.SKIP, null);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.getFirst(), is((Object) Map.of("v", "a\nb\nc")));
+        assertThat(rows.get(1), is((Object) Map.of("v", "d")));
+    }
+
+    @Test
+    @Timeout(30)
+    void headerEndingWithSeparatorKeepsRowsAfterUnclosedQuote() throws Exception {
+        var rows = readSkipping("a,b,\n1,x,\n2,\"bad,\n3,y,\n4,z,\n", true, OnBadLines.SKIP, null);
+
+        assertThat(rows, hasSize(3));
+        assertThat(rows.getFirst(), is((Object) Map.of("a", "1", "b", "x")));
+        assertThat(rows.get(1), is((Object) Map.of("a", "3", "b", "y")));
+        assertThat(rows.get(2), is((Object) Map.of("a", "4", "b", "z")));
+    }
+
+    @Test
+    @Timeout(30)
+    void overlongLineIsDroppedAsBadLine() throws Exception {
+        var rows = readSkipping("k,v\n1,a\n2," + "x".repeat(5000) + "\n3,c\n", true, OnBadLines.SKIP, 1000);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "a")));
+        assertThat(rows.get(1), is((Object) Map.of("k", "3", "v", "c")));
+    }
+
+    @Test
+    @Timeout(30)
+    void longUnclosedQuoteIsLinear() throws Exception {
+        var csv = new StringBuilder("k,v\n0,\"open\n");
+        for (int i = 1; i <= 20000; i++) {
+            csv.append(i).append(",row\n");
+        }
+        var rows = readSkipping(csv.toString(), true, OnBadLines.SKIP, null);
+
+        assertThat(rows, hasSize(20000));
+    }
+
+    private List<Object> readRows(String csv, boolean header, OnBadLines onBadLines, int skipRows, Integer maxFieldSize) throws Exception {
+        var src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        var builder = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(header))
+            .skipEmptyRows(Property.ofValue(false))
+            .skipRows(Property.ofValue(skipRows))
+            .onBadLines(Property.ofValue(onBadLines));
+        if (maxFieldSize != null) {
+            builder.maxFieldSize(Property.ofValue(maxFieldSize)).maxRecordSize(Property.ofValue(maxFieldSize * 4));
+        }
+        var reader = builder.build();
+
+        var runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        var output = reader.run(runContext);
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
+            return FileSerde.readAll(in).collectList().block();
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void errorModeKeepsUnclosedQuoteAtEndOfInput() throws Exception {
+        var rows = readRows("k,v\n1,a\n2,\"open", true, OnBadLines.ERROR, 0, null);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "a")));
+        assertThat(rows.getLast(), is((Object) Map.of("k", "2", "v", "open")));
+    }
+
+    @Test
+    @Timeout(30)
+    void crlfInsideQuotedFieldIsPreserved() throws Exception {
+        var csv = "k,v\r\n1,\"a\r\nb\"\r\n2,\"be\"ta\r\n3,c\r\n";
+        var expected = Map.of("k", "1", "v", "a\r\nb");
+
+        assertThat(readRows(csv.replace("2,\"be\"ta\r\n", ""), true, OnBadLines.ERROR, 0, null).getFirst(), is((Object) expected));
+
+        var skip = readRows(csv, true, OnBadLines.SKIP, 0, null);
+        assertThat(skip, hasSize(2));
+        assertThat(skip.getFirst(), is((Object) expected));
+        assertThat(skip.getLast(), is((Object) Map.of("k", "3", "v", "c")));
+    }
+
+    @Test
+    @Timeout(30)
+    void blankLineWithoutHeaderYieldsEmptyRowLikeErrorMode() throws Exception {
+        var csv = "1,a\n\n2,b\n";
+        var error = readRows(csv, false, OnBadLines.ERROR, 0, null);
+
+        assertThat(error, hasSize(3));
+        assertThat(readRows(csv, false, OnBadLines.SKIP, 0, null), is(error));
+        assertThat(readRows(csv, false, OnBadLines.WARN, 0, null), is(error));
+    }
+
+    @Test
+    @Timeout(30)
+    void badPreambleLineCountsTowardSkipRows() throws Exception {
+        var rows = readRows("\"junk\"x\nk,v\n1,a\n", true, OnBadLines.SKIP, 1, null);
+
+        assertThat(rows, hasSize(1));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "a")));
+    }
+
+    @Test
+    @Timeout(30)
+    void goodPreambleLineCountsTowardSkipRows() throws Exception {
+        var rows = readRows("preamble\nk,v\n1,a\n", true, OnBadLines.SKIP, 1, null);
+
+        assertThat(rows, hasSize(1));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "a")));
+    }
+
+    @Test
+    @Timeout(30)
+    void openQuoteIsBoundedByMaxFieldSize() throws Exception {
+        var csv = "1,a\n2,\"open\n" + "x\n".repeat(2000) + "3,c\n";
+        var rows = readRows(csv, false, OnBadLines.SKIP, 0, 100);
+
+        assertThat(rows, hasSize(2002));
+        assertThat(rows.getFirst(), is((Object) List.of("1", "a")));
+        assertThat(rows.getLast(), is((Object) List.of("3", "c")));
+    }
+
+    // runContext.logger() returns a Logback logger from an isolated LoggerContext; attach directly to capture logs.
+    private static final class CapturingAppender extends AppenderBase<ILoggingEvent> {
+        final List<ILoggingEvent> list = new CopyOnWriteArrayList<>();
+
+        @Override
+        protected void append(ILoggingEvent event) {
+            list.add(event);
+        }
+    }
+
+    private static CapturingAppender attachLogCapture(RunContext runContext) {
+        var contextLogger = (Logger) runContext.logger();
+        contextLogger.setLevel(Level.DEBUG);
+        var appender = new CapturingAppender();
+        appender.setContext(contextLogger.getLoggerContext());
+        appender.start();
+        contextLogger.addAppender(appender);
+        return appender;
     }
 }
