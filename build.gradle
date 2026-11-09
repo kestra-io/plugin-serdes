@@ -103,13 +103,13 @@ dependencies {
     }
     implementation group: 'org.json', name: 'json', version: '20260814'
 
-    implementation "org.commonmark:commonmark:0.31.0" // for Markdown
+    implementation "org.commonmark:commonmark:0.32.0" // for Markdown
     implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
     implementation "com.vladsch.flexmark:flexmark-html2md-converter:0.64.8" // for HTML to Markdown conversion
     implementation "org.jsoup:jsoup:1.23.2" // for HTML parsing (required by flexmark-html2md-converter)
 
     implementation 'com.networknt:json-schema-validator' // version managed by the Kestra platform BOM
-    implementation 'org.jruby.joni:joni:2.2.8' // ECMA-262 regex for JSON Schema "pattern"
+    implementation 'org.jruby.joni:joni:2.2.9' // ECMA-262 regex for JSON Schema "pattern"
 
     // Security: the platform BOM pins Jackson 2.22.1 and (via json-schema-validator) Jackson 3.1.4, which are
     // affected by the databind and core async parser advisories. Force the patched releases until the platform ships them.
@@ -123,8 +123,8 @@ dependencies {
 configurations.configureEach {
     exclude group: "org.apache.hadoop", module: "hadoop-client"
     // Jackson 2 is pinned by enforcedPlatform (a strict constraint conflicts), so it must be forced.
-    resolutionStrategy.force 'com.fasterxml.jackson.core:jackson-databind:2.22.3',
-        'com.fasterxml.jackson.core:jackson-core:2.22.3'
+    resolutionStrategy.force 'com.fasterxml.jackson.core:jackson-databind:2.22.4',
+        'com.fasterxml.jackson.core:jackson-core:2.22.4'
 }
 
 /**********************************************************************************************************************\
