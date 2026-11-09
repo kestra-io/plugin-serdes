@@ -200,8 +200,7 @@ public class InferAvroSchemaFromIonTest {
                 """
                     {"foo-bar": "a", "foo_bar": "b"}
                     {"foo_bar": "c", "foo-bar": "d"}
-                    """.getBytes()
-            ),
+                    """.getBytes()),
             output
         );
         var schema = new String(output.toByteArray());

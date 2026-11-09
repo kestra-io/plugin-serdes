@@ -12,6 +12,10 @@ import java.util.stream.IntStream;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import com.google.common.collect.ImmutableMap;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -25,10 +29,6 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.OnBadLines;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.AppenderBase;
 import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
@@ -806,12 +806,10 @@ class IonToParquetTest {
     private static Map<String, Object> validNestedLogicalRow(int id) {
         Map<String, Object> row = new HashMap<>();
         row.put("id", id);
-        row.put(
-            "items", List.of(
-                Map.of("externalId", UUID.randomUUID().toString()),
-                Map.of("externalId", UUID.randomUUID().toString())
-            )
-        );
+        row.put("items", List.of(
+            Map.of("externalId", UUID.randomUUID().toString()),
+            Map.of("externalId", UUID.randomUUID().toString())
+        ));
         row.put("byKey", Map.of("a", Map.of("eventDate", LocalDate.of(2024, 1, 1))));
         return row;
     }
@@ -1025,13 +1023,12 @@ class IonToParquetTest {
         Random random = new Random(42);
         List<String> words = IntStream.range(0, 300).mapToObj(i -> "word" + i).toList();
         return IntStream.range(0, 20_000)
-            .mapToObj(id ->
-            {
+            .mapToObj(id -> {
                 StringBuilder text = new StringBuilder();
                 for (int i = 0; i < 20; i++) {
                     text.append(words.get(random.nextInt(words.size()))).append(' ');
                 }
-                return Map.<String, Object> of("id", id, "text", text.toString());
+                return Map.<String, Object>of("id", id, "text", text.toString());
             })
             .toList();
     }
