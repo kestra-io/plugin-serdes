@@ -94,7 +94,7 @@ dependencies {
     implementation "org.commonmark:commonmark:0.29.0" // for Markdown
     implementation "com.vladsch.flexmark:flexmark:0.64.8" // for Markdown parsing
     implementation "com.vladsch.flexmark:flexmark-html2md-converter:0.64.8" // for HTML to Markdown conversion
-    implementation "org.jsoup:jsoup:1.22.2" // for HTML parsing (required by flexmark-html2md-converter)
+    implementation "org.jsoup:jsoup:1.24.1" // for HTML parsing (required by flexmark-html2md-converter)
 
     // Kestra 1.3's BOM pins networknt 1.5.x, but the task uses the 2.x API; 2.0.x is still on Jackson 2.
     implementation('com.networknt:json-schema-validator') {
@@ -105,6 +105,14 @@ dependencies {
 
 configurations.configureEach {
     exclude group: "org.apache.hadoop", module: "hadoop-client"
+    // Platform BOM strictly pins a vulnerable jsoup, so it must be forced.
+    resolutionStrategy.force 'org.jsoup:jsoup:1.24.1'
+    // Platform BOM pins jetty 12.0.31 (CVE-affected). servlet/webapp stay on 9.4 since 12.0 has no such modules.
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'org.eclipse.jetty' && !details.requested.name.matches('jetty-(servlet|webapp)')) {
+            details.useVersion '12.0.36'
+        }
+    }
 }
 
 /**********************************************************************************************************************\
