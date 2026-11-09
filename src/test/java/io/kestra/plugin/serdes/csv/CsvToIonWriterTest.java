@@ -264,7 +264,7 @@ class CsvToIonWriterTest {
     }
 
     @Test
-    void badRowInsideSkipWindowDoesNotCountAgainstSkipRows() throws Exception {
+    void badRowInsideSkipWindowCountsAgainstSkipRows() throws Exception {
         // the first row is unparseable (quoted field larger than the buffer) and sits inside the skip window
         String csv = "\"" + "x".repeat(50) + "\"\nh1,h2\n1,2\n";
         URI src = storageInterface.put(
@@ -273,7 +273,7 @@ class CsvToIonWriterTest {
         );
 
         CsvToIon reader = CsvToIon.builder()
-            .id("badRowInsideSkipWindowDoesNotCountAgainstSkipRows")
+            .id("badRowInsideSkipWindowCountsAgainstSkipRows")
             .type(CsvToIon.class.getName())
             .from(Property.ofValue(src.toString()))
             .maxBufferSize(Property.ofValue(8))
@@ -289,9 +289,9 @@ class CsvToIonWriterTest {
             rows = FileSerde.readAll(in).collectList().block();
         }
 
-        // the bad row is dropped by onBadLines before the skip filter, so it never consumes the skip budget;
-        // the parse error also ends the stream, leaving no rows at all
-        assertThat(rows, is(empty()));
+        // the dropped bad row consumes the skip budget, so the next line is still read as the header
+        assertThat(rows, hasSize(1));
+        assertThat(rows.getFirst(), is((Object) Map.of("h1", "1", "h2", "2")));
     }
 
     @Test
@@ -838,7 +838,7 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsWarn.getValue(), is(3D)); // 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsWarn.getValue(), is(3D)); // value1, value6 and value11 remain
 
         // Test SKIP
         CsvToIon readerSkip = CsvToIon.builder()
@@ -858,7 +858,7 @@ class CsvToIonWriterTest {
             .findFirst()
             .get();
 
-        assertThat(recordsSkip.getValue(), is(3D)); // header + 3 good lines processed, 2 bad lines skipped
+        assertThat(recordsSkip.getValue(), is(3D)); // value1, value6 and value11 remain
     }
 
     @Test
@@ -929,14 +929,14 @@ class CsvToIonWriterTest {
     @Test
     @Timeout(30)
     void badQuotesPreservesSubsequentRows() throws Exception {
-        String csv = "k,v\n10,alpha\n20,\"be\"ta\n30,gamma\n40,delta\n50,eps\n";
-        URI src = storageInterface.put(
+        var csv = "k,v\n10,alpha\n20,\"be\"ta\n30,gamma\n40,delta\n50,eps\n";
+        var src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
         );
 
         // Test with onBadLines: SKIP
-        CsvToIon readerSkip = CsvToIon.builder()
+        var readerSkip = CsvToIon.builder()
             .id(IdUtils.create())
             .type(CsvToIon.class.getName())
             .from(Property.ofValue(src.toString()))
@@ -944,10 +944,10 @@ class CsvToIonWriterTest {
             .onBadLines(Property.ofValue(OnBadLines.SKIP))
             .build();
 
-        RunContext runContextSkip = TestsUtils.mockRunContext(runContextFactory, readerSkip, ImmutableMap.of());
-        CsvToIon.Output outputSkip = readerSkip.run(runContextSkip);
+        var runContextSkip = TestsUtils.mockRunContext(runContextFactory, readerSkip, ImmutableMap.of());
+        var outputSkip = readerSkip.run(runContextSkip);
 
-        Counter recordsSkip = (Counter) runContextSkip.metrics()
+        var recordsSkip = (Counter) runContextSkip.metrics()
             .stream()
             .filter(metric -> metric.getName().equals("records"))
             .findFirst()
@@ -961,13 +961,13 @@ class CsvToIonWriterTest {
             rowsSkip = FileSerde.readAll(in).collectList().block();
         }
         assertThat(rowsSkip, hasSize(4));
-        assertThat(rowsSkip.get(0), is((Object) Map.of("k", "10", "v", "alpha")));
+        assertThat(rowsSkip.getFirst(), is((Object) Map.of("k", "10", "v", "alpha")));
         assertThat(rowsSkip.get(1), is((Object) Map.of("k", "30", "v", "gamma")));
         assertThat(rowsSkip.get(2), is((Object) Map.of("k", "40", "v", "delta")));
         assertThat(rowsSkip.get(3), is((Object) Map.of("k", "50", "v", "eps")));
 
         // Test with onBadLines: WARN
-        CsvToIon readerWarn = CsvToIon.builder()
+        var readerWarn = CsvToIon.builder()
             .id(IdUtils.create())
             .type(CsvToIon.class.getName())
             .from(Property.ofValue(src.toString()))
@@ -975,9 +975,9 @@ class CsvToIonWriterTest {
             .onBadLines(Property.ofValue(OnBadLines.WARN))
             .build();
 
-        RunContext runContextWarn = TestsUtils.mockRunContext(runContextFactory, readerWarn, ImmutableMap.of());
-        CapturingAppender warnings = attachLogCapture(runContextWarn);
-        CsvToIon.Output outputWarn = readerWarn.run(runContextWarn);
+        var runContextWarn = TestsUtils.mockRunContext(runContextFactory, readerWarn, ImmutableMap.of());
+        var warnings = attachLogCapture(runContextWarn);
+        var outputWarn = readerWarn.run(runContextWarn);
 
         assertThat(
             warnings.list.stream()
@@ -986,7 +986,7 @@ class CsvToIonWriterTest {
             is(1L)
         );
 
-        Counter recordsWarn = (Counter) runContextWarn.metrics()
+        var recordsWarn = (Counter) runContextWarn.metrics()
             .stream()
             .filter(metric -> metric.getName().equals("records"))
             .findFirst()
@@ -1000,7 +1000,7 @@ class CsvToIonWriterTest {
             rowsWarn = FileSerde.readAll(in).collectList().block();
         }
         assertThat(rowsWarn, hasSize(4));
-        assertThat(rowsWarn.get(0), is((Object) Map.of("k", "10", "v", "alpha")));
+        assertThat(rowsWarn.getFirst(), is((Object) Map.of("k", "10", "v", "alpha")));
         assertThat(rowsWarn.get(1), is((Object) Map.of("k", "30", "v", "gamma")));
         assertThat(rowsWarn.get(2), is((Object) Map.of("k", "40", "v", "delta")));
         assertThat(rowsWarn.get(3), is((Object) Map.of("k", "50", "v", "eps")));
@@ -1009,13 +1009,13 @@ class CsvToIonWriterTest {
     @Test
     @Timeout(30)
     void multiLineQuotedRecordsWithBadLine() throws Exception {
-        String csv = "k,v\n10,\"hello\nworld\"\n20,\"be\"ta\n30,\"multi\nline\nrecord\"\n";
-        URI src = storageInterface.put(
+        var csv = "k,v\n10,\"hello\nworld\"\n20,\"be\"ta\n30,\"multi\nline\nrecord\"\n";
+        var src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
         );
 
-        CsvToIon reader = CsvToIon.builder()
+        var reader = CsvToIon.builder()
             .id(IdUtils.create())
             .type(CsvToIon.class.getName())
             .from(Property.ofValue(src.toString()))
@@ -1023,10 +1023,10 @@ class CsvToIonWriterTest {
             .onBadLines(Property.ofValue(OnBadLines.SKIP))
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
-        CsvToIon.Output output = reader.run(runContext);
+        var runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        var output = reader.run(runContext);
 
-        Counter records = (Counter) runContext.metrics()
+        var records = (Counter) runContext.metrics()
             .stream()
             .filter(metric -> metric.getName().equals("records"))
             .findFirst()
@@ -1039,12 +1039,12 @@ class CsvToIonWriterTest {
             rows = FileSerde.readAll(in).collectList().block();
         }
         assertThat(rows, hasSize(2));
-        assertThat(rows.get(0), is((Object) Map.of("k", "10", "v", "hello\nworld")));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "10", "v", "hello\nworld")));
         assertThat(rows.get(1), is((Object) Map.of("k", "30", "v", "multi\nline\nrecord")));
     }
 
     private List<Object> readSkipping(String csv, boolean header, OnBadLines onBadLines, Integer maxRecordSize) throws Exception {
-        URI src = storageInterface.put(
+        var src = storageInterface.put(
             TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
             new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
         );
@@ -1060,8 +1060,8 @@ class CsvToIonWriterTest {
         }
         var reader = builder.build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
-        CsvToIon.Output output = reader.run(runContext);
+        var runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        var output = reader.run(runContext);
         try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
             return FileSerde.readAll(in).collectList().block();
         }
@@ -1073,7 +1073,7 @@ class CsvToIonWriterTest {
         var rows = readSkipping("1,\"multi\nline\nrecord\"\n2,ok\n", false, OnBadLines.SKIP, null);
 
         assertThat(rows, hasSize(2));
-        assertThat(rows.get(0), is((Object) List.of("1", "multi\nline\nrecord")));
+        assertThat(rows.getFirst(), is((Object) List.of("1", "multi\nline\nrecord")));
         assertThat(rows.get(1), is((Object) List.of("2", "ok")));
     }
 
@@ -1083,7 +1083,7 @@ class CsvToIonWriterTest {
         var rows = readSkipping("k,v\n1,\"123 Main St\nApt 4, Floor 2\nCity\"\n2,\"be\"ta\n3,z\n", true, OnBadLines.WARN, null);
 
         assertThat(rows, hasSize(2));
-        assertThat(rows.get(0), is((Object) Map.of("k", "1", "v", "123 Main St\nApt 4, Floor 2\nCity")));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "123 Main St\nApt 4, Floor 2\nCity")));
         assertThat(rows.get(1), is((Object) Map.of("k", "3", "v", "z")));
     }
 
@@ -1093,7 +1093,7 @@ class CsvToIonWriterTest {
         var rows = readSkipping("v\n\"a\nb\nc\"\nd\n", true, OnBadLines.SKIP, null);
 
         assertThat(rows, hasSize(2));
-        assertThat(rows.get(0), is((Object) Map.of("v", "a\nb\nc")));
+        assertThat(rows.getFirst(), is((Object) Map.of("v", "a\nb\nc")));
         assertThat(rows.get(1), is((Object) Map.of("v", "d")));
     }
 
@@ -1103,7 +1103,7 @@ class CsvToIonWriterTest {
         var rows = readSkipping("a,b,\n1,x,\n2,\"bad,\n3,y,\n4,z,\n", true, OnBadLines.SKIP, null);
 
         assertThat(rows, hasSize(3));
-        assertThat(rows.get(0), is((Object) Map.of("a", "1", "b", "x")));
+        assertThat(rows.getFirst(), is((Object) Map.of("a", "1", "b", "x")));
         assertThat(rows.get(1), is((Object) Map.of("a", "3", "b", "y")));
         assertThat(rows.get(2), is((Object) Map.of("a", "4", "b", "z")));
     }
@@ -1114,7 +1114,7 @@ class CsvToIonWriterTest {
         var rows = readSkipping("k,v\n1,a\n2," + "x".repeat(5000) + "\n3,c\n", true, OnBadLines.SKIP, 1000);
 
         assertThat(rows, hasSize(2));
-        assertThat(rows.get(0), is((Object) Map.of("k", "1", "v", "a")));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "a")));
         assertThat(rows.get(1), is((Object) Map.of("k", "3", "v", "c")));
     }
 
@@ -1130,6 +1130,96 @@ class CsvToIonWriterTest {
         assertThat(rows, hasSize(20000));
     }
 
+    private List<Object> readRows(String csv, boolean header, OnBadLines onBadLines, int skipRows, Integer maxFieldSize) throws Exception {
+        var src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        var builder = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(header))
+            .skipEmptyRows(Property.ofValue(false))
+            .skipRows(Property.ofValue(skipRows))
+            .onBadLines(Property.ofValue(onBadLines));
+        if (maxFieldSize != null) {
+            builder.maxFieldSize(Property.ofValue(maxFieldSize)).maxRecordSize(Property.ofValue(maxFieldSize * 4));
+        }
+        var reader = builder.build();
+
+        var runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        var output = reader.run(runContext);
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
+            return FileSerde.readAll(in).collectList().block();
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void errorModeKeepsUnclosedQuoteAtEndOfInput() throws Exception {
+        var rows = readRows("k,v\n1,a\n2,\"open", true, OnBadLines.ERROR, 0, null);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "a")));
+        assertThat(rows.getLast(), is((Object) Map.of("k", "2", "v", "open")));
+    }
+
+    @Test
+    @Timeout(30)
+    void crlfInsideQuotedFieldIsPreserved() throws Exception {
+        var csv = "k,v\r\n1,\"a\r\nb\"\r\n2,\"be\"ta\r\n3,c\r\n";
+        var expected = Map.of("k", "1", "v", "a\r\nb");
+
+        assertThat(readRows(csv.replace("2,\"be\"ta\r\n", ""), true, OnBadLines.ERROR, 0, null).getFirst(), is((Object) expected));
+
+        var skip = readRows(csv, true, OnBadLines.SKIP, 0, null);
+        assertThat(skip, hasSize(2));
+        assertThat(skip.getFirst(), is((Object) expected));
+        assertThat(skip.getLast(), is((Object) Map.of("k", "3", "v", "c")));
+    }
+
+    @Test
+    @Timeout(30)
+    void blankLineWithoutHeaderYieldsEmptyRowLikeErrorMode() throws Exception {
+        var csv = "1,a\n\n2,b\n";
+        var error = readRows(csv, false, OnBadLines.ERROR, 0, null);
+
+        assertThat(error, hasSize(3));
+        assertThat(readRows(csv, false, OnBadLines.SKIP, 0, null), is(error));
+        assertThat(readRows(csv, false, OnBadLines.WARN, 0, null), is(error));
+    }
+
+    @Test
+    @Timeout(30)
+    void badPreambleLineCountsTowardSkipRows() throws Exception {
+        var rows = readRows("\"junk\"x\nk,v\n1,a\n", true, OnBadLines.SKIP, 1, null);
+
+        assertThat(rows, hasSize(1));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "a")));
+    }
+
+    @Test
+    @Timeout(30)
+    void goodPreambleLineCountsTowardSkipRows() throws Exception {
+        var rows = readRows("preamble\nk,v\n1,a\n", true, OnBadLines.SKIP, 1, null);
+
+        assertThat(rows, hasSize(1));
+        assertThat(rows.getFirst(), is((Object) Map.of("k", "1", "v", "a")));
+    }
+
+    @Test
+    @Timeout(30)
+    void openQuoteIsBoundedByMaxFieldSize() throws Exception {
+        var csv = "1,a\n2,\"open\n" + "x\n".repeat(2000) + "3,c\n";
+        var rows = readRows(csv, false, OnBadLines.SKIP, 0, 100);
+
+        assertThat(rows, hasSize(2002));
+        assertThat(rows.getFirst(), is((Object) List.of("1", "a")));
+        assertThat(rows.getLast(), is((Object) List.of("3", "c")));
+    }
+
     // runContext.logger() returns a Logback logger from an isolated LoggerContext; attach directly to capture logs.
     private static final class CapturingAppender extends AppenderBase<ILoggingEvent> {
         final List<ILoggingEvent> list = new CopyOnWriteArrayList<>();
@@ -1141,9 +1231,9 @@ class CsvToIonWriterTest {
     }
 
     private static CapturingAppender attachLogCapture(RunContext runContext) {
-        Logger contextLogger = (Logger) runContext.logger();
+        var contextLogger = (Logger) runContext.logger();
         contextLogger.setLevel(Level.DEBUG);
-        CapturingAppender appender = new CapturingAppender();
+        var appender = new CapturingAppender();
         appender.setContext(contextLogger.getLoggerContext());
         appender.start();
         contextLogger.addAppender(appender);
