@@ -23,10 +23,6 @@ import org.apache.avro.io.DatumReader;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.AppenderBase;
 import com.devskiller.friendly_id.FriendlyId;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
@@ -45,6 +41,10 @@ import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.OnBadLines;
 import io.kestra.plugin.serdes.csv.IonToCsv;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import jakarta.inject.Inject;
 
 import static io.kestra.core.utils.Rethrow.throwConsumer;
@@ -323,7 +323,12 @@ class IonToAvroTest {
         try (OutputStream output = new FileOutputStream(tempFile)) {
             List.of(
                 ImmutableMap.of("id", 1, "s", "a"),
-                new HashMap<String, Object>() {{ put("id", null); put("s", "b"); }},
+                new HashMap<String, Object>() {
+                    {
+                        put("id", null);
+                        put("s", "b");
+                    }
+                },
                 ImmutableMap.of("id", 3, "s", "c")
             ).forEach(throwConsumer(row -> FileSerde.write(output, row)));
         }
@@ -621,10 +626,12 @@ class IonToAvroTest {
     private static Map<String, Object> validNestedLogicalRow(int id) {
         Map<String, Object> row = new HashMap<>();
         row.put("id", id);
-        row.put("items", List.of(
-            Map.of("externalId", UUID.randomUUID().toString()),
-            Map.of("externalId", UUID.randomUUID().toString())
-        ));
+        row.put(
+            "items", List.of(
+                Map.of("externalId", UUID.randomUUID().toString()),
+                Map.of("externalId", UUID.randomUUID().toString())
+            )
+        );
         row.put("byKey", Map.of("a", Map.of("eventDate", LocalDate.of(2024, 1, 1))));
         return row;
     }
@@ -675,7 +682,8 @@ class IonToAvroTest {
         try (InputStream inputStream = storageInterface.get(TenantService.MAIN_TENANT, null, uri)) {
             exception = assertThrows(
                 RuntimeException.class,
-                () -> writer.convert(inputStream, schema, record -> {
+                () -> writer.convert(inputStream, schema, record ->
+                {
                     throw new IOException("disk full");
                 }, runContext)
             );

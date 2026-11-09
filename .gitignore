@@ -16,4 +16,3 @@ out/
 .factorypath
 bin/
 *.hprof
-allure-results/

@@ -10,6 +10,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -31,6 +32,10 @@ import io.kestra.plugin.serdes.OnBadLines;
 import io.kestra.plugin.serdes.OnEmptyHeader;
 import io.kestra.plugin.serdes.SerdesUtils;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import de.siegmar.fastcsv.reader.CsvParseException;
 import jakarta.inject.Inject;
 
@@ -971,7 +976,15 @@ class CsvToIonWriterTest {
             .build();
 
         RunContext runContextWarn = TestsUtils.mockRunContext(runContextFactory, readerWarn, ImmutableMap.of());
+        CapturingAppender warnings = attachLogCapture(runContextWarn);
         CsvToIon.Output outputWarn = readerWarn.run(runContextWarn);
+
+        assertThat(
+            warnings.list.stream()
+                .filter(e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("Bad line encountered"))
+                .count(),
+            is(1L)
+        );
 
         Counter recordsWarn = (Counter) runContextWarn.metrics()
             .stream()
@@ -1028,5 +1041,112 @@ class CsvToIonWriterTest {
         assertThat(rows, hasSize(2));
         assertThat(rows.get(0), is((Object) Map.of("k", "10", "v", "hello\nworld")));
         assertThat(rows.get(1), is((Object) Map.of("k", "30", "v", "multi\nline\nrecord")));
+    }
+
+    private List<Object> readSkipping(String csv, boolean header, OnBadLines onBadLines, Integer maxRecordSize) throws Exception {
+        URI src = storageInterface.put(
+            TenantService.MAIN_TENANT, null, URI.create("/" + IdUtils.create() + ".csv"),
+            new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))
+        );
+
+        var builder = CsvToIon.builder()
+            .id(IdUtils.create())
+            .type(CsvToIon.class.getName())
+            .from(Property.ofValue(src.toString()))
+            .header(Property.ofValue(header))
+            .onBadLines(Property.ofValue(onBadLines));
+        if (maxRecordSize != null) {
+            builder.maxFieldSize(Property.ofValue(maxRecordSize)).maxRecordSize(Property.ofValue(maxRecordSize));
+        }
+        var reader = builder.build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of());
+        CsvToIon.Output output = reader.run(runContext);
+        try (InputStream in = storageInterface.get(TenantService.MAIN_TENANT, null, output.getUri())) {
+            return FileSerde.readAll(in).collectList().block();
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void multiLineRecordOfThreeLinesWithoutHeaderIsKept() throws Exception {
+        var rows = readSkipping("1,\"multi\nline\nrecord\"\n2,ok\n", false, OnBadLines.SKIP, null);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) List.of("1", "multi\nline\nrecord")));
+        assertThat(rows.get(1), is((Object) List.of("2", "ok")));
+    }
+
+    @Test
+    @Timeout(30)
+    void multiLineRecordMiddleLineWithHeaderFieldCountIsKept() throws Exception {
+        var rows = readSkipping("k,v\n1,\"123 Main St\nApt 4, Floor 2\nCity\"\n2,\"be\"ta\n3,z\n", true, OnBadLines.WARN, null);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) Map.of("k", "1", "v", "123 Main St\nApt 4, Floor 2\nCity")));
+        assertThat(rows.get(1), is((Object) Map.of("k", "3", "v", "z")));
+    }
+
+    @Test
+    @Timeout(30)
+    void singleColumnMultiLineRecordIsKept() throws Exception {
+        var rows = readSkipping("v\n\"a\nb\nc\"\nd\n", true, OnBadLines.SKIP, null);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) Map.of("v", "a\nb\nc")));
+        assertThat(rows.get(1), is((Object) Map.of("v", "d")));
+    }
+
+    @Test
+    @Timeout(30)
+    void headerEndingWithSeparatorKeepsRowsAfterUnclosedQuote() throws Exception {
+        var rows = readSkipping("a,b,\n1,x,\n2,\"bad,\n3,y,\n4,z,\n", true, OnBadLines.SKIP, null);
+
+        assertThat(rows, hasSize(3));
+        assertThat(rows.get(0), is((Object) Map.of("a", "1", "b", "x")));
+        assertThat(rows.get(1), is((Object) Map.of("a", "3", "b", "y")));
+        assertThat(rows.get(2), is((Object) Map.of("a", "4", "b", "z")));
+    }
+
+    @Test
+    @Timeout(30)
+    void overlongLineIsDroppedAsBadLine() throws Exception {
+        var rows = readSkipping("k,v\n1,a\n2," + "x".repeat(5000) + "\n3,c\n", true, OnBadLines.SKIP, 1000);
+
+        assertThat(rows, hasSize(2));
+        assertThat(rows.get(0), is((Object) Map.of("k", "1", "v", "a")));
+        assertThat(rows.get(1), is((Object) Map.of("k", "3", "v", "c")));
+    }
+
+    @Test
+    @Timeout(30)
+    void longUnclosedQuoteIsLinear() throws Exception {
+        var csv = new StringBuilder("k,v\n0,\"open\n");
+        for (int i = 1; i <= 20000; i++) {
+            csv.append(i).append(",row\n");
+        }
+        var rows = readSkipping(csv.toString(), true, OnBadLines.SKIP, null);
+
+        assertThat(rows, hasSize(20000));
+    }
+
+    // runContext.logger() returns a Logback logger from an isolated LoggerContext; attach directly to capture logs.
+    private static final class CapturingAppender extends AppenderBase<ILoggingEvent> {
+        final List<ILoggingEvent> list = new CopyOnWriteArrayList<>();
+
+        @Override
+        protected void append(ILoggingEvent event) {
+            list.add(event);
+        }
+    }
+
+    private static CapturingAppender attachLogCapture(RunContext runContext) {
+        Logger contextLogger = (Logger) runContext.logger();
+        contextLogger.setLevel(Level.DEBUG);
+        CapturingAppender appender = new CapturingAppender();
+        appender.setContext(contextLogger.getLoggerContext());
+        appender.start();
+        contextLogger.addAppender(appender);
+        return appender;
     }
 }

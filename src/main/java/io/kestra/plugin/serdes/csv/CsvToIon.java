@@ -230,98 +230,30 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
                 CsvReader<CsvRecord> csvReader = this.csvReader(reader, runContext);
                 flowable = Flux.fromIterable(csvReader);
             } else {
-                BufferedReader br = reader instanceof BufferedReader b ? b : new BufferedReader(reader);
-                var builder = this.csvReaderBuilder(runContext);
-                var handler = this.createCsvRecordHandler(runContext);
-                char quote = runContext.render(textDelimiter).as(Character.class).orElse('"');
-                int rMaxFieldSize = runContext.render(maxFieldSize).as(Integer.class).orElse(DEFAULT_MAX_FIELD_SIZE);
-                int rMaxRecordSize = maxRecordSize == null
-                    ? Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize)
-                    : runContext.render(maxRecordSize).as(Integer.class)
-                        .orElse(Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize));
-
-                flowable = Flux.<CsvRecord, StringBuilder>generate(
-                    () -> new StringBuilder(),
-                    (pending, sink) -> {
-                        try {
-                            String line;
-                            while ((line = br.readLine()) != null) {
-                                if (pending.length() > 0) {
-                                    String candidate = pending + "\n" + line;
-                                    try {
-                                        var it = builder.build(handler, new StringReader(candidate)).iterator();
-                                        if (it.hasNext()) {
-                                            pending.setLength(0);
-                                            sink.next(it.next());
-                                            return pending;
-                                        }
-                                    } catch (CsvParseException ignored) {
-                                        try {
-                                            var it = builder.build(handler, new StringReader(line)).iterator();
-                                            if (it.hasNext()) {
-                                                var rec = it.next();
-                                                int expected = effectiveHeaderCount.get();
-                                                if (expected <= 0 || rec.getFieldCount() == expected) {
-                                                    if (rOnBadLinesValue == OnBadLines.WARN) {
-                                                        runContext.logger().warn("Bad line encountered (skipped): unclosed quote");
-                                                    }
-                                                    pending.setLength(0);
-                                                    sink.next(rec);
-                                                    return pending;
-                                                }
-                                            }
-                                        } catch (CsvParseException ignoredAgain) {
-                                            // Neither candidate nor single line parses
-                                        }
-
-                                        if (candidate.length() < rMaxRecordSize) {
-                                            pending.setLength(0);
-                                            pending.append(candidate);
-                                            continue;
-                                        } else {
-                                            if (rOnBadLinesValue == OnBadLines.WARN) {
-                                                runContext.logger().warn("Bad line encountered (skipped): record exceeded maxRecordSize");
-                                            }
-                                            pending.setLength(0);
-                                            continue;
-                                        }
-                                    }
-                                } else {
-                                    try {
-                                        var it = builder.build(handler, new StringReader(line)).iterator();
-                                        if (it.hasNext()) {
-                                            sink.next(it.next());
-                                            return pending;
-                                        }
-                                    } catch (CsvParseException e) {
-                                        int q = 0;
-                                        for (int i = 0; i < line.length(); i++) {
-                                            if (line.charAt(i) == quote) q++;
-                                        }
-                                        if (q % 2 != 0 && line.length() < rMaxRecordSize) {
-                                            pending.append(line);
-                                            continue;
-                                        }
-                                        if (rOnBadLinesValue == OnBadLines.WARN) {
-                                            runContext.logger().warn("Bad line encountered (skipped): {}", e.getMessage());
-                                        }
-                                    }
-                                }
-                            }
-                            if (pending.length() > 0) {
-                                if (rOnBadLinesValue == OnBadLines.WARN) {
-                                    runContext.logger().warn("Bad line encountered (skipped): Unclosed quoted field at end of input");
-                                }
-                                pending.setLength(0);
-                            }
-                            sink.complete();
-                        } catch (Exception e) {
-                            sink.error(e);
-                        }
-                        return pending;
-                    },
-                    pending -> pending.setLength(0)
+                var lenient = new LenientRecordReader(
+                    reader instanceof BufferedReader b ? b : new BufferedReader(reader),
+                    this.csvReaderBuilder(runContext),
+                    this.createCsvRecordHandler(runContext),
+                    this.renderQuote(runContext),
+                    this.renderSeparator(runContext),
+                    runContext.render(allowExtraCharsAfterClosingQuote).as(Boolean.class).orElse(false),
+                    this.renderMaxRecordSize(runContext),
+                    rOnBadLinesValue == OnBadLines.WARN ? runContext.logger() : null
                 );
+
+                flowable = Flux.<CsvRecord> generate(sink ->
+                {
+                    try {
+                        var next = lenient.next();
+                        if (next == null) {
+                            sink.complete();
+                        } else {
+                            sink.next(next);
+                        }
+                    } catch (Exception e) {
+                        sink.error(e);
+                    }
+                });
             }
 
             Mono<Long> count = FileSerde.writeAll(
@@ -471,11 +403,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
     private CsvReader.CsvReaderBuilder csvReaderBuilder(RunContext runContext) throws IllegalVariableEvaluationException {
         var builder = CsvReader.builder();
 
-        runContext.render(textDelimiter).as(Character.class)
-            .ifPresent(builder::quoteCharacter);
-
-        runContext.render(fieldSeparator).as(Character.class)
-            .ifPresent(builder::fieldSeparator);
+        builder.quoteCharacter(renderQuote(runContext));
+        builder.fieldSeparator(renderSeparator(runContext));
 
         runContext.render(skipEmptyRows).as(Boolean.class)
             .ifPresent(builder::skipEmptyLines);
@@ -495,11 +424,8 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
 
     private de.siegmar.fastcsv.reader.CsvRecordHandler createCsvRecordHandler(RunContext runContext) throws IllegalVariableEvaluationException {
         var handlerBuilder = de.siegmar.fastcsv.reader.CsvRecordHandler.builder();
-        int rMaxFieldSize = runContext.render(maxFieldSize).as(Integer.class).orElse(DEFAULT_MAX_FIELD_SIZE);
-        int rMaxRecordSize = maxRecordSize == null
-            ? Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize)
-            : runContext.render(maxRecordSize).as(Integer.class)
-                .orElse(Math.max(DEFAULT_MAX_RECORD_SIZE, rMaxFieldSize));
+        var rMaxFieldSize = renderMaxFieldSize(runContext);
+        var rMaxRecordSize = renderMaxRecordSize(runContext);
 
         if (rMaxRecordSize < rMaxFieldSize) {
             throw new IllegalArgumentException(
@@ -511,6 +437,204 @@ public class CsvToIon extends Task implements RunnableTask<CsvToIon.Output> {
         handlerBuilder.maxRecordSize(rMaxRecordSize);
 
         return handlerBuilder.build();
+    }
+
+    private char renderQuote(RunContext runContext) throws IllegalVariableEvaluationException {
+        return runContext.render(textDelimiter).as(Character.class).orElse('"');
+    }
+
+    private char renderSeparator(RunContext runContext) throws IllegalVariableEvaluationException {
+        return runContext.render(fieldSeparator).as(Character.class).orElse(',');
+    }
+
+    private int renderMaxFieldSize(RunContext runContext) throws IllegalVariableEvaluationException {
+        return runContext.render(maxFieldSize).as(Integer.class).orElse(DEFAULT_MAX_FIELD_SIZE);
+    }
+
+    private int renderMaxRecordSize(RunContext runContext) throws IllegalVariableEvaluationException {
+        var defaultSize = Math.max(DEFAULT_MAX_RECORD_SIZE, renderMaxFieldSize(runContext));
+        return maxRecordSize == null ? defaultSize : runContext.render(maxRecordSize).as(Integer.class).orElse(defaultSize);
+    }
+
+    /**
+     * Reads CSV records for {@code onBadLines} SKIP and WARN. FastCSV does not advance after a parse error,
+     * so records are cut here from bounded physical lines. A record continues on the next line only while a
+     * quoted field is still open. A record that is malformed, never closes, or exceeds {@code maxRecordSize}
+     * drops its first physical line only; the following lines are read again as new records.
+     */
+    private static final class LenientRecordReader {
+        private enum State {
+            FIELD_START,
+            UNQUOTED,
+            QUOTED,
+            AFTER_QUOTE,
+            INVALID
+        }
+
+        private static final String OVERLONG = new String("");
+
+        private final BufferedReader reader;
+        private final CsvReader.CsvReaderBuilder builder;
+        private final de.siegmar.fastcsv.reader.CsvRecordHandler handler;
+        private final char quote;
+        private final char separator;
+        private final boolean allowExtraAfterQuote;
+        private final int maxRecordSize;
+        private final org.slf4j.Logger warnLogger;
+        private final ArrayDeque<String> replay = new ArrayDeque<>();
+
+        private LenientRecordReader(
+            BufferedReader reader,
+            CsvReader.CsvReaderBuilder builder,
+            de.siegmar.fastcsv.reader.CsvRecordHandler handler,
+            char quote,
+            char separator,
+            boolean allowExtraAfterQuote,
+            int maxRecordSize,
+            org.slf4j.Logger warnLogger) {
+            this.reader = reader;
+            this.builder = builder;
+            this.handler = handler;
+            this.quote = quote;
+            this.separator = separator;
+            this.allowExtraAfterQuote = allowExtraAfterQuote;
+            this.maxRecordSize = maxRecordSize;
+            this.warnLogger = warnLogger;
+        }
+
+        CsvRecord next() throws IOException {
+            while (true) {
+                var first = nextLine();
+                if (first == null) {
+                    return null;
+                }
+                if (first == OVERLONG) {
+                    bad("line exceeded maxRecordSize");
+                    continue;
+                }
+
+                var record = new StringBuilder(first);
+                var used = new ArrayList<String>();
+                used.add(first);
+                var state = scan(State.FIELD_START, first);
+                String failure = state == State.INVALID ? "unexpected character after closing quote" : null;
+
+                while (failure == null && state == State.QUOTED) {
+                    var line = nextLine();
+                    if (line == null) {
+                        failure = "unclosed quoted field";
+                    } else if (line == OVERLONG) {
+                        failure = "line exceeded maxRecordSize";
+                    } else {
+                        used.add(line);
+                        record.append('\n').append(line);
+                        if (record.length() > maxRecordSize) {
+                            failure = "record exceeded maxRecordSize";
+                        } else {
+                            state = scan(state, line);
+                            if (state == State.INVALID) {
+                                failure = "unexpected character after closing quote";
+                            }
+                        }
+                    }
+                }
+
+                if (failure != null) {
+                    bad(failure);
+                    for (int i = used.size() - 1; i >= 1; i--) {
+                        replay.addFirst(used.get(i));
+                    }
+                    continue;
+                }
+
+                try {
+                    var iterator = builder.build(handler, new StringReader(record.toString())).iterator();
+                    if (iterator.hasNext()) {
+                        return iterator.next();
+                    }
+                } catch (CsvParseException e) {
+                    bad(e.getMessage());
+                }
+            }
+        }
+
+        private State scan(State start, String line) {
+            var state = start;
+            for (int i = 0; i < line.length(); i++) {
+                var ch = line.charAt(i);
+                switch (state) {
+                    case FIELD_START -> {
+                        if (ch == quote) {
+                            state = State.QUOTED;
+                        } else if (ch != separator) {
+                            state = State.UNQUOTED;
+                        }
+                    }
+                    case UNQUOTED -> {
+                        if (ch == separator) {
+                            state = State.FIELD_START;
+                        }
+                    }
+                    case QUOTED -> {
+                        if (ch == quote) {
+                            state = State.AFTER_QUOTE;
+                        }
+                    }
+                    case AFTER_QUOTE -> {
+                        if (ch == quote) {
+                            state = State.QUOTED;
+                        } else if (ch == separator) {
+                            state = State.FIELD_START;
+                        } else {
+                            state = allowExtraAfterQuote ? State.UNQUOTED : State.INVALID;
+                        }
+                    }
+                    case INVALID -> {
+                        return state;
+                    }
+                }
+            }
+            return state;
+        }
+
+        /** Returns the next physical line, {@code null} at end of input, or {@link #OVERLONG} when it exceeds the limit. */
+        private String nextLine() throws IOException {
+            if (!replay.isEmpty()) {
+                return replay.pollFirst();
+            }
+            var line = new StringBuilder();
+            var overlong = false;
+            var any = false;
+            int c;
+            while ((c = reader.read()) != -1) {
+                any = true;
+                if (c == '\n') {
+                    break;
+                }
+                if (c == '\r') {
+                    reader.mark(1);
+                    if (reader.read() != '\n') {
+                        reader.reset();
+                    }
+                    break;
+                }
+                if (line.length() >= maxRecordSize) {
+                    overlong = true;
+                } else {
+                    line.append((char) c);
+                }
+            }
+            if (!any) {
+                return null;
+            }
+            return overlong ? OVERLONG : line.toString();
+        }
+
+        private void bad(String reason) {
+            if (warnLogger != null) {
+                warnLogger.warn("Bad line encountered (skipped): {}", reason);
+            }
+        }
     }
 
     private CsvReader<CsvRecord> csvReader(Reader reader, RunContext runContext) throws IllegalVariableEvaluationException {

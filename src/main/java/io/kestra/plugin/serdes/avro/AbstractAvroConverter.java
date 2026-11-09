@@ -223,7 +223,8 @@ public abstract class AbstractAvroConverter extends Task {
             var invalidField = firstNonNullableFieldHoldingNull(datum);
             if (invalidField != null) {
                 if (rOnBadLines == OnBadLines.WARN) {
-                    runContext.logger().warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), describeRecord(datum));
+                    runContext.logger()
+                        .warn("Bad record skipped (onBadLines=WARN): field '{}' of schema '{}' is null but not nullable: {}", invalidField, datum.getSchema().getName(), describeRecord(datum));
                 } else {
                     skippedRecordCallback.run();
                 }

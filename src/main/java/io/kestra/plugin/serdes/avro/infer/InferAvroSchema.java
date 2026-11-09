@@ -317,7 +317,8 @@ public class InferAvroSchema {
                 false,
                 // Recreate fields to reset position; carry over aliases so
                 // AvroConverter can still look up values by the original Ion key.
-                mergedFields.stream().map(field -> {
+                mergedFields.stream().map(field ->
+                {
                     var rebuilt = new Field(field.name(), field.schema());
                     field.aliases().forEach(rebuilt::addAlias);
                     return rebuilt;
