@@ -168,6 +168,12 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
         private long size;
     }
 
+    // Decimal128's largest adjusted exponent, used as the limit in both directions. A number written with an
+    // exponent whose adjusted exponent is past it stays a string, because consumers that call toPlainString()
+    // expand a few bytes like 1e999999999 into a 1 GB string. Zero only expands to the right. JsonToToon writes
+    // numbers past it with an exponent for the same reason
+    static final long MAX_NUMBER_EXPONENT = 6144;
+
     /**
      * TOON 3.0 parser for the subset emitted by JsonToToon.
      * <p>
@@ -191,11 +197,6 @@ public class ToonToJson extends Task implements RunnableTask<ToonToJson.Output> 
         private static final Pattern KEY_ARRAY_PATTERN = Pattern.compile(
             "^(%1$s|[^\"]*?)\\[(\\d+)](?:\\{([^}\"]*+(?:%1$s[^}\"]*+)*+)})?$".formatted(QUOTED_STRING)
         );
-
-        // Decimal128's largest adjusted exponent, used as the limit in both directions. A number written with an
-        // exponent whose adjusted exponent is past it stays a string, because consumers that call toPlainString(),
-        // like JsonToToon, expand a few bytes like 1e999999999 into a 1 GB string. Zero only expands to the right
-        private static final long MAX_NUMBER_EXPONENT = 6144;
 
         private static final Pattern JSON_NUMBER = Pattern.compile("-?(?:0|[1-9]\\d*)(?:\\.\\d+)?([eE][+-]?\\d+)?");
 
