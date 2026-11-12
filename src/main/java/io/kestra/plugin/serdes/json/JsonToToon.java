@@ -1,7 +1,6 @@
 package io.kestra.plugin.serdes.json;
 
 import java.io.*;
-import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +10,7 @@ import java.util.TimeZone;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -98,6 +98,7 @@ import lombok.experimental.SuperBuilder;
 )
 public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> {
     private static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofJson().copy()
+        .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
         .setSerializationInclusion(JsonInclude.Include.ALWAYS)
         .setTimeZone(TimeZone.getDefault());
@@ -184,7 +185,7 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
      * - Root arrays use headers: [N]: ... or [N]{fields}: ...
      * - Root objects use regular key: value lines.
      * - Root primitives use a single primitive line.
-     * - Numbers are emitted in canonical decimal form without exponent.
+     * - Numbers are emitted in canonical decimal form without exponent, unless that form would be too long.
      * - Strings follow TOON 3.0 quoting rules.
      * - Arrays of uniform objects are rendered in tabular form when applicable.
      * - Mixed arrays are rendered as list arrays with "- " items.
@@ -637,25 +638,23 @@ public class JsonToToon extends Task implements RunnableTask<JsonToToon.Output> 
 
         /**
          * Canonical number formatting:
-         * - no exponent
+         * - no exponent, unless the adjusted exponent is past ToonToJson.MAX_NUMBER_EXPONENT
          * - no unnecessary trailing zeros
          * - -0 normalized to 0
          */
         private String formatNumber(JsonNode node) {
-            BigDecimal dec = node.decimalValue();
+            var dec = node.decimalValue().stripTrailingZeros();
 
-            if (dec.compareTo(BigDecimal.ZERO) == 0) {
+            if (dec.signum() == 0) {
                 return "0";
             }
 
-            String s = dec.stripTrailingZeros().toPlainString();
-
-            // Ensure "-0" variants are normalized to "0"
-            if (s.equals("-0")) {
-                return "0";
+            var adjustedExponent = (long) dec.precision() - dec.scale() - 1;
+            if (Math.abs(adjustedExponent) > ToonToJson.MAX_NUMBER_EXPONENT) {
+                return dec.toString();
             }
 
-            return s;
+            return dec.toPlainString();
         }
 
         /**

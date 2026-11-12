@@ -16,6 +16,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 
@@ -323,6 +324,107 @@ class JsonToToonTest {
         String result = readResult(jsonOutput.getUri());
         var mapper = new ObjectMapper();
         assertThat(mapper.readTree(result), is(mapper.readTree(json)));
+    }
+
+    private String toToon(String json) throws Exception {
+        var temp = File.createTempFile("numbers_", ".json");
+        try (var w = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            w.write(json);
+        }
+        return readResult(convert(temp).getUri()).trim();
+    }
+
+    @Test
+    void numbersPastDoubleRange() throws Exception {
+        var result = toToon("""
+            {"big": 1e400, "negative": -1.8e308, "edge": 1E+6144}
+            """);
+
+        assertThat(
+            result, is(
+                String.join(
+                    "\n",
+                    "big: 1" + "0".repeat(400),
+                    "negative: -18" + "0".repeat(307),
+                    "edge: 1" + "0".repeat(6144)
+                )
+            )
+        );
+    }
+
+    @Test
+    void smallAndLongDecimalsKeepTheirDigits() throws Exception {
+        var result = toToon("""
+            {"tiny": 1e-400, "precise": 0.12345678901234567890123, "negativeZero": -0.0}
+            """);
+
+        assertThat(
+            result, is(
+                String.join(
+                    "\n",
+                    "tiny: 0." + "0".repeat(399) + "1",
+                    "precise: 0.12345678901234567890123",
+                    "negativeZero: 0"
+                )
+            )
+        );
+    }
+
+    @Test
+    void numbersPastTheExponentLimitKeepAnExponent() throws Exception {
+        var result = toToon("""
+            {"far": 1e999999999, "tinyFar": -2.5e-6146}
+            """);
+
+        assertThat(
+            result, is(
+                String.join(
+                    "\n",
+                    "far: 1E+999999999",
+                    "tinyFar: -2.5E-6146"
+                )
+            )
+        );
+    }
+
+    @Test
+    void roundTripToonNumbersThroughJson() throws Exception {
+        var toon = """
+            small: 1e30
+            big: 1e400
+            tiny: 1e-400
+            precise: 0.12345678901234567890123
+            """;
+        var toonFile = File.createTempFile("numbers_", ".toon");
+        try (var w = new FileWriter(toonFile, StandardCharsets.UTF_8)) {
+            w.write(toon);
+        }
+
+        var toonToJson = ToonToJson.builder()
+            .id(IdUtils.create())
+            .type(ToonToJson.class.getName())
+            .from(Property.ofValue(this.serdesUtils.resourceToStorageObject(toonFile).toString()))
+            .build();
+        var jsonOutput = toonToJson.run(TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of()));
+
+        var jsonToToon = JsonToToon.builder()
+            .id(IdUtils.create())
+            .type(JsonToToon.class.getName())
+            .from(Property.ofValue(jsonOutput.getUri().toString()))
+            .build();
+        var toonOutput = jsonToToon.run(TestsUtils.mockRunContext(this.runContextFactory, jsonToToon, ImmutableMap.of()));
+
+        assertThat(
+            readResult(toonOutput.getUri()).trim(), is(
+                String.join(
+                    "\n",
+                    "small: 1" + "0".repeat(30),
+                    "big: 1" + "0".repeat(400),
+                    "tiny: 0." + "0".repeat(399) + "1",
+                    "precise: 0.12345678901234567890123"
+                )
+            )
+        );
     }
 
     @Test
