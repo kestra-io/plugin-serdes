@@ -16,6 +16,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.serdes.SerdesUtils;
 
@@ -400,14 +401,14 @@ class JsonToToonTest {
         }
 
         var toonToJson = ToonToJson.builder()
-            .id(ToonToJson.class.getSimpleName())
+            .id(IdUtils.create())
             .type(ToonToJson.class.getName())
             .from(Property.ofValue(this.serdesUtils.resourceToStorageObject(toonFile).toString()))
             .build();
         var jsonOutput = toonToJson.run(TestsUtils.mockRunContext(this.runContextFactory, toonToJson, ImmutableMap.of()));
 
         var jsonToToon = JsonToToon.builder()
-            .id(JsonToToon.class.getSimpleName())
+            .id(IdUtils.create())
             .type(JsonToToon.class.getName())
             .from(Property.ofValue(jsonOutput.getUri().toString()))
             .build();
