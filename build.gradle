@@ -126,6 +126,8 @@ configurations.configureEach {
     resolutionStrategy.force 'com.fasterxml.jackson.core:jackson-databind:2.22.4',
         'com.fasterxml.jackson.core:jackson-core:2.22.4',
         'org.jsoup:jsoup:1.24.1'
+    // SEC-0370: snappy-java comes via parquet-hadoop and hadoop-common, remove once the Kestra platform ships >= 1.1.10.9.
+    resolutionStrategy.force 'org.xerial.snappy:snappy-java:1.1.10.9'
     // Platform BOM pins jetty 12.0.31 (CVE-affected). servlet/webapp stay on 9.4 since 12.0 has no such modules.
     resolutionStrategy.eachDependency { details ->
         if (details.requested.group == 'org.eclipse.jetty' && !details.requested.name.matches('jetty-(servlet|webapp)')) {
