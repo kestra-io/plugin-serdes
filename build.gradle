@@ -69,7 +69,7 @@ dependencies {
     implementation "com.google.protobuf:protobuf-java:4.36.2"
     implementation "com.google.protobuf:protobuf-java-util:4.36.2"
 
-    implementation 'de.siegmar:fastcsv:4.4.0'
+    implementation 'de.siegmar:fastcsv:4.4.1'
     implementation 'commons-io:commons-io' // for BOMInputStream
     implementation ('org.apache.avro:avro:1.12.2') {
         exclude group: 'com.fasterxml.jackson.core'
@@ -123,8 +123,8 @@ dependencies {
 configurations.configureEach {
     exclude group: "org.apache.hadoop", module: "hadoop-client"
     // Jackson 2 is pinned by enforcedPlatform (a strict constraint conflicts), so it must be forced.
-    resolutionStrategy.force 'com.fasterxml.jackson.core:jackson-databind:2.22.4',
-        'com.fasterxml.jackson.core:jackson-core:2.22.4',
+    resolutionStrategy.force 'com.fasterxml.jackson.core:jackson-databind:2.23.0',
+        'com.fasterxml.jackson.core:jackson-core:2.23.0',
         'org.jsoup:jsoup:1.24.1'
     // SEC-0370: snappy-java comes via parquet-hadoop and hadoop-common, remove once the Kestra platform ships >= 1.1.10.9.
     resolutionStrategy.force 'org.xerial.snappy:snappy-java:1.1.10.12'
