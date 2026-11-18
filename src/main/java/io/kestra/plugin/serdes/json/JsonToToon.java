@@ -80,7 +80,7 @@ import lombok.experimental.SuperBuilder;
                     provider:
                       type: io.kestra.plugin.ai.provider.GoogleGemini
                       apiKey: "{{ kv('GOOGLE_API_KEY') }}"
-                      modelName: gemini-2.5-flash
+                      modelName: gemini-3.8-flash
                     messages:
                       - type: SYSTEM
                         content: You are an assistant that summarizes data.
