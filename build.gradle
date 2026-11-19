@@ -100,6 +100,8 @@ dependencies {
     implementation("org.apache.hadoop:hadoop-mapreduce-client-core:3.5.0") {
         exclude group: "org.slf4j"
         exclude group: "com.fasterxml.jackson.core"
+        // SEC-2111: jline 3.9.0 (jline-remote-telnet CVE-2026-56740/56741) comes via hadoop-yarn-client, only used by the YARN CLI.
+        exclude group: "org.jline"
     }
     implementation group: 'org.json', name: 'json', version: '20260814'
 
