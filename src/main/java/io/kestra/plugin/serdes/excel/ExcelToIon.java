@@ -163,7 +163,7 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                 var rowIterator = sheet.rowIterator();
 
                 var headers = new ArrayList<>();
-                var firstColNum = 0;
+                final var firstColNum = 0;
                 var lastColNum = -1;
 
                 if (renderedHeader && rowIterator.hasNext()) {
@@ -175,7 +175,6 @@ public class ExcelToIon extends Task implements RunnableTask<ExcelToIon.Output> 
                     }
 
                     if (headerRow != null) {
-                        firstColNum = headerRow.getFirstCellNum();
                         lastColNum = headerRow.getLastCellNum();
                         for (int i = firstColNum; i < lastColNum; i++) {
                             var cell = headerRow.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
