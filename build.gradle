@@ -74,7 +74,7 @@ dependencies {
     implementation ('org.apache.avro:avro:1.12.2') {
         exclude group: 'com.fasterxml.jackson.core'
     }
-    implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.18.1'
+    implementation group: 'org.apache.parquet', name: 'parquet-avro', version: '1.18.2'
     implementation group: 'org.apache.poi', name: 'poi', version: '6.0.0'
     implementation group: 'org.apache.poi', name: 'poi-ooxml', version: '6.0.0'
     implementation group: 'com.github.pjfanning', name: 'excel-streaming-reader', version: '5.3.0'
@@ -111,7 +111,7 @@ dependencies {
     implementation "org.jsoup:jsoup:1.24.1" // for HTML parsing (required by flexmark-html2md-converter)
 
     implementation 'com.networknt:json-schema-validator' // version managed by the Kestra platform BOM
-    implementation 'org.jruby.joni:joni:2.2.9' // ECMA-262 regex for JSON Schema "pattern"
+    implementation 'org.jruby.joni:joni:2.2.10' // ECMA-262 regex for JSON Schema "pattern"
 
     // Security: the platform BOM pins Jackson 2.22.1 and (via json-schema-validator) Jackson 3.1.4, which are
     // affected by the databind and core async parser advisories. Force the patched releases until the platform ships them.
@@ -190,7 +190,7 @@ dependencies {
 dependencies {
     testImplementation enforcedPlatform("io.kestra:platform:$kestraVersion")
     // io.kestra:platform no longer manages allure's version as of Kestra 2.0, so pin it explicitly.
-    testImplementation "io.qameta.allure:allure-junit5:2.35.5"
+    testImplementation "io.qameta.allure:allure-junit5:2.35.6"
 }
 
 /**********************************************************************************************************************\
