@@ -431,6 +431,39 @@ public class ExcelToIonTest {
     }
 
     @Test
+    void emptyLeadingHeaderCellKeepsLeadingColumns() throws Exception {
+        var sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("Sheet1");
+            var headerRow = sheet.createRow(0);
+            headerRow.createCell(1).setCellValue("b");
+            headerRow.createCell(2).setCellValue("c");
+
+            var dataRow = sheet.createRow(1);
+            dataRow.createCell(0).setCellValue(1);
+            dataRow.createCell(1).setCellValue(2);
+            dataRow.createCell(2).setCellValue(3);
+
+            try (var out = new FileOutputStream(sourceFile)) {
+                workbook.write(out);
+            }
+        }
+
+        var source = this.serdesUtils.resourceToStorageObject(sourceFile);
+
+        var reader = ExcelToIon.builder()
+            .id(ExcelToIonTest.class.getSimpleName())
+            .type(ExcelToIon.class.getName())
+            .from(Property.ofValue(source.toString()))
+            .header(Property.ofValue(true))
+            .build();
+        var ionOutput = reader.run(TestsUtils.mockRunContext(runContextFactory, reader, ImmutableMap.of()));
+
+        var out = ionToText(storageInterface.get(TenantService.MAIN_TENANT, null, ionOutput.getUris().get("Sheet1")));
+        assertThat(out, is("$ion_1_0 {Column0:1e0,b:2e0,c:3e0}"));
+    }
+
+    @Test
     void skipRowsWithoutHeaderSkipsLeadingRows() throws Exception {
         var sourceFile = File.createTempFile(this.getClass().getSimpleName().toLowerCase() + "_", ".xlsx");
         try (var workbook = new XSSFWorkbook()) {
