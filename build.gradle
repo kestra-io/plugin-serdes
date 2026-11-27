@@ -39,7 +39,7 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add("-parameters")
 }
 
-ext.ionVersion = '1.12.1'
+ext.ionVersion = '1.12.2'
 
 dependencies {
     // Platform
@@ -111,7 +111,7 @@ dependencies {
     implementation "org.jsoup:jsoup:1.24.1" // for HTML parsing (required by flexmark-html2md-converter)
 
     implementation 'com.networknt:json-schema-validator' // version managed by the Kestra platform BOM
-    implementation 'org.jruby.joni:joni:2.2.10' // ECMA-262 regex for JSON Schema "pattern"
+    implementation 'org.jruby.joni:joni:2.2.12' // ECMA-262 regex for JSON Schema "pattern"
 
     // Security: the platform BOM pins Jackson 2.22.1 and (via json-schema-validator) Jackson 3.1.4, which are
     // affected by the databind and core async parser advisories. Force the patched releases until the platform ships them.
